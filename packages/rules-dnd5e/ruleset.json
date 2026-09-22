@@ -1,0 +1,342 @@
+{
+  "id": "dnd5e-srd",
+  "name": "D&D 5e (SRD)",
+  "version": "1.0.0",
+  "system": "dnd5e",
+  "description": "SRD-safe ability checks, skills, saves, and DC guidance for 5th Edition.",
+  "abilities": [
+    {
+      "id": "strength",
+      "abbr": "STR",
+      "name": "Strength",
+      "used_for": [
+        "Athletic feats of power",
+        "Breaking, lifting, forcing open",
+        "Jumping and climbing when contested by force"
+      ]
+    },
+    {
+      "id": "dexterity",
+      "abbr": "DEX",
+      "name": "Dexterity",
+      "used_for": [
+        "Balance, agility, reflexes",
+        "Stealth and sleight of hand",
+        "Initiative, ranged attacks, AC (light/medium)"
+      ]
+    },
+    {
+      "id": "constitution",
+      "abbr": "CON",
+      "name": "Constitution",
+      "used_for": [
+        "Endurance and stamina",
+        "Holding breath, resisting poison",
+        "Concentration saves for spells"
+      ]
+    },
+    {
+      "id": "intelligence",
+      "abbr": "INT",
+      "name": "Intelligence",
+      "used_for": [
+        "Recall lore and reason through puzzles",
+        "Investigate clues and analyze evidence"
+      ]
+    },
+    {
+      "id": "wisdom",
+      "abbr": "WIS",
+      "name": "Wisdom",
+      "used_for": [
+        "Notice and intuition",
+        "Animal handling, insight, survival",
+        "Perception and medicine"
+      ]
+    },
+    {
+      "id": "charisma",
+      "abbr": "CHA",
+      "name": "Charisma",
+      "used_for": [
+        "Social influence and performance",
+        "Deception, intimidation, persuasion"
+      ]
+    }
+  ],
+  "skills": [
+    { "id": "acrobatics", "name": "Acrobatics", "ability": "dexterity", "examples": ["Stay upright on a tossing deck", "Tumble through enemies", "Perform a stunt"] },
+    { "id": "animal_handling", "name": "Animal Handling", "ability": "wisdom", "examples": ["Calm a mount", "Intuit an animal's intentions"] },
+    { "id": "arcana", "name": "Arcana", "ability": "intelligence", "examples": ["Recall lore about spells or magic items", "Identify a magical effect"] },
+    { "id": "athletics", "name": "Athletics", "ability": "strength", "examples": ["Climb a sheer cliff", "Swim against a current", "Grapple"] },
+    { "id": "deception", "name": "Deception", "ability": "charisma", "examples": ["Tell a convincing lie", "Wear a disguise socially"] },
+    { "id": "history", "name": "History", "ability": "intelligence", "examples": ["Recall historical events", "Identify a legendary figure"] },
+    { "id": "insight", "name": "Insight", "ability": "wisdom", "examples": ["Sense a creature's motives", "Detect a lie"] },
+    { "id": "intimidation", "name": "Intimidation", "ability": "charisma", "examples": ["Threaten a prisoner", "Cow a crowd"] },
+    { "id": "investigation", "name": "Investigation", "ability": "intelligence", "examples": ["Deduce from clues", "Find a hidden compartment by searching carefully"] },
+    { "id": "medicine", "name": "Medicine", "ability": "wisdom", "examples": ["Stabilize a dying creature", "Diagnose an illness"] },
+    { "id": "nature", "name": "Nature", "ability": "intelligence", "examples": ["Recall lore about terrain, plants, animals"] },
+    { "id": "perception", "name": "Perception", "ability": "wisdom", "examples": ["Spot a hidden creature", "Hear a whisper", "Notice a trap"] },
+    { "id": "performance", "name": "Performance", "ability": "charisma", "examples": ["Entertain an audience", "Distract with a song"] },
+    { "id": "persuasion", "name": "Persuasion", "ability": "charisma", "examples": ["Negotiate terms", "Convince a guard"] },
+    { "id": "religion", "name": "Religion", "ability": "intelligence", "examples": ["Recall lore about deities and rites"] },
+    { "id": "sleight_of_hand", "name": "Sleight of Hand", "ability": "dexterity", "examples": ["Pick a pocket", "Plant an object", "Conceal a weapon"] },
+    { "id": "stealth", "name": "Stealth", "ability": "dexterity", "examples": ["Hide from enemies", "Sneak past a sentry"] },
+    { "id": "survival", "name": "Survival", "ability": "wisdom", "examples": ["Track creatures", "Forage", "Avoid natural hazards"] }
+  ],
+  "saves": [
+    { "id": "strength", "ability": "strength", "examples": ["Resist being pushed or knocked prone by force"] },
+    { "id": "dexterity", "ability": "dexterity", "examples": ["Dodge a fireball or trap", "Reduce falling damage via agility"] },
+    { "id": "constitution", "ability": "constitution", "examples": ["Resist poison", "Maintain concentration"] },
+    { "id": "intelligence", "ability": "intelligence", "examples": ["Resist psychic probing or illusions tied to intellect"] },
+    { "id": "wisdom", "ability": "wisdom", "examples": ["Resist charm, fear, or mental domination"] },
+    { "id": "charisma", "ability": "charisma", "examples": ["Resist possession or banishment effects"] }
+  ],
+  "dc_bands": [
+    { "label": "Very Easy", "dc": 5, "when": "Trivial for competent adventurers" },
+    { "label": "Easy", "dc": 10, "when": "Simple task with mild risk of failure" },
+    { "label": "Medium", "dc": 15, "when": "Standard adventuring challenge" },
+    { "label": "Hard", "dc": 20, "when": "Requires notable skill or luck" },
+    { "label": "Very Hard", "dc": 25, "when": "Heroic difficulty" },
+    { "label": "Nearly Impossible", "dc": 30, "when": "Legendary feat" }
+  ],
+  "check_guidance": [
+    {
+      "keywords": ["sneak", "sneaks", "sneaking", "hide", "hides", "stealth", "quietly", "unseen", "sneak past", "sneaks past"],
+      "check_type": "skill",
+      "skill": "stealth",
+      "ability": "dexterity",
+      "suggested_dc": 15,
+      "notes": "Contested by passive Perception or active Perception if searching."
+    },
+    {
+      "keywords": ["climb", "swim", "jump", "grapple", "grapples", "shove", "shoves", "lift", "break down", "force open"],
+      "check_type": "skill",
+      "skill": "athletics",
+      "ability": "strength",
+      "suggested_dc": 15,
+      "notes": "Use Athletics for force-based movement and grappling. Grapple/shove are often contested by Athletics or Acrobatics."
+    },
+    {
+      "keywords": ["balance", "tumble", "flip", "land on feet", "tightrope"],
+      "check_type": "skill",
+      "skill": "acrobatics",
+      "ability": "dexterity",
+      "suggested_dc": 15,
+      "notes": "Prefer Acrobatics over Athletics when agility matters more than power."
+    },
+    {
+      "keywords": ["lie", "lies", "bluff", "bluffs", "disguise", "deceive", "deceives", "feint socially", "pretend"],
+      "check_type": "skill",
+      "skill": "deception",
+      "ability": "charisma",
+      "suggested_dc": 15,
+      "notes": "Often contested by Insight."
+    },
+    {
+      "keywords": [
+        "convince", "convinces", "negotiate", "negotiates", "persuade", "persuades",
+        "diplomacy", "ask nicely", "seduce", "seduces", "flirt", "flirts",
+        "sweet-talk", "sweet talk", "talk into", "bargain", "bargains",
+        "charm socially", "woo", "woos"
+      ],
+      "check_type": "skill",
+      "skill": "persuasion",
+      "ability": "charisma",
+      "suggested_dc": 15,
+      "notes": "Honest social influence. Against a beast, prefer Animal Handling instead."
+    },
+    {
+      "keywords": [
+        "calm animal", "calm the", "pet", "pets", "petting",
+        "befriend beast", "soothe", "soothes", "soothe mount",
+        "animal handling", "ride rough", "gentle the", "gentles"
+      ],
+      "check_type": "skill",
+      "skill": "animal_handling",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Calm, befriend, or handle a beast or mount."
+    },
+    {
+      "keywords": ["threaten", "threatens", "scare", "scares", "intimidate", "intimidates", "cow", "cows"],
+      "check_type": "skill",
+      "skill": "intimidation",
+      "ability": "charisma",
+      "suggested_dc": 15,
+      "notes": "May have lasting social consequences. Often contested by Insight or a contested social check."
+    },
+    {
+      "keywords": ["spot", "spots", "notice", "notices", "hear", "hears", "look around", "aware", "perceive", "perception check"],
+      "check_type": "skill",
+      "skill": "perception",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Compare to Passive Perception when the character is not actively searching."
+    },
+    {
+      "keywords": ["search", "searches", "clue", "deduce", "investigate", "investigates", "examine carefully"],
+      "check_type": "skill",
+      "skill": "investigation",
+      "ability": "intelligence",
+      "suggested_dc": 15,
+      "notes": "Investigation analyzes; Perception notices."
+    },
+    {
+      "keywords": ["track", "tracks", "forage", "forages", "survive", "wilderness", "follow trail"],
+      "check_type": "skill",
+      "skill": "survival",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Wilderness navigation and tracking."
+    },
+    {
+      "keywords": ["pickpocket", "palm", "sleight", "plant item", "steal quietly"],
+      "check_type": "skill",
+      "skill": "sleight_of_hand",
+      "ability": "dexterity",
+      "suggested_dc": 15,
+      "notes": "Often contested by Perception."
+    },
+    {
+      "keywords": ["insight", "read them", "are they lying", "motives", "sense motive"],
+      "check_type": "skill",
+      "skill": "insight",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Contests Deception or gauges intent."
+    },
+    {
+      "keywords": ["magic lore", "arcane", "identify magic", "arcana check"],
+      "check_type": "skill",
+      "skill": "arcana",
+      "ability": "intelligence",
+      "suggested_dc": 15,
+      "notes": "Magical knowledge checks."
+    },
+    {
+      "keywords": ["history check", "recall history", "historical lore", "who was"],
+      "check_type": "skill",
+      "skill": "history",
+      "ability": "intelligence",
+      "suggested_dc": 15,
+      "notes": "Historical knowledge."
+    },
+    {
+      "keywords": ["nature check", "nature lore", "plant lore", "beast lore"],
+      "check_type": "skill",
+      "skill": "nature",
+      "ability": "intelligence",
+      "suggested_dc": 15,
+      "notes": "Natural world knowledge."
+    },
+    {
+      "keywords": ["religion check", "holy lore", "deity", "rite", "religious"],
+      "check_type": "skill",
+      "skill": "religion",
+      "ability": "intelligence",
+      "suggested_dc": 15,
+      "notes": "Religious knowledge."
+    },
+    {
+      "keywords": ["stabilize", "diagnose", "first aid", "medicine check", "tend wounds"],
+      "check_type": "skill",
+      "skill": "medicine",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Treat injuries or illness."
+    },
+    {
+      "keywords": ["perform", "performs", "entertain", "sing", "sings", "dance", "dances", "distract with a song"],
+      "check_type": "skill",
+      "skill": "performance",
+      "ability": "charisma",
+      "suggested_dc": 15,
+      "notes": "Entertain or distract an audience."
+    },
+    {
+      "keywords": ["poison", "concentration", "exhaustion", "hold breath", "disease save", "con save"],
+      "check_type": "save",
+      "ability": "constitution",
+      "suggested_dc": 15,
+      "notes": "Constitution saving throw."
+    },
+    {
+      "keywords": ["dodge blast", "leap aside", "dex save", "fireball", "traps spring"],
+      "check_type": "save",
+      "ability": "dexterity",
+      "suggested_dc": 15,
+      "notes": "Dexterity saving throw."
+    },
+    {
+      "keywords": ["frightened", "wis save", "fear save", "mental domination", "charm save"],
+      "check_type": "save",
+      "ability": "wisdom",
+      "suggested_dc": 15,
+      "notes": "Wisdom saving throw."
+    },
+    {
+      "keywords": ["initiative", "who goes first", "roll init"],
+      "check_type": "initiative",
+      "ability": "dexterity",
+      "suggested_dc": null,
+      "notes": "d20 + Dexterity modifier (+ initiative bonuses)."
+    },
+    {
+      "keywords": [
+        "attack",
+        "attacks",
+        "swing",
+        "swings",
+        "shoot",
+        "shoots",
+        "strike",
+        "strikes",
+        "fight",
+        "fighting",
+        "melee",
+        "ranged",
+        "weapon",
+        "sword",
+        "club",
+        "dagger",
+        "bow",
+        "crossbow",
+        "axe",
+        "mace",
+        "spear",
+        "javelin",
+        "slash",
+        "slashes",
+        "stab",
+        "stabs",
+        "bash",
+        "bashes",
+        "smite",
+        "smites",
+        "fire at",
+        "shoot at",
+        "engage",
+        "engages",
+        "hit them",
+        "hits them"
+      ],
+      "check_type": "attack",
+      "ability": null,
+      "suggested_dc": null,
+      "notes": "Attack roll vs target AC (not a DC). Use the matching weapon attack bonus on the sheet, then roll damage on a hit. Naming a creature alone is not an attack."
+    }
+  ],
+  "advantage_notes": [
+    "Advantage: roll 2d20, take the higher.",
+    "Disadvantage: roll 2d20, take the lower.",
+    "Do not stack multiple advantage sources; one is enough.",
+    "Advantage and disadvantage cancel to a normal roll."
+  ],
+  "dice_defaults": {
+    "ability_check": "1d20",
+    "saving_throw": "1d20",
+    "attack_roll": "1d20",
+    "initiative": "1d20"
+  }
+}

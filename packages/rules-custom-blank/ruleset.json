@@ -1,0 +1,23 @@
+{
+  "id": "custom-blank",
+  "name": "Custom / Next Game (blank)",
+  "version": "0.1.0",
+  "system": "custom",
+  "description": "Empty template pack. Duplicate this folder and fill skills/abilities/check_guidance for your next system.",
+  "abilities": [],
+  "skills": [],
+  "saves": [],
+  "dc_bands": [
+    { "label": "Easy", "dc": 10, "when": "Simple" },
+    { "label": "Medium", "dc": 15, "when": "Standard" },
+    { "label": "Hard", "dc": 20, "when": "Difficult" }
+  ],
+  "check_guidance": [],
+  "advantage_notes": [],
+  "dice_defaults": {
+    "ability_check": "1d20",
+    "saving_throw": "1d20",
+    "attack_roll": "1d20",
+    "initiative": "1d20"
+  }
+}

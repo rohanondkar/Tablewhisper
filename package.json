@@ -1,0 +1,10 @@
+{
+  "name": "dm-console-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:api": "cd apps/api && python -m uvicorn app.main:app --host 127.0.0.1 --port 8766 --reload",
+    "dev:ui": "npm --prefix apps/desktop run dev:ui",
+    "dev": "npm --prefix apps/desktop run dev"
+  }
+}
