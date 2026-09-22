@@ -54,8 +54,12 @@ def image_url_for(monster: dict[str, Any]) -> str:
 
 
 def with_image(monster: dict[str, Any]) -> dict[str, Any]:
+    from .xp import normalize_cr, xp_for_creature
+
     out = dict(monster)
     out["image_url"] = image_url_for(monster)
+    out["cr"] = normalize_cr(out.get("cr"))
+    out["xp"] = xp_for_creature(out)
     return out
 
 
@@ -198,6 +202,7 @@ def list_encounter() -> list[dict[str, Any]]:
         ).fetchall()
         out = []
         for r in rows:
+            tmpl = with_image(json.loads(r["data_json"]))
             out.append(
                 {
                     "id": r["id"],
@@ -207,8 +212,10 @@ def list_encounter() -> list[dict[str, Any]]:
                     "ac": r["ac"],
                     "max_hp": r["max_hp"],
                     "current_hp": r["current_hp"],
-                    "template": with_image(json.loads(r["data_json"])),
-                    "image_url": image_url_for(json.loads(r["data_json"])),
+                    "cr": tmpl.get("cr"),
+                    "xp": tmpl.get("xp"),
+                    "template": tmpl,
+                    "image_url": tmpl.get("image_url") or image_url_for(tmpl),
                 }
             )
         return out
@@ -224,6 +231,7 @@ def get_enemy(enemy_id: str) -> dict[str, Any] | None:
         ).fetchone()
         if not r:
             return None
+        tmpl = with_image(json.loads(r["data_json"]))
         return {
             "id": r["id"],
             "label": r["label"],
@@ -232,8 +240,10 @@ def get_enemy(enemy_id: str) -> dict[str, Any] | None:
             "ac": r["ac"],
             "max_hp": r["max_hp"],
             "current_hp": r["current_hp"],
-            "template": with_image(json.loads(r["data_json"])),
-            "image_url": image_url_for(json.loads(r["data_json"])),
+            "cr": tmpl.get("cr"),
+            "xp": tmpl.get("xp"),
+            "template": tmpl,
+            "image_url": tmpl.get("image_url") or image_url_for(tmpl),
         }
 
 
@@ -249,11 +259,32 @@ def spawn_enemy(
     monster_id: str,
     label: str | None = None,
     count: int = 1,
+    *,
+    cr: str | None = None,
+    xp: int | None = None,
+    ac: int | None = None,
+    hp: int | None = None,
 ) -> list[dict[str, Any]]:
+    from .xp import normalize_cr, xp_for_cr
+
     ensure_encounter_tables()
     template = get_template(monster_id)
     if not template:
         raise ValueError(f"Unknown monster: {monster_id}")
+    # Instance overrides (DM scaling) — does not rewrite the catalog entry
+    inst = dict(template)
+    if cr is not None and str(cr).strip() != "":
+        inst["cr"] = normalize_cr(cr)
+        if xp is None:
+            inst["xp"] = xp_for_cr(inst["cr"])
+    if xp is not None:
+        inst["xp"] = max(0, int(xp))
+    if ac is not None:
+        inst["ac"] = int(ac)
+    if hp is not None:
+        inst["hp"] = max(1, int(hp))
+    inst = with_image(inst)
+
     sid = db.active_session_id()
     existing = list_encounter()
     spawned: list[dict[str, Any]] = []
@@ -265,22 +296,24 @@ def spawn_enemy(
             used = {e["label"].lower() for e in existing + spawned}
             letter = None
             for code in range(ord("A"), ord("Z") + 1):
-                candidate = f"{template['name']} {chr(code)}"
+                candidate = f"{inst['name']} {chr(code)}"
                 if candidate.lower() not in used:
                     letter = chr(code)
                     break
-            use_label = f"{template['name']} {letter or i + 1}"
+            use_label = f"{inst['name']} {letter or i + 1}"
         eid = str(uuid.uuid4())
         row = {
             "id": eid,
             "label": use_label,
-            "monster_id": template["id"],
-            "name": template["name"],
-            "ac": int(template["ac"]),
-            "max_hp": int(template["hp"]),
-            "current_hp": int(template["hp"]),
-            "template": template,
-            "image_url": image_url_for(template),
+            "monster_id": inst["id"],
+            "name": inst["name"],
+            "ac": int(inst["ac"]),
+            "max_hp": int(inst["hp"]),
+            "current_hp": int(inst["hp"]),
+            "cr": inst.get("cr"),
+            "xp": inst.get("xp"),
+            "template": inst,
+            "image_url": image_url_for(inst),
         }
         with db.db() as conn:
             conn.execute(
@@ -293,12 +326,12 @@ def spawn_enemy(
                     eid,
                     sid,
                     use_label,
-                    template["id"],
-                    template["name"],
+                    inst["id"],
+                    inst["name"],
                     row["ac"],
                     row["max_hp"],
                     row["current_hp"],
-                    json.dumps(template),
+                    json.dumps(inst),
                     db.utcnow(),
                 ),
             )

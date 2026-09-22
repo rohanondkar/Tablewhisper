@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, ollama_client, query_engine, rules, voice, monsters, npcs
+from . import db, ollama_client, query_engine, rules, voice, monsters, npcs, xp as xp_mod
 from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
@@ -93,6 +93,20 @@ class CharacterPatch(BaseModel):
     initiative: int | None = None
     abilities: dict[str, Any] | None = None
     skills: dict[str, Any] | None = None
+    xp: int | None = None
+    milestones: list[str] | None = None
+
+
+class XpAwardRequest(BaseModel):
+    kind: str  # defeat | milestone
+    character_ids: list[str]
+    xp: int | None = None
+    creature_id: str | None = None
+    label: str | None = None
+    cr: str | None = None
+    milestone_id: str | None = None
+    milestone_label: str | None = None
+    note: str | None = None
 
 
 @app.get("/health")
@@ -218,6 +232,130 @@ def patch_character(char_id: str, body: CharacterPatch) -> dict[str, Any]:
         name_part = class_level.rsplit(" ", 1)[0] if class_level else "Level"
         current["class_level"] = f"{name_part} {patch['level']}"
     return db.public_character(db.upsert_character(current))
+
+
+@app.post("/xp/award")
+def award_xp(body: XpAwardRequest) -> dict[str, Any]:
+    kind = (body.kind or "").strip().lower()
+    if kind not in {"defeat", "milestone"}:
+        raise HTTPException(400, "kind must be defeat or milestone")
+    if not body.character_ids:
+        raise HTTPException(400, "Select at least one character")
+
+    chars: list[dict[str, Any]] = []
+    for cid in body.character_ids:
+        c = db.get_character(cid)
+        if not c:
+            raise HTTPException(404, f"Character not found: {cid}")
+        chars.append(xp_mod.ensure_character_progress(c))
+
+    total_xp = body.xp
+    milestone_id = body.milestone_id
+    milestone_label = body.milestone_label
+    label = body.label or "creature"
+    cr = body.cr
+
+    if kind == "defeat":
+        if total_xp is None:
+            tmpl = None
+            if body.creature_id:
+                enemy = monsters.get_enemy(body.creature_id)
+                if enemy:
+                    tmpl = enemy.get("template") or {}
+                    label = enemy.get("label") or label
+                    cr = enemy.get("cr") or cr
+                else:
+                    scene_n = npcs.get_scene_npc(body.creature_id)
+                    if scene_n:
+                        tmpl = scene_n.get("template") or {}
+                        label = scene_n.get("label") or label
+                        cr = scene_n.get("cr") or cr
+            total_xp = xp_mod.xp_for_creature(tmpl) if tmpl else xp_mod.xp_for_cr(cr)
+        milestone_id = milestone_id or f"defeat:{body.creature_id or label}"
+        milestone_label = milestone_label or f"Defeated {label}"
+    else:
+        mid_kind = milestone_id or "story_beat"
+        # Allow full ids like social_charm:mira — base kind is before colon
+        base_kind = mid_kind.split(":", 1)[0]
+        if total_xp is None:
+            total_xp = xp_mod.story_xp_for_kind(base_kind)
+        milestone_id = mid_kind
+        milestone_label = milestone_label or xp_mod.milestone_label_for_kind(base_kind)
+
+    total_xp = max(0, int(total_xp))
+    shares = xp_mod.split_xp(total_xp, len(chars))
+    results: list[dict[str, Any]] = []
+    skipped_dup = False
+
+    for char, share in zip(chars, shares):
+        before = int(char.get("xp") or 0)
+        level_before = xp_mod.level_from_xp(before)
+        milestones = list(char.get("milestones") or [])
+        if milestone_id in milestones:
+            skipped_dup = True
+            results.append(
+                {
+                    "id": char["id"],
+                    "name": char.get("name"),
+                    "xp_before": before,
+                    "xp_after": before,
+                    "xp_gained": 0,
+                    "leveled": False,
+                    "duplicate": True,
+                    "xp_progress": xp_mod.progress_for_xp(before),
+                }
+            )
+            continue
+        after = before + share
+        milestones.append(milestone_id)
+        char["xp"] = after
+        char["milestones"] = milestones
+        level_after = xp_mod.level_from_xp(after)
+        saved = db.public_character(db.upsert_character(char))
+        results.append(
+            {
+                "id": saved["id"],
+                "name": saved.get("name"),
+                "xp_before": before,
+                "xp_after": after,
+                "xp_gained": share,
+                "leveled": level_after > level_before,
+                "duplicate": False,
+                "xp_progress": saved.get("xp_progress"),
+            }
+        )
+
+    summary = {
+        "kind": kind,
+        "label": label,
+        "cr": cr,
+        "total_xp": total_xp,
+        "milestone_id": milestone_id,
+        "milestone_label": milestone_label,
+        "note": body.note,
+        "awards": results,
+        "check_type": "xp_award",
+        "roll_line": (
+            f"{'Defeat' if kind == 'defeat' else 'Milestone'}: {milestone_label} "
+            f"— {total_xp} XP split among {len(chars)}"
+            + (" (already awarded)" if skipped_dup and all(r.get("duplicate") for r in results) else "")
+        ),
+    }
+    db.add_event(
+        body.note or milestone_label or f"XP award ({kind})",
+        summary,
+    )
+    return {
+        "ok": True,
+        "kind": kind,
+        "total_xp": total_xp,
+        "milestone_id": milestone_id,
+        "milestone_label": milestone_label,
+        "label": label,
+        "cr": cr,
+        "characters": [db.public_character(db.get_character(r["id"])) for r in results if r.get("id")],
+        "awards": results,
+    }
 
 
 @app.post("/characters/preview")
@@ -348,12 +486,20 @@ class SpawnRequest(BaseModel):
     monster_id: str
     label: str | None = None
     count: int = Field(default=1, ge=1, le=12)
+    cr: str | None = None
+    xp: int | None = None
+    ac: int | None = None
+    hp: int | None = None
 
 
 class NpcSpawnRequest(BaseModel):
     npc_id: str
     label: str | None = None
     count: int = Field(default=1, ge=1, le=12)
+    cr: str | None = None
+    xp: int | None = None
+    ac: int | None = None
+    hp: int | None = None
 
 
 class EnemyHpPatch(BaseModel):
@@ -425,7 +571,15 @@ def get_encounter() -> list[dict[str, Any]]:
 @app.post("/encounter/spawn")
 def spawn_encounter(body: SpawnRequest) -> list[dict[str, Any]]:
     try:
-        return monsters.spawn_enemy(body.monster_id, label=body.label, count=body.count)
+        return monsters.spawn_enemy(
+            body.monster_id,
+            label=body.label,
+            count=body.count,
+            cr=body.cr,
+            xp=body.xp,
+            ac=body.ac,
+            hp=body.hp,
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -514,7 +668,15 @@ def get_scene() -> list[dict[str, Any]]:
 @app.post("/scene/spawn")
 def spawn_scene(body: NpcSpawnRequest) -> list[dict[str, Any]]:
     try:
-        return npcs.spawn_npc(body.npc_id, label=body.label, count=body.count)
+        return npcs.spawn_npc(
+            body.npc_id,
+            label=body.label,
+            count=body.count,
+            cr=body.cr,
+            xp=body.xp,
+            ac=body.ac,
+            hp=body.hp,
+        )
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

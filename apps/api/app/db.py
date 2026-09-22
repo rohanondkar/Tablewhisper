@@ -146,13 +146,17 @@ def get_character(char_id: str) -> dict[str, Any] | None:
 
 
 def public_character(data: dict[str, Any]) -> dict[str, Any]:
-    out = dict(data)
+    from .xp import ensure_character_progress
+
+    out = ensure_character_progress(dict(data))
     out.pop("raw_fields", None)
     return out
 
 
 def upsert_character(data: dict[str, Any]) -> dict[str, Any]:
-    data = dict(data)
+    from .xp import ensure_character_progress
+
+    data = ensure_character_progress(dict(data))
     data["updated_at"] = utcnow()
     with db() as conn:
         conn.execute(

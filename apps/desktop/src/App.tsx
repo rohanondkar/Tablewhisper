@@ -18,6 +18,60 @@ import {
 
 const API_BASE = "http://127.0.0.1:8766";
 
+const CR_OPTIONS = [
+  "0",
+  "1/8",
+  "1/4",
+  "1/2",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20",
+];
+
+const CR_TO_XP: Record<string, number> = {
+  "0": 10,
+  "1/8": 25,
+  "1/4": 50,
+  "1/2": 100,
+  "1": 200,
+  "2": 450,
+  "3": 700,
+  "4": 1100,
+  "5": 1800,
+  "6": 2300,
+  "7": 2900,
+  "8": 3900,
+  "9": 5000,
+  "10": 5900,
+  "11": 7200,
+  "12": 8400,
+  "13": 10000,
+  "14": 11500,
+  "15": 13000,
+  "16": 15000,
+  "17": 18000,
+  "18": 20000,
+  "19": 22000,
+  "20": 25000,
+};
+
 export default function App() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -40,7 +94,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<Partial<Character>>({});
-  const [pickReuploadOpen, setPickReuploadOpen] = useState(false);
+  const [reuploadOpen, setReuploadOpen] = useState(false);
   const [reuploadTargetId, setReuploadTargetId] = useState<string | null>(null);
   const [reuploadFile, setReuploadFile] = useState<File | null>(null);
   const [reuploadPreview, setReuploadPreview] = useState<CharacterPreview | null>(null);
@@ -63,6 +117,18 @@ export default function App() {
   const [rightTab, setRightTab] = useState<"foes" | "scene" | "log">("foes");
   const [addModal, setAddModal] = useState<null | "monster" | "npc">(null);
   const [showCustomInModal, setShowCustomInModal] = useState(false);
+  const [spawnTune, setSpawnTune] = useState({ cr: "0", xp: 10, ac: 10, hp: 10 });
+  const [xpAward, setXpAward] = useState<null | {
+    kind: "defeat" | "milestone";
+    label: string;
+    cr?: string;
+    xp: number;
+    creatureId?: string;
+    milestoneId?: string;
+    milestoneLabel?: string;
+  }>(null);
+  const [xpRecipients, setXpRecipients] = useState<string[]>([]);
+  const [awardedDefeatIds, setAwardedDefeatIds] = useState<Set<string>>(() => new Set());
   const rightTabInitialized = useRef(false);
 
   const selected = useMemo(
@@ -161,12 +227,131 @@ export default function App() {
 
   useEffect(() => {
     if (!addModal) return;
+    if (addModal === "monster") {
+      const m =
+        monsters.find((x) => x.id === spawnId) ||
+        filteredMonsters[0] ||
+        monsters[0];
+      if (!m) return;
+      setSpawnTune({
+        cr: String(m.cr || "0"),
+        xp: m.xp ?? CR_TO_XP[String(m.cr || "0")] ?? 10,
+        ac: m.ac,
+        hp: m.hp,
+      });
+    } else {
+      const n = npcs.find((x) => x.id === spawnNpcId) || filteredNpcs[0] || npcs[0];
+      if (!n) return;
+      setSpawnTune({
+        cr: String(n.cr || "0"),
+        xp: n.xp ?? CR_TO_XP[String(n.cr || "0")] ?? 10,
+        ac: n.ac,
+        hp: n.hp,
+      });
+    }
+  }, [addModal, spawnId, spawnNpcId, monsters, npcs, filteredMonsters, filteredNpcs]);
+
+  useEffect(() => {
+    if (!addModal && !reuploadOpen && !xpAward) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setAddModal(null);
+      if (e.key !== "Escape") return;
+      if (xpAward) setXpAward(null);
+      else if (addModal) setAddModal(null);
+      else if (reuploadOpen) clearReuploadWizard();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addModal]);
+  }, [addModal, reuploadOpen, xpAward]);
+
+  function openDefeatAward(creature: {
+    id: string;
+    label: string;
+    cr?: string;
+    xp?: number;
+  }) {
+    if (awardedDefeatIds.has(creature.id)) return;
+    const xp = creature.xp ?? 10;
+    setXpRecipients(characters.map((c) => c.id));
+    setXpAward({
+      kind: "defeat",
+      label: creature.label,
+      cr: creature.cr,
+      xp,
+      creatureId: creature.id,
+      milestoneId: `defeat:${creature.id}`,
+      milestoneLabel: `Defeated ${creature.label}`,
+    });
+  }
+
+  function openMilestoneAward() {
+    if (!result) return;
+    const skill = result.skill || null;
+    const subject =
+      result.target?.label ||
+      (result.target as { name?: string } | null | undefined)?.name ||
+      "";
+    let kind = "story_beat";
+    let storyXp = 25;
+    if (skill === "persuasion" || skill === "performance") {
+      kind = "social_charm";
+      storyXp = 50;
+    } else if (skill === "deception") {
+      kind = "social_deception";
+      storyXp = 50;
+    } else if (skill === "intimidation") {
+      kind = "social_intimidation";
+      storyXp = 50;
+    } else if (skill === "animal_handling") {
+      kind = "social_animal";
+      storyXp = 50;
+    }
+    const slug = subject
+      ? `${kind}:${subject.toLowerCase().replace(/\s+/g, "_")}`
+      : kind;
+    const labels: Record<string, string> = {
+      social_charm: "Social success (charm / persuade / seduce)",
+      social_deception: "Social success (deception)",
+      social_intimidation: "Social success (intimidation)",
+      social_animal: "Social success (animal handling)",
+      story_beat: "Story beat",
+    };
+    setXpRecipients(characters.map((c) => c.id));
+    setXpAward({
+      kind: "milestone",
+      label: subject || result.check_type,
+      xp: storyXp,
+      milestoneId: slug,
+      milestoneLabel: subject ? `${labels[kind]} — ${subject}` : labels[kind],
+    });
+  }
+
+  async function confirmXpAward() {
+    if (!xpAward || !xpRecipients.length) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await api.awardXp({
+        kind: xpAward.kind,
+        character_ids: xpRecipients,
+        xp: xpAward.xp,
+        creature_id: xpAward.creatureId,
+        label: xpAward.label,
+        cr: xpAward.cr,
+        milestone_id: xpAward.milestoneId,
+        milestone_label: xpAward.milestoneLabel,
+      });
+      if (xpAward.kind === "defeat" && xpAward.creatureId) {
+        setAwardedDefeatIds((prev) => new Set(prev).add(xpAward.creatureId!));
+      }
+      setCharacters(out.characters.length ? out.characters : await api.listCharacters());
+      setEvents(await api.sessionEvents());
+      setXpAward(null);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleQuery() {
     if (!query.trim()) return;
@@ -224,7 +409,7 @@ export default function App() {
   }
 
   function clearReuploadWizard() {
-    setPickReuploadOpen(false);
+    setReuploadOpen(false);
     setReuploadTargetId(null);
     setReuploadFile(null);
     setReuploadPreview(null);
@@ -240,13 +425,14 @@ export default function App() {
     setReuploadPreview(null);
     setReuploadFile(null);
     setReuploadTargetId(null);
-    setPickReuploadOpen(true);
+    setReuploadOpen(true);
   }
 
   function pickReuploadTarget(id: string) {
     setReuploadTargetId(id);
-    setPickReuploadOpen(false);
-    // Defer so the pick modal unmounts before the native file dialog opens.
+    setReuploadPreview(null);
+    setReuploadFile(null);
+    // Defer so React paints the "Choose PDF" step before the native dialog.
     window.setTimeout(() => reuploadFileRef.current?.click(), 0);
   }
 
@@ -457,6 +643,18 @@ export default function App() {
       <main className="layout">
         <aside className="panel stack">
           <h2>Party</h2>
+          {characters.length > 0 && (
+            <div className="party-levels" aria-label="Party levels">
+              {characters.map((c) => (
+                <span key={c.id} className="party-level-chip">
+                  <strong>{c.name.split(/\s+/)[0]}</strong> L{c.level}
+                  {c.xp_progress && c.xp_progress.level_from_xp !== c.level
+                    ? ` · XP L${c.xp_progress.level_from_xp}`
+                    : ""}
+                </span>
+              ))}
+            </div>
+          )}
           <div className="row">
             <label className="btn file-btn primary">
               Upload PDF
@@ -486,107 +684,6 @@ export default function App() {
             />
           </div>
 
-          {pickReuploadOpen && (
-            <div className="reupload-pick" role="dialog" aria-label="Choose character to update">
-              <strong>Which character are you updating?</strong>
-              <p className="muted small">Pick one, then choose the new D&amp;D Beyond PDF.</p>
-              <ul className="reupload-pick-list">
-                {characters.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      className="btn reupload-pick-item"
-                      disabled={busy}
-                      onClick={() => pickReuploadTarget(c.id)}
-                    >
-                      <span className="reupload-pick-name">{c.name}</span>
-                      <span className="muted small">{c.class_level || `Level ${c.level}`}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="btn ghost" onClick={clearReuploadWizard}>
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {reuploadTargetId && !reuploadPreview && !pickReuploadOpen && (
-            <div className="reupload-pick">
-              <strong>
-                Updating {characters.find((c) => c.id === reuploadTargetId)?.name || "character"}
-              </strong>
-              <p className="muted small">Choose the new PDF in the file dialog, or cancel.</p>
-              <div className="row">
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => reuploadFileRef.current?.click()}
-                >
-                  Choose PDF
-                </button>
-                <button type="button" className="btn ghost" onClick={clearReuploadWizard}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {reuploadPreview && (
-            <div className="reupload-review" role="dialog" aria-label="Confirm character update">
-              <strong>Updating {reuploadPreview.current_name}</strong>
-              {reuploadPreview.name_mismatch && (
-                <p className="reupload-warn">
-                  This PDF looks like <em>{reuploadPreview.parsed_name}</em>, not{" "}
-                  {reuploadPreview.current_name}. Update the selected sheet anyway, or add it as a
-                  new party member.
-                </p>
-              )}
-              {reuploadPreview.changes.length === 0 ? (
-                <p className="muted">No differences detected.</p>
-              ) : (
-                <ul className="change-list">
-                  {reuploadPreview.changes.map((ch: CharacterChange) => (
-                    <li key={`${ch.label}-${ch.from}-${ch.to}`}>
-                      <span className="change-label">{ch.label}</span>
-                      <span className="change-values">
-                        <span className="change-from">{ch.from}</span>
-                        <span className="change-arrow" aria-hidden>
-                          →
-                        </span>
-                        <span className="change-to">{ch.to}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="row">
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={() => void confirmReupload()}
-                >
-                  Confirm update
-                </button>
-                {reuploadPreview.name_mismatch && (
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={busy}
-                    onClick={() => void uploadReuploadAsNew()}
-                  >
-                    Upload as new character
-                  </button>
-                )}
-                <button type="button" className="btn ghost" disabled={busy} onClick={clearReuploadWizard}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
           <div className="party-list">
             {characters.length === 0 && (
               <p className="muted">Upload D&D Beyond character PDFs to build the party.</p>
@@ -609,7 +706,7 @@ export default function App() {
                   <div style={{ minWidth: 0 }}>
                     <strong>{c.name}</strong>
                     <small>
-                      {c.class_level} · {c.species}
+                      L{c.level} · {c.class_level} · {c.species}
                     </small>
                   </div>
                 </div>
@@ -617,6 +714,17 @@ export default function App() {
                   <span>AC {c.ac}</span>
                   <span>HP {c.current_hp ?? c.max_hp}/{c.max_hp}</span>
                   <span>Init {c.initiative >= 0 ? `+${c.initiative}` : c.initiative}</span>
+                </div>
+                <div className="xp-line">
+                  <span>
+                    XP {c.xp_progress?.xp ?? c.xp ?? 0}
+                    {c.xp_progress && c.xp_progress.xp_to_next > 0
+                      ? ` / ${c.xp_progress.xp_next_threshold}`
+                      : ""}
+                  </span>
+                  {c.xp_progress?.ready_to_level && (
+                    <span className="level-ready-pill">Level up ready</span>
+                  )}
                 </div>
               </div>
             );})}
@@ -943,18 +1051,59 @@ export default function App() {
                       if (!raw) return;
                       const dmg = Number(raw);
                       if (!Number.isFinite(dmg)) return;
-                      await api.damageEnemy(result.target!.id!, dmg);
-                      setEncounter(await api.listEncounter());
-                      setResult({
-                        ...result,
-                        target: {
-                          ...result.target!,
-                          current_hp: Math.max(0, result.target!.current_hp - dmg),
-                        },
-                      });
+                      const tid = result.target!.id!;
+                      // Prefer encounter damage; fall back to scene NPC patch
+                      try {
+                        await api.damageEnemy(tid, dmg);
+                        const enc = await api.listEncounter();
+                        setEncounter(enc);
+                        const updated = enc.find((e) => e.id === tid);
+                        const newHp = updated
+                          ? updated.current_hp
+                          : Math.max(0, result.target!.current_hp - dmg);
+                        setResult({
+                          ...result,
+                          target: { ...result.target!, current_hp: newHp },
+                        });
+                        if (updated && updated.current_hp <= 0) {
+                          openDefeatAward(updated);
+                        }
+                      } catch {
+                        await api.setSceneNpcHp(
+                          tid,
+                          Math.max(0, result.target!.current_hp - dmg)
+                        );
+                        const sc = await api.listScene();
+                        setScene(sc);
+                        const updated = sc.find((e) => e.id === tid);
+                        const newHp = updated
+                          ? updated.current_hp
+                          : Math.max(0, result.target!.current_hp - dmg);
+                        setResult({
+                          ...result,
+                          target: { ...result.target!, current_hp: newHp },
+                        });
+                        if (updated && updated.current_hp <= 0) {
+                          openDefeatAward(updated);
+                        }
+                      }
                     }}
                   >
                     Apply damage to {result.target.label}
+                  </button>
+                </div>
+              )}
+              {(result.check_type === "skill" ||
+                result.check_type === "ability" ||
+                result.check_type === "save") && (
+                <div className="row" style={{ marginTop: "0.65rem" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy || characters.length === 0}
+                    onClick={openMilestoneAward}
+                  >
+                    Award milestone
                   </button>
                 </div>
               )}
@@ -1061,6 +1210,8 @@ export default function App() {
                             <span>
                               HP {e.current_hp}/{e.max_hp}
                             </span>
+                            {e.cr != null && <span>CR {e.cr}</span>}
+                            {e.xp != null && <span>XP {e.xp}</span>}
                           </div>
                           <div className="hp-bar" title={`${pct.toFixed(0)}%`}>
                             <span style={{ width: `${pct}%` }} />
@@ -1073,8 +1224,9 @@ export default function App() {
                           onClick={async () => {
                             const raw = window.prompt("Set current HP", String(e.current_hp));
                             if (raw == null) return;
-                            await api.setEnemyHp(e.id, Number(raw));
+                            const updated = await api.setEnemyHp(e.id, Number(raw));
                             setEncounter(await api.listEncounter());
+                            if (updated.current_hp <= 0) openDefeatAward(updated);
                           }}
                         >
                           Set HP
@@ -1145,6 +1297,8 @@ export default function App() {
                             <span>
                               HP {e.current_hp}/{e.max_hp}
                             </span>
+                            {e.cr != null && <span>CR {e.cr}</span>}
+                            {e.xp != null && <span>XP {e.xp}</span>}
                           </div>
                           <div className="hp-bar" title={`${pct.toFixed(0)}%`}>
                             <span style={{ width: `${pct}%` }} />
@@ -1157,8 +1311,9 @@ export default function App() {
                           onClick={async () => {
                             const raw = window.prompt("Set current HP", String(e.current_hp));
                             if (raw == null) return;
-                            await api.setSceneNpcHp(e.id, Number(raw));
+                            const updated = await api.setSceneNpcHp(e.id, Number(raw));
                             setScene(await api.listScene());
+                            if (updated.current_hp <= 0) openDefeatAward(updated);
                           }}
                         >
                           Set HP
@@ -1213,6 +1368,227 @@ export default function App() {
         </aside>
       </main>
 
+      {xpAward && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setXpAward(null);
+          }}
+        >
+          <div className="modal-panel" role="dialog" aria-modal="true" aria-label="Award XP">
+            <div className="modal-header">
+              <h2>{xpAward.kind === "defeat" ? "Defeat XP" : "Award milestone"}</h2>
+              <button type="button" className="btn ghost" onClick={() => setXpAward(null)}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                <strong>{xpAward.milestoneLabel || xpAward.label}</strong>
+              </p>
+              <p className="muted small">
+                {xpAward.kind === "defeat"
+                  ? `CR ${xpAward.cr || "?"} · ${xpAward.xp} XP total (split among selected)`
+                  : `${xpAward.xp} story XP (split among selected)`}
+              </p>
+              <label className="muted small" style={{ display: "block", marginTop: "0.75rem" }}>
+                Total XP
+                <input
+                  type="number"
+                  min={0}
+                  value={xpAward.xp}
+                  onChange={(e) =>
+                    setXpAward((a) => (a ? { ...a, xp: Number(e.target.value) || 0 } : a))
+                  }
+                  style={{ display: "block", width: "100%", marginTop: "0.25rem" }}
+                />
+              </label>
+              <p className="muted small" style={{ marginTop: "0.75rem" }}>
+                Award to:
+              </p>
+              <ul className="xp-recipient-list">
+                {characters.map((c) => (
+                  <li key={c.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={xpRecipients.includes(c.id)}
+                        onChange={(e) => {
+                          setXpRecipients((prev) =>
+                            e.target.checked
+                              ? [...prev, c.id]
+                              : prev.filter((id) => id !== c.id)
+                          );
+                        }}
+                      />
+                      {c.name}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="row" style={{ marginTop: "1rem" }}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy || xpRecipients.length === 0}
+                  onClick={() => void confirmXpAward()}
+                >
+                  Confirm award
+                </button>
+                <button type="button" className="btn ghost" onClick={() => setXpAward(null)}>
+                  Skip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reuploadOpen && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) clearReuploadWizard();
+          }}
+        >
+          <div
+            className="modal-panel modal-panel-reupload"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Re-upload character"
+          >
+            <div className="modal-header">
+              <h2>
+                {!reuploadTargetId
+                  ? "Re-upload"
+                  : reuploadPreview
+                    ? `Updating ${reuploadPreview.current_name}`
+                    : `Updating ${characters.find((c) => c.id === reuploadTargetId)?.name || "character"}`}
+              </h2>
+              <button type="button" className="btn ghost" onClick={clearReuploadWizard}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              {!reuploadTargetId && (
+                <>
+                  <p className="muted small">Which character are you updating? Then choose the new PDF.</p>
+                  <ul className="reupload-pick-list">
+                    {characters.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className="btn reupload-pick-item"
+                          disabled={busy}
+                          onClick={() => pickReuploadTarget(c.id)}
+                        >
+                          <span className="reupload-pick-name">{c.name}</span>
+                          <span className="muted small">{c.class_level || `Level ${c.level}`}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+
+              {reuploadTargetId && !reuploadPreview && (
+                <>
+                  <p className="muted small">
+                    Choose the new D&amp;D Beyond PDF
+                    {reuploadFile ? ` (${reuploadFile.name})` : ""}, or pick a different character.
+                  </p>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={busy}
+                      onClick={() => reuploadFileRef.current?.click()}
+                    >
+                      Choose PDF
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setReuploadTargetId(null);
+                        setReuploadFile(null);
+                        setReuploadPreview(null);
+                      }}
+                    >
+                      Back
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {reuploadPreview && (
+                <>
+                  {reuploadPreview.name_mismatch && (
+                    <p className="reupload-warn">
+                      This PDF looks like <em>{reuploadPreview.parsed_name}</em>, not{" "}
+                      {reuploadPreview.current_name}. Update the selected sheet anyway, or add it as
+                      a new party member.
+                    </p>
+                  )}
+                  {reuploadPreview.changes.length === 0 ? (
+                    <p className="muted">No differences detected.</p>
+                  ) : (
+                    <ul className="change-list">
+                      {reuploadPreview.changes.map((ch: CharacterChange) => (
+                        <li key={`${ch.label}-${ch.from}-${ch.to}`}>
+                          <span className="change-label">{ch.label}</span>
+                          <span className="change-values">
+                            <span className="change-from">{ch.from}</span>
+                            <span className="change-arrow" aria-hidden>
+                              →
+                            </span>
+                            <span className="change-to">{ch.to}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="row" style={{ marginTop: "0.85rem" }}>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={busy}
+                      onClick={() => void confirmReupload()}
+                    >
+                      Confirm update
+                    </button>
+                    {reuploadPreview.name_mismatch && (
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => void uploadReuploadAsNew()}
+                      >
+                        Upload as new character
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setReuploadPreview(null);
+                        setReuploadFile(null);
+                      }}
+                    >
+                      Back
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {addModal && (
         <div
           className="modal-backdrop"
@@ -1266,10 +1642,79 @@ export default function App() {
                     >
                       {filteredMonsters.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.name} · CR {m.cr || "?"} · AC {m.ac} · HP {m.hp}
+                          {m.name} · CR {m.cr || "?"} · XP {m.xp ?? "?"} · AC {m.ac} · HP {m.hp}
                         </option>
                       ))}
                     </select>
+                    <div className="spawn-tune">
+                      <p className="muted small">
+                        Monsters use <strong>Challenge Rating (CR)</strong>, not PC levels. Adjust
+                        before spawn to scale this fight (XP updates with CR).
+                      </p>
+                      <div className="spawn-tune-grid">
+                        <label>
+                          CR
+                          <select
+                            className="btn"
+                            value={
+                              CR_OPTIONS.includes(spawnTune.cr) ? spawnTune.cr : spawnTune.cr
+                            }
+                            onChange={(e) => {
+                              const cr = e.target.value;
+                              setSpawnTune((t) => ({
+                                ...t,
+                                cr,
+                                xp: CR_TO_XP[cr] ?? t.xp,
+                              }));
+                            }}
+                          >
+                            {!CR_OPTIONS.includes(spawnTune.cr) && (
+                              <option value={spawnTune.cr}>{spawnTune.cr}</option>
+                            )}
+                            {CR_OPTIONS.map((cr) => (
+                              <option key={cr} value={cr}>
+                                {cr}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          XP
+                          <input
+                            type="number"
+                            min={0}
+                            value={spawnTune.xp}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({ ...t, xp: Number(e.target.value) || 0 }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          AC
+                          <input
+                            type="number"
+                            value={spawnTune.ac}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({ ...t, ac: Number(e.target.value) || 0 }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          HP
+                          <input
+                            type="number"
+                            min={1}
+                            value={spawnTune.hp}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({
+                                ...t,
+                                hp: Math.max(1, Number(e.target.value) || 1),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
                     <button
                       className="btn primary"
                       disabled={
@@ -1285,7 +1730,12 @@ export default function App() {
                         if (!id) return;
                         setBusy(true);
                         try {
-                          await api.spawnEnemy(id, 1);
+                          await api.spawnEnemy(id, 1, undefined, {
+                            cr: spawnTune.cr,
+                            xp: spawnTune.xp,
+                            ac: spawnTune.ac,
+                            hp: spawnTune.hp,
+                          });
                           setSpawnId(id);
                           setEncounter(await api.listEncounter());
                           setRightTab("foes");
@@ -1412,10 +1862,77 @@ export default function App() {
                     >
                       {filteredNpcs.map((n) => (
                         <option key={n.id} value={n.id}>
-                          {n.name} · {n.role || "NPC"} · {n.attitude || "?"} · AC {n.ac}
+                          {n.name} · {n.role || "NPC"} · XP {n.xp ?? "?"} · AC {n.ac}
                         </option>
                       ))}
                     </select>
+                    <div className="spawn-tune">
+                      <p className="muted small">
+                        Scene NPCs also use <strong>CR</strong> (not class levels). Tweak CR / XP /
+                        HP before spawning this instance.
+                      </p>
+                      <div className="spawn-tune-grid">
+                        <label>
+                          CR
+                          <select
+                            className="btn"
+                            value={spawnTune.cr}
+                            onChange={(e) => {
+                              const cr = e.target.value;
+                              setSpawnTune((t) => ({
+                                ...t,
+                                cr,
+                                xp: CR_TO_XP[cr] ?? t.xp,
+                              }));
+                            }}
+                          >
+                            {!CR_OPTIONS.includes(spawnTune.cr) && (
+                              <option value={spawnTune.cr}>{spawnTune.cr}</option>
+                            )}
+                            {CR_OPTIONS.map((cr) => (
+                              <option key={cr} value={cr}>
+                                {cr}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          XP
+                          <input
+                            type="number"
+                            min={0}
+                            value={spawnTune.xp}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({ ...t, xp: Number(e.target.value) || 0 }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          AC
+                          <input
+                            type="number"
+                            value={spawnTune.ac}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({ ...t, ac: Number(e.target.value) || 0 }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          HP
+                          <input
+                            type="number"
+                            min={1}
+                            value={spawnTune.hp}
+                            onChange={(e) =>
+                              setSpawnTune((t) => ({
+                                ...t,
+                                hp: Math.max(1, Number(e.target.value) || 1),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+                    </div>
                     <button
                       className="btn primary"
                       disabled={
@@ -1431,7 +1948,12 @@ export default function App() {
                         if (!id) return;
                         setBusy(true);
                         try {
-                          await api.spawnNpc(id, 1);
+                          await api.spawnNpc(id, 1, undefined, {
+                            cr: spawnTune.cr,
+                            xp: spawnTune.xp,
+                            ac: spawnTune.ac,
+                            hp: spawnTune.hp,
+                          });
                           setSpawnNpcId(id);
                           setScene(await api.listScene());
                           setRightTab("scene");

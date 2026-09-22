@@ -338,5 +338,15 @@
     "saving_throw": "1d20",
     "attack_roll": "1d20",
     "initiative": "1d20"
+  },
+  "advancement": {
+    "xp_thresholds": [0, 0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000, 85000, 100000, 120000, 140000, 165000, 195000, 225000, 265000, 305000, 355000],
+    "story_xp": {
+      "social_charm": 50,
+      "social_deception": 50,
+      "social_intimidation": 50,
+      "social_animal": 50,
+      "story_beat": 25
+    }
   }
 }

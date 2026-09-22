@@ -32,7 +32,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "0",
+      "xp": 10
     },
     {
       "id": "tamsin",
@@ -62,7 +64,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "0",
+      "xp": 10
     },
     {
       "id": "harlan",
@@ -91,7 +95,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/8",
+      "xp": 25
     },
     {
       "id": "cole",
@@ -121,7 +127,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/8",
+      "xp": 25
     },
     {
       "id": "brenna",
@@ -150,7 +158,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/8",
+      "xp": 25
     },
     {
       "id": "lilo",
@@ -181,7 +191,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/8",
+      "xp": 25
     },
     {
       "id": "vex",
@@ -211,7 +223,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/2",
+      "xp": 100
     },
     {
       "id": "elara",
@@ -241,7 +255,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/2",
+      "xp": 100
     },
     {
       "id": "garr",
@@ -270,7 +286,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "1/4",
+      "xp": 50
     },
     {
       "id": "pip",
@@ -301,7 +319,9 @@
           "damage_type": "bludgeoning"
         }
       ],
-      "kind": "npc"
+      "kind": "npc",
+      "cr": "0",
+      "xp": 10
     }
   ]
 }

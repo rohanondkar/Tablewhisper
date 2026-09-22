@@ -39,6 +39,16 @@ export interface Character {
   source_pdf: string | null;
   pdf_hash: string | null;
   updated_at: string;
+  xp?: number;
+  milestones?: string[];
+  xp_progress?: {
+    xp: number;
+    level_from_xp: number;
+    xp_into_level: number;
+    xp_to_next: number;
+    xp_next_threshold: number;
+    ready_to_level: boolean;
+  };
 }
 
 export interface CharacterChange {
@@ -101,6 +111,7 @@ export interface MonsterTemplate {
   ac: number;
   hp: number;
   cr?: string;
+  xp?: number;
   type?: string;
   notes?: string;
   aliases?: string[];
@@ -115,6 +126,8 @@ export interface EncounterEnemy {
   ac: number;
   max_hp: number;
   current_hp: number;
+  cr?: string;
+  xp?: number;
   image_url?: string;
 }
 
@@ -123,6 +136,8 @@ export interface NpcTemplate {
   name: string;
   ac: number;
   hp: number;
+  cr?: string;
+  xp?: number;
   role?: string;
   attitude?: string;
   aliases?: string[];
@@ -140,7 +155,29 @@ export interface SceneNpc {
   max_hp: number;
   current_hp: number;
   attitude: string;
+  cr?: string;
+  xp?: number;
   image_url?: string;
+}
+
+export interface XpAwardResult {
+  ok: boolean;
+  kind: string;
+  total_xp: number;
+  milestone_id: string;
+  milestone_label: string;
+  label?: string;
+  cr?: string | null;
+  awards: Array<{
+    id: string;
+    name?: string;
+    xp_before: number;
+    xp_after: number;
+    xp_gained: number;
+    leveled: boolean;
+    duplicate?: boolean;
+  }>;
+  characters: Character[];
 }
 
 export interface SessionEvent {
@@ -290,11 +327,24 @@ export const api = {
     }),
   listMonsters: () => request<MonsterTemplate[]>("/monsters"),
   listEncounter: () => request<EncounterEnemy[]>("/encounter"),
-  spawnEnemy: (monsterId: string, count = 1, label?: string) =>
+  spawnEnemy: (
+    monsterId: string,
+    count = 1,
+    label?: string,
+    overrides?: { cr?: string; xp?: number; ac?: number; hp?: number }
+  ) =>
     request<EncounterEnemy[]>("/encounter/spawn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ monster_id: monsterId, count, label: label || null }),
+      body: JSON.stringify({
+        monster_id: monsterId,
+        count,
+        label: label || null,
+        cr: overrides?.cr ?? null,
+        xp: overrides?.xp ?? null,
+        ac: overrides?.ac ?? null,
+        hp: overrides?.hp ?? null,
+      }),
     }),
   clearEncounter: () => request<{ ok: boolean }>("/encounter", { method: "DELETE" }),
   removeEnemy: (id: string) =>
@@ -329,11 +379,24 @@ export const api = {
   },
   listNpcs: () => request<NpcTemplate[]>("/npcs"),
   listScene: () => request<SceneNpc[]>("/scene"),
-  spawnNpc: (npcId: string, count = 1, label?: string) =>
+  spawnNpc: (
+    npcId: string,
+    count = 1,
+    label?: string,
+    overrides?: { cr?: string; xp?: number; ac?: number; hp?: number }
+  ) =>
     request<SceneNpc[]>("/scene/spawn", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ npc_id: npcId, count, label: label || null }),
+      body: JSON.stringify({
+        npc_id: npcId,
+        count,
+        label: label || null,
+        cr: overrides?.cr ?? null,
+        xp: overrides?.xp ?? null,
+        ac: overrides?.ac ?? null,
+        hp: overrides?.hp ?? null,
+      }),
     }),
   clearScene: () => request<{ ok: boolean }>("/scene", { method: "DELETE" }),
   removeSceneNpc: (id: string) =>
@@ -370,4 +433,20 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<NpcTemplate>;
   },
+  awardXp: (body: {
+    kind: "defeat" | "milestone";
+    character_ids: string[];
+    xp?: number;
+    creature_id?: string;
+    label?: string;
+    cr?: string;
+    milestone_id?: string;
+    milestone_label?: string;
+    note?: string;
+  }) =>
+    request<XpAwardResult>("/xp/award", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
 };

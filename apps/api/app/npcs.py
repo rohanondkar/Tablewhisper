@@ -55,8 +55,19 @@ def image_url_for(npc: dict[str, Any]) -> str:
 
 
 def with_image(npc: dict[str, Any]) -> dict[str, Any]:
+    from .xp import normalize_cr, xp_for_creature
+
     out = dict(npc)
     out["image_url"] = image_url_for(npc)
+    out.setdefault("cr", "0")
+    out["cr"] = normalize_cr(out.get("cr"))
+    if out.get("xp") is None:
+        out["xp"] = xp_for_creature(out)
+    else:
+        try:
+            out["xp"] = int(out["xp"])
+        except (TypeError, ValueError):
+            out["xp"] = xp_for_creature(out)
     return out
 
 
@@ -161,6 +172,8 @@ def save_custom_npc(data: dict[str, Any]) -> dict[str, Any]:
     data.setdefault("attacks", [])
     data.setdefault("attitude", "indifferent")
     data.setdefault("role", "")
+    data.setdefault("cr", "0")
+    data.setdefault("xp", 10)
     data.setdefault("location_tags", ["custom"])
     data.setdefault(
         "social",
@@ -212,7 +225,7 @@ def list_scene() -> list[dict[str, Any]]:
         ).fetchall()
         out = []
         for r in rows:
-            tmpl = json.loads(r["data_json"])
+            tmpl = with_image(json.loads(r["data_json"]))
             out.append(
                 {
                     "id": r["id"],
@@ -224,8 +237,10 @@ def list_scene() -> list[dict[str, Any]]:
                     "current_hp": r["current_hp"],
                     "attitude": r["attitude"] or tmpl.get("attitude") or "indifferent",
                     "kind": "npc",
-                    "template": with_image(tmpl),
-                    "image_url": image_url_for(tmpl),
+                    "cr": tmpl.get("cr"),
+                    "xp": tmpl.get("xp"),
+                    "template": tmpl,
+                    "image_url": tmpl.get("image_url") or image_url_for(tmpl),
                 }
             )
         return out
@@ -241,7 +256,7 @@ def get_scene_npc(npc_instance_id: str) -> dict[str, Any] | None:
         ).fetchone()
         if not r:
             return None
-        tmpl = json.loads(r["data_json"])
+        tmpl = with_image(json.loads(r["data_json"]))
         return {
             "id": r["id"],
             "label": r["label"],
@@ -252,8 +267,10 @@ def get_scene_npc(npc_instance_id: str) -> dict[str, Any] | None:
             "current_hp": r["current_hp"],
             "attitude": r["attitude"] or tmpl.get("attitude") or "indifferent",
             "kind": "npc",
-            "template": with_image(tmpl),
-            "image_url": image_url_for(tmpl),
+            "cr": tmpl.get("cr"),
+            "xp": tmpl.get("xp"),
+            "template": tmpl,
+            "image_url": tmpl.get("image_url") or image_url_for(tmpl),
         }
 
 
@@ -269,11 +286,31 @@ def spawn_npc(
     npc_id: str,
     label: str | None = None,
     count: int = 1,
+    *,
+    cr: str | None = None,
+    xp: int | None = None,
+    ac: int | None = None,
+    hp: int | None = None,
 ) -> list[dict[str, Any]]:
+    from .xp import normalize_cr, xp_for_cr
+
     ensure_scene_tables()
     template = get_template(npc_id)
     if not template:
         raise ValueError(f"Unknown NPC: {npc_id}")
+    inst = dict(template)
+    if cr is not None and str(cr).strip() != "":
+        inst["cr"] = normalize_cr(cr)
+        if xp is None:
+            inst["xp"] = xp_for_cr(inst["cr"])
+    if xp is not None:
+        inst["xp"] = max(0, int(xp))
+    if ac is not None:
+        inst["ac"] = int(ac)
+    if hp is not None:
+        inst["hp"] = max(1, int(hp))
+    inst = with_image(inst)
+
     sid = db.active_session_id()
     existing = list_scene()
     spawned: list[dict[str, Any]] = []
@@ -283,30 +320,32 @@ def spawn_npc(
         else:
             used = {e["label"].lower() for e in existing + spawned}
             # Prefer bare name once, then Name A, B...
-            if template["name"].lower() not in used and not label:
-                use_label = template["name"]
+            if inst["name"].lower() not in used and not label:
+                use_label = inst["name"]
             else:
                 letter = None
                 for code in range(ord("A"), ord("Z") + 1):
-                    candidate = f"{template['name']} {chr(code)}"
+                    candidate = f"{inst['name']} {chr(code)}"
                     if candidate.lower() not in used:
                         letter = chr(code)
                         break
-                use_label = f"{template['name']} {letter or i + 1}"
+                use_label = f"{inst['name']} {letter or i + 1}"
         eid = str(uuid.uuid4())
-        attitude = template.get("attitude") or "indifferent"
+        attitude = inst.get("attitude") or "indifferent"
         row = {
             "id": eid,
             "label": use_label,
-            "npc_id": template["id"],
-            "name": template["name"],
-            "ac": int(template["ac"]),
-            "max_hp": int(template["hp"]),
-            "current_hp": int(template["hp"]),
+            "npc_id": inst["id"],
+            "name": inst["name"],
+            "ac": int(inst["ac"]),
+            "max_hp": int(inst["hp"]),
+            "current_hp": int(inst["hp"]),
             "attitude": attitude,
             "kind": "npc",
-            "template": template,
-            "image_url": image_url_for(template),
+            "cr": inst.get("cr"),
+            "xp": inst.get("xp"),
+            "template": inst,
+            "image_url": image_url_for(inst),
         }
         with db.db() as conn:
             conn.execute(
@@ -319,13 +358,13 @@ def spawn_npc(
                     eid,
                     sid,
                     use_label,
-                    template["id"],
-                    template["name"],
+                    inst["id"],
+                    inst["name"],
                     row["ac"],
                     row["max_hp"],
                     row["current_hp"],
                     attitude,
-                    json.dumps(template),
+                    json.dumps(inst),
                     db.utcnow(),
                 ),
             )
