@@ -10,3 +10,4 @@ apps/desktop/dist/
 apps/api/.venv/
 uploads/
 *.log
+*.tsbuildinfo
