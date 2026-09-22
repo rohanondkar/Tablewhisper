@@ -192,8 +192,12 @@ export default function App() {
           <span className={`pill ${status?.whisper.available ? "on" : "off"}`}>
             Whisper {status?.whisper.available ? status.whisper.model : "optional"}
           </span>
-          <span className={`pill ${status?.audio.capturing ? "on" : ""}`}>
-            Audio {status?.audio.capturing ? "listening" : "idle"}
+          <span className={`pill ${status?.audio.capturing || status?.audio.source === "discord" ? "on" : ""}`}>
+            {status?.audio.source === "discord"
+              ? "Discord VC"
+              : status?.audio.source === "wasapi" || status?.audio.capturing
+                ? "System audio"
+                : "Audio idle"}
           </span>
           <select
             className="btn"
@@ -220,6 +224,39 @@ export default function App() {
             }}
           >
             + Session
+          </button>
+          <button
+            className="btn quit-btn"
+            title="Stop API, UI terminals, and close DM Console"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Quit DM Console?\n\nThis closes the app and stops the API / UI terminal windows."
+                )
+              ) {
+                return;
+              }
+              setBusy(true);
+              try {
+                if (window.dmDesktop?.quitAll) {
+                  await window.dmDesktop.quitAll();
+                  return;
+                }
+                await api.shutdown();
+                window.close();
+              } catch {
+                try {
+                  await api.shutdown();
+                } catch {
+                  /* ignore — process may already be dying */
+                }
+                window.close();
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Quit
           </button>
         </div>
       </header>

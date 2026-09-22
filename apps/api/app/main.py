@@ -1,19 +1,22 @@
 from __future__ import annotations
 
+import os
 import shutil
+import subprocess
+import threading
 import uuid
 from pathlib import Path
 from typing import Any
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db, ollama_client, query_engine, rules, voice, monsters
-from .config import DATA_DIR, DEFAULT_RULESET, UPLOADS_DIR
+from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
 
@@ -76,8 +79,24 @@ class CharacterPatch(BaseModel):
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    """Lightweight liveness plus a few fields for start-dev option 4."""
+    models = []
+    try:
+        models = ollama_client.list_models()
+    except Exception:
+        models = []
+    audio = voice.status()
+    return {
+        "status": "ok",
+        "api": "ok",
+        "port": int(__import__("os").environ.get("DM_API_PORT", "8766")),
+        "ollama": "ready" if models else "offline",
+        "whisper": "ready" if voice.whisper_available() else "optional",
+        "audio": audio.get("source") or ("listening" if audio.get("capturing") else "idle"),
+        "audio_source": audio.get("source") or "idle",
+        "active_ruleset": db.get_setting("active_ruleset", DEFAULT_RULESET),
+    }
 
 
 @app.get("/status")
@@ -97,8 +116,11 @@ def status() -> dict[str, Any]:
         },
         "audio": {
             "capturing": audio["capturing"],
+            "wasapi_capturing": audio.get("wasapi_capturing", False),
             "buffer_seconds": audio["buffer_seconds"],
             "device": audio["device"],
+            "source": audio.get("source") or "idle",
+            "discord_fresh": bool(audio.get("discord_fresh")),
         },
         "active_ruleset": db.get_setting("active_ruleset", DEFAULT_RULESET),
         "active_session_id": db.active_session_id(),
@@ -375,10 +397,53 @@ def voice_stop() -> dict[str, Any]:
     return {"ok": True, **voice.stop_capture()}
 
 
+class DiscordIngestJson(BaseModel):
+    pcm_b64: str
+    sample_rate: int = 16000
+
+
+def _client_is_local(request: Request) -> bool:
+    host = (request.client.host if request.client else "") or ""
+    return host in {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
+@app.post("/voice/discord/ingest")
+async def discord_ingest(request: Request) -> dict[str, Any]:
+    """
+    Accept PCM from the local Discord bot into the Whisper ring buffer.
+    Localhost only unless DM_ALLOW_REMOTE_INGEST=1.
+    """
+    if not _client_is_local(request) and not voice.allow_remote_ingest():
+        raise HTTPException(403, "Discord ingest is localhost-only")
+
+    ctype = (request.headers.get("content-type") or "").lower()
+    sample_rate = 16000
+    try:
+        if "application/json" in ctype:
+            body = DiscordIngestJson.model_validate(await request.json())
+            import base64
+
+            pcm = base64.b64decode(body.pcm_b64)
+            sample_rate = int(body.sample_rate or 16000)
+        else:
+            pcm = await request.body()
+            sr_header = request.headers.get("x-sample-rate")
+            if sr_header:
+                sample_rate = int(sr_header)
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid ingest payload: {exc}") from exc
+
+    try:
+        return {"ok": True, **voice.ingest_discord_pcm(pcm, sample_rate=sample_rate)}
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
+
+
 @app.post("/voice/capture")
 def voice_capture() -> dict[str, Any]:
     try:
-        if not voice.status()["capturing"]:
+        st = voice.status()
+        if not st["capturing"] and not st.get("discord_fresh"):
             voice.start_capture()
         transcript = voice.transcribe_buffer()
     except Exception as exc:
@@ -387,3 +452,40 @@ def voice_capture() -> dict[str, Any]:
         raise HTTPException(400, "No speech detected in the recent audio buffer")
     result = query_engine.resolve_query(transcript)
     return {"transcript": transcript, "result": result}
+
+
+def _run_quit_script() -> Path | None:
+    script = ROOT / "scripts" / "quit-dm.bat"
+    if not script.exists():
+        return None
+    # Detach so this process can die when the script kills the port.
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+    subprocess.Popen(
+        ["cmd", "/c", str(script)],
+        cwd=str(ROOT),
+        creationflags=creationflags,
+        close_fds=True,
+    )
+    return script
+
+
+@app.post("/shutdown")
+def shutdown_stack() -> dict[str, Any]:
+    """
+    Stop API + Vite terminals (start-dev windows) and free ports.
+    Safe to call from the browser Quit button when Electron is not running.
+    """
+    script = _run_quit_script()
+
+    def _exit_soon() -> None:
+        import time
+
+        time.sleep(0.35)
+        os._exit(0)
+
+    threading.Thread(target=_exit_soon, daemon=True).start()
+    return {"ok": True, "script": str(script) if script else None}

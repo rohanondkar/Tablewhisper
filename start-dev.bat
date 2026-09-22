@@ -24,16 +24,18 @@ echo   1 ^) Start app   (API + UI + open browser once)     [recommended]
 echo   2 ^) First-time setup   (venv + npm install)
 echo   3 ^) Show all commands
 echo   4 ^) Health check
-echo   5 ^) Quit
+echo   5 ^) Start Discord bot   (VC listen → API buffer)
+echo   6 ^) Quit
 echo  ----------------------------------------------------------------
 echo.
-set /p CHOICE=  Pick 1-5: 
+set /p CHOICE=  Pick 1-6: 
 
 if "%CHOICE%"=="1" goto start
 if "%CHOICE%"=="2" goto setup
 if "%CHOICE%"=="3" goto commands
 if "%CHOICE%"=="4" goto health
-if "%CHOICE%"=="5" exit /b 0
+if "%CHOICE%"=="5" goto discord_bot
+if "%CHOICE%"=="6" exit /b 0
 goto menu
 
 :setup
@@ -76,6 +78,13 @@ echo  --- Start UI ---
 echo   cd /d "%ROOT%apps\desktop"
 echo   npm.cmd run dev:ui
 echo.
+echo  --- Discord bot (Developer Portal VC listen) ---
+echo   cd /d "%ROOT%apps\discord-bot"
+echo   copy discord.example.json discord.json
+echo   python -m venv .venv
+echo   .venv\Scripts\python.exe -m pip install -r requirements.txt
+echo   .venv\Scripts\python.exe bot.py
+echo.
 echo  --- Electron (Ctrl+N voice) ---
 echo   cd /d "%ROOT%apps\desktop"
 echo   set DM_API_PORT=%API_PORT%
@@ -91,12 +100,101 @@ echo.
 pause
 goto menu
 
+:discord_bot
+echo.
+set "CURL=curl.exe"
+where curl.exe >nul 2>&1
+if errorlevel 1 set "CURL=curl"
+"%CURL%" -sf --connect-timeout 2 "http://127.0.0.1:%API_PORT%/health" >nul 2>&1
+if errorlevel 1 (
+  echo  [!] API is not running on port %API_PORT%.
+  echo      Start option 1 first, then come back for the Discord bot.
+  pause
+  goto menu
+)
+if not exist "%ROOT%apps\discord-bot\discord.json" (
+  echo  [!] Missing apps\discord-bot\discord.json
+  echo      Copy discord.example.json → discord.json and paste your Developer Portal token.
+  echo      Guide: apps\discord-bot\README.md
+  echo      Portal: https://discord.com/developers/applications
+  pause
+  goto menu
+)
+if not exist "%ROOT%apps\discord-bot\.venv\Scripts\python.exe" (
+  echo  [SETUP] Discord bot venv...
+  pushd "%ROOT%apps\discord-bot"
+  python -m venv .venv
+  .venv\Scripts\python.exe -m pip install --upgrade pip
+  .venv\Scripts\python.exe -m pip install -r requirements.txt
+  popd
+)
+echo  Starting Discord VC bot...
+start "DM Discord Bot" cmd /k "cd /d "%ROOT%apps\discord-bot" && title DM Discord Bot && echo. && echo  Discord VC → http://127.0.0.1:%API_PORT%/voice/discord/ingest && echo  In Discord: !join / !leave  ^(Ctrl+N resolves in the app^) && echo. && .venv\Scripts\python.exe bot.py"
+echo  [OK] Discord bot window opened.
+pause
+goto menu
+
 :health
 echo.
-curl -s http://127.0.0.1:%API_PORT%/health
+echo  ================================================================
+echo   HEALTH CHECK
+echo  ================================================================
 echo.
-curl -s http://127.0.0.1:%API_PORT%/sessions
+
+REM Prefer curl.exe so PowerShell's curl alias never interferes if launched oddly.
+set "CURL=curl.exe"
+where curl.exe >nul 2>&1
+if errorlevel 1 set "CURL=curl"
+
+echo  API  http://127.0.0.1:%API_PORT%/health
+"%CURL%" -s -S --connect-timeout 2 --max-time 5 "http://127.0.0.1:%API_PORT%/health" > "%TEMP%\dm_health.json" 2> "%TEMP%\dm_health.err"
+if errorlevel 1 (
+  echo    [DOWN]  API not reachable on port %API_PORT%
+  echo            Start the app with menu option 1 first.
+  if exist "%TEMP%\dm_health.err" type "%TEMP%\dm_health.err"
+) else (
+  echo    [UP]    API responded:
+  type "%TEMP%\dm_health.json"
+  echo.
+)
+
 echo.
+echo  STATUS  http://127.0.0.1:%API_PORT%/status
+"%CURL%" -s -S --connect-timeout 2 --max-time 8 "http://127.0.0.1:%API_PORT%/status" > "%TEMP%\dm_status.json" 2>nul
+if errorlevel 1 (
+  echo    [DOWN]  /status unavailable
+) else (
+  echo    [UP]    Runtime status:
+  type "%TEMP%\dm_status.json"
+  echo.
+)
+
+echo.
+echo  UI  http://127.0.0.1:5173/
+"%CURL%" -s -S -o nul --connect-timeout 2 --max-time 5 -w "%%{http_code}" "http://127.0.0.1:5173/" > "%TEMP%\dm_ui_code.txt" 2>nul
+set /p UI_CODE=<"%TEMP%\dm_ui_code.txt"
+if "%UI_CODE%"=="200" (
+  echo    [UP]    Vite UI responding ^(HTTP %UI_CODE%^)
+) else if "%UI_CODE%"=="304" (
+  echo    [UP]    Vite UI responding ^(HTTP %UI_CODE%^)
+) else (
+  echo    [DOWN]  UI not reachable on 5173 ^(HTTP %UI_CODE%^)
+  echo            Start the app with menu option 1 first.
+)
+
+echo.
+echo  SESSIONS  http://127.0.0.1:%API_PORT%/sessions
+"%CURL%" -s -S --connect-timeout 2 --max-time 5 "http://127.0.0.1:%API_PORT%/sessions" > "%TEMP%\dm_sessions.json" 2>nul
+if errorlevel 1 (
+  echo    [DOWN]  /sessions unavailable
+) else (
+  echo    [UP]
+  type "%TEMP%\dm_sessions.json"
+  echo.
+)
+
+echo.
+echo  ----------------------------------------------------------------
 pause
 goto menu
 

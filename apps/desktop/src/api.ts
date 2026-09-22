@@ -125,7 +125,14 @@ export interface StatusInfo {
   api: string;
   ollama: { available: boolean; model: string | null; models: string[] };
   whisper: { available: boolean; model: string };
-  audio: { capturing: boolean; buffer_seconds: number; device: string | null };
+  audio: {
+    capturing: boolean;
+    wasapi_capturing?: boolean;
+    buffer_seconds: number;
+    device: string | null;
+    source?: "discord" | "wasapi" | "idle" | string;
+    discord_fresh?: boolean;
+  };
   active_ruleset: string;
   active_session_id: string | null;
 }
@@ -220,6 +227,8 @@ export const api = {
     request<{ ok: boolean }>(`/sessions/${id}`, { method: "DELETE" }),
   audioStart: () => request<{ ok: boolean }>("/voice/start", { method: "POST" }),
   audioStop: () => request<{ ok: boolean }>("/voice/stop", { method: "POST" }),
+  shutdown: () =>
+    request<{ ok: boolean }>("/shutdown", { method: "POST" }).catch(() => ({ ok: true })),
   settings: () => request<Record<string, unknown>>("/settings"),
   updateSettings: (patch: Record<string, unknown>) =>
     request<Record<string, unknown>>("/settings", {

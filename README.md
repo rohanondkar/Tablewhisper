@@ -123,7 +123,7 @@ Or in a browser: http://127.0.0.1:8766/health → `{"status":"ok"}`
 1. Start API + UI.
 2. Upload D&D Beyond character PDFs (Party panel).
 3. Type a situation → **Resolve check**.
-4. Voice (optional): **Start listening** while Discord plays → **Ctrl+N** (Electron) or Capture button.
+4. Voice (optional): **Start listening** while Discord/desktop audio plays → **Ctrl+N** (Electron) or Capture.
 5. Level-up: **Re-upload** or **Edit sheet**.
 6. Ruleset dropdown: `dnd5e-srd` now; add packs under `packages\`.
 

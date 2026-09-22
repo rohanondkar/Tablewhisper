@@ -122,6 +122,15 @@ button {
   align-items: center;
 }
 
+.quit-btn {
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  color: #fecaca !important;
+}
+
+.quit-btn:hover {
+  background: rgba(248, 113, 113, 0.15) !important;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;

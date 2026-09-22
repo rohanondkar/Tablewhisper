@@ -1,12 +1,14 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, shell } = require("electron");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execFile } = require("child_process");
 const http = require("http");
 
 const API_PORT = process.env.DM_API_PORT || "8766";
 const API_BASE = `http://127.0.0.1:${API_PORT}`;
+const ROOT = path.resolve(__dirname, "..", "..", "..");
 let mainWindow = null;
 let apiProcess = null;
+let quitting = false;
 
 function waitForApi(timeoutMs = 60000) {
   const start = Date.now();
@@ -86,6 +88,33 @@ function registerHotkeys() {
   if (!ok) console.warn("Failed to register Ctrl+N");
 }
 
+function runQuitScript() {
+  const script = path.join(ROOT, "scripts", "quit-dm.bat");
+  const fs = require("fs");
+  if (!fs.existsSync(script)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    execFile("cmd.exe", ["/c", script], { windowsHide: true }, () => resolve(true));
+  });
+}
+
+async function quitEverything() {
+  if (quitting) return { ok: true };
+  quitting = true;
+  try {
+    if (apiProcess && !apiProcess.killed) {
+      try {
+        apiProcess.kill();
+      } catch {
+        /* ignore */
+      }
+    }
+    await runQuitScript();
+  } finally {
+    app.quit();
+  }
+  return { ok: true };
+}
+
 app.whenReady().then(async () => {
   startApi();
   try {
@@ -113,3 +142,4 @@ app.on("window-all-closed", () => {
 });
 
 ipcMain.handle("api:base", () => API_BASE);
+ipcMain.handle("app:quitAll", () => quitEverything());
