@@ -35,8 +35,15 @@ if "%CHOICE%"=="2" goto setup
 if "%CHOICE%"=="3" goto commands
 if "%CHOICE%"=="4" goto health
 if "%CHOICE%"=="5" goto discord_bot
-if "%CHOICE%"=="6" exit /b 0
+if "%CHOICE%"=="6" goto quit_all
 goto menu
+
+:quit_all
+echo.
+echo  Stopping API / UI / Discord terminals...
+call "%ROOT%scripts\quit-dm.bat"
+echo  Launcher exiting.
+exit /b 0
 
 :setup
 echo.
@@ -129,7 +136,7 @@ if not exist "%ROOT%apps\discord-bot\.venv\Scripts\python.exe" (
   popd
 )
 echo  Starting Discord VC bot...
-start "DM Discord Bot" cmd /k "cd /d "%ROOT%apps\discord-bot" && title DM Discord Bot && echo. && echo  Discord VC → http://127.0.0.1:%API_PORT%/voice/discord/ingest && echo  In Discord: !join / !leave  ^(Ctrl+N resolves in the app^) && echo. && .venv\Scripts\python.exe bot.py"
+start "DM Discord Bot" cmd /c "cd /d "%ROOT%apps\discord-bot" && title DM Discord Bot && echo. && echo  Discord VC → http://127.0.0.1:%API_PORT%/voice/discord/ingest && echo  In Discord: !join / !leave  ^(Ctrl+N resolves in the app^) && echo. && .venv\Scripts\python.exe bot.py & if errorlevel 1 pause"
 echo  [OK] Discord bot window opened.
 pause
 goto menu
@@ -218,10 +225,10 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') 
 timeout /t 2 /nobreak >nul
 
 echo  Starting API on port %API_PORT%...
-start "DM API :%API_PORT%" cmd /k "cd /d "%ROOT%apps\api" && title DM API :%API_PORT% && echo. && echo  API  http://127.0.0.1:%API_PORT%/health && echo  Docs http://127.0.0.1:%API_PORT%/docs && echo. && .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port %API_PORT% --reload"
+start "DM API :%API_PORT%" cmd /c "cd /d "%ROOT%apps\api" && title DM API :%API_PORT% && echo. && echo  API  http://127.0.0.1:%API_PORT%/health && echo  Docs http://127.0.0.1:%API_PORT%/docs && echo. && .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port %API_PORT% --reload & if errorlevel 1 pause"
 
 echo  Starting UI on port 5173...
-start "DM UI :5173" cmd /k "cd /d "%ROOT%apps\desktop" && title DM UI :5173 && echo. && echo  UI http://127.0.0.1:5173 && echo  (Do NOT press o — the launcher opens the browser for you.) && echo. && npm.cmd run dev:ui"
+start "DM UI :5173" cmd /c "cd /d "%ROOT%apps\desktop" && title DM UI :5173 && echo. && echo  UI http://127.0.0.1:5173 && echo  (Do NOT press o — the launcher opens the browser for you.) && echo. && npm.cmd run dev:ui & if errorlevel 1 pause"
 
 echo  Waiting for UI to be ready...
 set "READY=0"

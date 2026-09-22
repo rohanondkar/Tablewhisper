@@ -5,6 +5,7 @@ from typing import Any
 
 from . import db, ollama_client, rules
 from . import monsters as monsters_mod
+from . import npcs as npcs_mod
 
 # check_types where a clear rules hit should win over a conflicting LLM guess
 PROTECTED_TYPES = {"attack", "save", "initiative"}
@@ -402,9 +403,11 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
     events = db.list_events()
     hint = rules.match_guidance(text, ruleset)
 
-    # Peek at creature mention early for social/beast overrides (no spawn yet)
+    # Peek at NPC / creature mention early for social/beast overrides (no spawn yet)
+    npc_peek = npcs_mod.find_npc_context(text)
     creature_peek = monsters_mod.find_creature_context(text)
-    hint = _apply_intent_overrides(text, hint, creature_peek)
+    subject_peek = npc_peek or creature_peek
+    hint = _apply_intent_overrides(text, hint, subject_peek)
 
     # Skip local LLM when rules already decide — Ollama is the slow path (seconds–tens of seconds).
     skip_llm = _rules_are_decisive(hint)
@@ -500,11 +503,18 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
             source = "hybrid" if llm else "rules"
 
     # Naming a creature alone is not an attack
-    if check_type == "attack" and creature_peek and not _ATTACK_VERB_RE.search(text):
+    if check_type == "attack" and (npc_peek or creature_peek) and not _ATTACK_VERB_RE.search(text):
         check_type = "ability"
         suggested_dc = suggested_dc if suggested_dc is not None else 15
         notes = "Creature named without a combat verb — treating as a non-attack check. Clarify the action."
         reasoning = (reasoning + " " if reasoning else "") + "Demoted attack: no combat verb."
+
+    # Prefer NPC social DCs when a scene/catalog NPC is the subject
+    if check_type in {"skill", "ability", "save"} and npc_peek and skill:
+        npc_dc = npcs_mod.social_dc_for(npc_peek, skill)
+        if npc_dc is not None:
+            suggested_dc = npc_dc
+            notes = (notes + " " if notes else "") + f"{npc_peek.get('label')} social DC {npc_dc}."
 
     # Attacks never use a DC
     if check_type == "attack":
@@ -532,14 +542,14 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
     howto = None
     if check_type == "attack":
         try:
-            target = monsters_mod.resolve_or_spawn_target(text)
+            target = npcs_mod.resolve_or_spawn_npc(text) or monsters_mod.resolve_or_spawn_target(text)
         except Exception:
             target = None
         if target and modifier is not None:
             to_hit_needed = max(1, min(20, int(target["ac"]) - int(modifier)))
     elif check_type in {"skill", "save", "ability"}:
         # Narrative subject only — do not auto-spawn, do not use AC
-        target = creature_peek
+        target = npc_peek or creature_peek
         if target and target.get("virtual"):
             # Keep label/stats for UI but no encounter id for damage
             pass

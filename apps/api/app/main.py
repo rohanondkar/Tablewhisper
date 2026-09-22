@@ -15,18 +15,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, ollama_client, query_engine, rules, voice, monsters
+from . import db, ollama_client, query_engine, rules, voice, monsters, npcs
 from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
-from .pdf_import import character_diff, parse_dndbeyond_pdf
+from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
+from .npcs import CUSTOM_IMAGE_DIR as NPC_CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR as NPC_SRD_IMAGE_DIR
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init_db()
     monsters.ensure_encounter_tables()
+    npcs.ensure_scene_tables()
     CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    NPC_SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
@@ -49,6 +53,19 @@ app.mount(
     "/media/monsters/custom",
     StaticFiles(directory=str(CUSTOM_IMAGE_DIR)),
     name="monster_custom",
+)
+# NPC portraits
+NPC_SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/npcs/srd",
+    StaticFiles(directory=str(NPC_SRD_IMAGE_DIR)),
+    name="npc_srd",
+)
+app.mount(
+    "/media/npcs/custom",
+    StaticFiles(directory=str(NPC_CUSTOM_IMAGE_DIR)),
+    name="npc_custom",
 )
 
 
@@ -203,6 +220,44 @@ def patch_character(char_id: str, body: CharacterPatch) -> dict[str, Any]:
     return db.public_character(db.upsert_character(current))
 
 
+@app.post("/characters/preview")
+async def preview_character(
+    file: UploadFile = File(...),
+    replace_id: str = Form(...),
+) -> dict[str, Any]:
+    """Parse a PDF against an existing sheet without saving."""
+    if not replace_id.strip():
+        raise HTTPException(400, "replace_id is required")
+    old = db.get_character(replace_id)
+    if not old:
+        raise HTTPException(404, "Character to update not found")
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(400, "Upload a D&D Beyond PDF export")
+    dest = UPLOADS_DIR / f"{uuid.uuid4()}_{Path(file.filename).name}"
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        parsed = parse_dndbeyond_pdf(dest, character_id=replace_id)
+    except Exception as exc:
+        raise HTTPException(400, f"Failed to parse PDF: {exc}") from exc
+
+    parsed["id"] = replace_id
+    raw_diff = character_diff(old, parsed)
+    current_name = str(old.get("name") or "")
+    parsed_name = str(parsed.get("name") or "")
+    return {
+        "replace_id": replace_id,
+        "current_name": current_name,
+        "parsed_name": parsed_name,
+        "name_mismatch": bool(
+            current_name.strip()
+            and parsed_name.strip()
+            and current_name.strip().lower() != parsed_name.strip().lower()
+        ),
+        "changes": format_character_changes(raw_diff),
+    }
+
+
 @app.post("/characters/upload")
 async def upload_character(
     file: UploadFile = File(...),
@@ -219,14 +274,20 @@ async def upload_character(
         raise HTTPException(400, f"Failed to parse PDF: {exc}") from exc
 
     diff = None
+    changes: list[dict[str, str]] | None = None
     if replace_id:
         old = db.get_character(replace_id)
         if not old:
             raise HTTPException(404, "Character to replace not found")
         parsed["id"] = replace_id
         diff = character_diff(old, parsed)
+        changes = format_character_changes(diff)
     saved = db.upsert_character(parsed)
-    return {"character": db.public_character(saved), "diff": diff}
+    return {
+        "character": db.public_character(saved),
+        "diff": diff,
+        "changes": changes,
+    }
 
 
 @app.post("/query")
@@ -289,9 +350,21 @@ class SpawnRequest(BaseModel):
     count: int = Field(default=1, ge=1, le=12)
 
 
+class NpcSpawnRequest(BaseModel):
+    npc_id: str
+    label: str | None = None
+    count: int = Field(default=1, ge=1, le=12)
+
+
 class EnemyHpPatch(BaseModel):
     current_hp: int
     damage: int | None = None
+
+
+class SceneNpcPatch(BaseModel):
+    current_hp: int | None = None
+    damage: int | None = None
+    attitude: str | None = None
 
 
 class CustomMonsterBody(BaseModel):
@@ -384,6 +457,100 @@ def patch_enemy_hp(enemy_id: str, body: EnemyHpPatch) -> dict[str, Any]:
     return updated
 
 
+@app.get("/npcs")
+def npc_catalog() -> list[dict[str, Any]]:
+    return npcs.list_templates()
+
+
+@app.post("/npcs/custom")
+async def add_custom_npc(
+    name: str = Form(...),
+    ac: int = Form(12),
+    hp: int = Form(10),
+    attitude: str = Form("indifferent"),
+    role: str = Form(""),
+    image: UploadFile | None = File(None),
+) -> dict[str, Any]:
+    mid = name.lower().replace(" ", "-")
+    data: dict[str, Any] = {
+        "id": mid,
+        "name": name,
+        "ac": ac,
+        "hp": hp,
+        "aliases": [],
+        "attitude": attitude or "indifferent",
+        "role": role or "Custom NPC",
+        "social": {
+            "persuasion_dc": 13,
+            "deception_dc": 13,
+            "intimidation_dc": 13,
+            "insight_dc": 13,
+        },
+        "attacks": [],
+    }
+    if image and image.filename:
+        NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        ext = Path(image.filename).suffix.lower() or ".png"
+        if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
+            ext = ".png"
+        fname = f"{mid}{ext}"
+        dest = NPC_CUSTOM_IMAGE_DIR / fname
+        with dest.open("wb") as out:
+            shutil.copyfileobj(image.file, out)
+        data["image"] = fname
+    else:
+        data["image"] = "generic.svg"
+    try:
+        return npcs.save_custom_npc(data)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/scene")
+def get_scene() -> list[dict[str, Any]]:
+    return npcs.list_scene()
+
+
+@app.post("/scene/spawn")
+def spawn_scene(body: NpcSpawnRequest) -> list[dict[str, Any]]:
+    try:
+        return npcs.spawn_npc(body.npc_id, label=body.label, count=body.count)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/scene")
+def clear_scene_route() -> dict[str, bool]:
+    npcs.clear_scene()
+    return {"ok": True}
+
+
+@app.delete("/scene/{npc_instance_id}")
+def delete_scene_npc(npc_instance_id: str) -> dict[str, bool]:
+    if not npcs.remove_scene_npc(npc_instance_id):
+        raise HTTPException(404, "Scene NPC not found")
+    return {"ok": True}
+
+
+@app.patch("/scene/{npc_instance_id}")
+def patch_scene_npc(npc_instance_id: str, body: SceneNpcPatch) -> dict[str, Any]:
+    npc = npcs.get_scene_npc(npc_instance_id)
+    if not npc:
+        raise HTTPException(404, "Scene NPC not found")
+    new_hp = npc["current_hp"]
+    if body.damage is not None:
+        new_hp = npc["current_hp"] - int(body.damage)
+    elif body.current_hp is not None:
+        new_hp = body.current_hp
+    updated = npcs.update_scene_npc(
+        npc_instance_id,
+        current_hp=new_hp,
+        attitude=body.attitude,
+    )
+    assert updated is not None
+    return updated
+
+
 @app.post("/voice/start")
 def voice_start() -> dict[str, Any]:
     try:
@@ -456,19 +623,44 @@ def voice_capture() -> dict[str, Any]:
 
 def _run_quit_script() -> Path | None:
     script = ROOT / "scripts" / "quit-dm.bat"
-    if not script.exists():
+    ps1 = ROOT / "scripts" / "quit-dm.ps1"
+    if not script.exists() and not ps1.exists():
         return None
-    # Detach so this process can die when the script kills the port.
     creationflags = 0
     if os.name == "nt":
-        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
-            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        # New console group, hidden — must not die with the API process.
+        creationflags = (
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
         )
+    # Prefer PowerShell directly (more reliable force-kill than nested cmd).
+    if ps1.exists():
+        subprocess.Popen(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ps1),
+            ],
+            cwd=str(ROOT),
+            creationflags=creationflags,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return ps1
     subprocess.Popen(
         ["cmd", "/c", str(script)],
         cwd=str(ROOT),
         creationflags=creationflags,
         close_fds=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     return script
 
@@ -476,7 +668,7 @@ def _run_quit_script() -> Path | None:
 @app.post("/shutdown")
 def shutdown_stack() -> dict[str, Any]:
     """
-    Stop API + Vite terminals (start-dev windows) and free ports.
+    Force-close API + Vite + Discord terminals and free ports.
     Safe to call from the browser Quit button when Electron is not running.
     """
     script = _run_quit_script()
@@ -484,7 +676,8 @@ def shutdown_stack() -> dict[str, Any]:
     def _exit_soon() -> None:
         import time
 
-        time.sleep(0.35)
+        # Let the force-quit script start before this process vanishes.
+        time.sleep(1.2)
         os._exit(0)
 
     threading.Thread(target=_exit_soon, daemon=True).start()

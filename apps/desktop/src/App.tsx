@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   mediaUrlSync,
   type Character,
+  type CharacterChange,
+  type CharacterPreview,
   type CheckResult,
   type EncounterEnemy,
   type MonsterTemplate,
+  type NpcTemplate,
   type RulesetSummary,
+  type SceneNpc,
   type SessionEvent,
   type SessionInfo,
   type StatusInfo,
@@ -25,21 +29,41 @@ export default function App() {
   const [encounter, setEncounter] = useState<EncounterEnemy[]>([]);
   const [spawnId, setSpawnId] = useState("orc");
   const [monsterFilter, setMonsterFilter] = useState("");
+  const [npcs, setNpcs] = useState<NpcTemplate[]>([]);
+  const [scene, setScene] = useState<SceneNpc[]>([]);
+  const [spawnNpcId, setSpawnNpcId] = useState("mira");
+  const [npcFilter, setNpcFilter] = useState("");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<CheckResult | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [diff, setDiff] = useState<Record<string, unknown> | null>(null);
   const [editing, setEditing] = useState(false);
   const [editDraft, setEditDraft] = useState<Partial<Character>>({});
+  const [pickReuploadOpen, setPickReuploadOpen] = useState(false);
+  const [reuploadTargetId, setReuploadTargetId] = useState<string | null>(null);
+  const [reuploadFile, setReuploadFile] = useState<File | null>(null);
+  const [reuploadPreview, setReuploadPreview] = useState<CharacterPreview | null>(null);
+  const reuploadFileRef = useRef<HTMLInputElement>(null);
   const [customMonster, setCustomMonster] = useState({
     name: "",
     ac: 13,
     hp: 15,
     image: null as File | null,
   });
+  const [customNpc, setCustomNpc] = useState({
+    name: "",
+    ac: 12,
+    hp: 12,
+    attitude: "indifferent",
+    role: "",
+    image: null as File | null,
+  });
   const [apiBase, setApiBase] = useState(API_BASE);
+  const [rightTab, setRightTab] = useState<"foes" | "scene" | "log">("foes");
+  const [addModal, setAddModal] = useState<null | "monster" | "npc">(null);
+  const [showCustomInModal, setShowCustomInModal] = useState(false);
+  const rightTabInitialized = useRef(false);
 
   const selected = useMemo(
     () => characters.find((c) => c.id === selectedId) || null,
@@ -60,15 +84,29 @@ export default function App() {
         String(m.cr || "").toLowerCase().includes(q)
     );
   }, [monsters, monsterFilter]);
+  const filteredNpcs = useMemo(() => {
+    const q = npcFilter.trim().toLowerCase();
+    if (!q) return npcs;
+    return npcs.filter(
+      (n) =>
+        n.name.toLowerCase().includes(q) ||
+        n.id.toLowerCase().includes(q) ||
+        (n.role || "").toLowerCase().includes(q) ||
+        (n.attitude || "").toLowerCase().includes(q) ||
+        (n.aliases || []).some((a) => a.toLowerCase().includes(q))
+    );
+  }, [npcs, npcFilter]);
 
   const refresh = useCallback(async () => {
-    const [s, chars, ev, rs, mons, enc] = await Promise.all([
+    const [s, chars, ev, rs, mons, enc, npcList, sceneList] = await Promise.all([
       api.status(),
       api.listCharacters(),
       api.sessionEvents(),
       api.listRulesets(),
       api.listMonsters(),
       api.listEncounter(),
+      api.listNpcs().catch(() => [] as NpcTemplate[]),
+      api.listScene().catch(() => [] as SceneNpc[]),
     ]);
     setStatus(s);
     setCharacters(chars);
@@ -76,6 +114,8 @@ export default function App() {
     setRulesets(rs);
     setMonsters(mons);
     setEncounter(enc);
+    setNpcs(npcList);
+    setScene(sceneList);
     try {
       const sess = await api.listSessions();
       setSessions(sess);
@@ -85,8 +125,11 @@ export default function App() {
     if (mons.length && !mons.find((m) => m.id === spawnId)) {
       setSpawnId(mons[0].id);
     }
+    if (npcList.length && !npcList.find((n) => n.id === spawnNpcId)) {
+      setSpawnNpcId(npcList[0].id);
+    }
     if (!selectedId && chars.length) setSelectedId(chars[0].id);
-  }, [selectedId, spawnId]);
+  }, [selectedId, spawnId, spawnNpcId]);
 
   useEffect(() => {
     if (window.dmDesktop?.getApiBase) {
@@ -107,6 +150,24 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (rightTabInitialized.current) return;
+    if (!monsters.length && !npcs.length && !encounter.length && !scene.length) return;
+    rightTabInitialized.current = true;
+    if (encounter.length > 0) setRightTab("foes");
+    else if (scene.length > 0) setRightTab("scene");
+    else setRightTab("foes");
+  }, [encounter.length, scene.length, monsters.length, npcs.length]);
+
+  useEffect(() => {
+    if (!addModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAddModal(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [addModal]);
+
   async function handleQuery() {
     if (!query.trim()) return;
     setBusy(true);
@@ -117,6 +178,7 @@ export default function App() {
       setResult(r);
       setEvents(await api.sessionEvents());
       setEncounter(await api.listEncounter());
+      setScene(await api.listScene().catch(() => []));
     } catch (e) {
       setError(String(e));
     } finally {
@@ -137,6 +199,8 @@ export default function App() {
       setQuery(out.transcript);
       setResult(out.result);
       setEvents(await api.sessionEvents());
+      setEncounter(await api.listEncounter());
+      setScene(await api.listScene().catch(() => []));
       setStatus(await api.status());
     } catch (e) {
       setError(String(e));
@@ -145,12 +209,89 @@ export default function App() {
     }
   }
 
-  async function handleUpload(file: File, replaceId?: string) {
+  async function handleUpload(file: File) {
     setBusy(true);
     setError(null);
     try {
-      const out = await api.uploadCharacter(file, replaceId);
-      setDiff(out.diff || null);
+      const out = await api.uploadCharacter(file);
+      await refresh();
+      setSelectedId(out.character.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function clearReuploadWizard() {
+    setPickReuploadOpen(false);
+    setReuploadTargetId(null);
+    setReuploadFile(null);
+    setReuploadPreview(null);
+    if (reuploadFileRef.current) reuploadFileRef.current.value = "";
+  }
+
+  function startReupload() {
+    setError(null);
+    if (!characters.length) {
+      setError("Upload a character PDF first before re-uploading.");
+      return;
+    }
+    setReuploadPreview(null);
+    setReuploadFile(null);
+    setReuploadTargetId(null);
+    setPickReuploadOpen(true);
+  }
+
+  function pickReuploadTarget(id: string) {
+    setReuploadTargetId(id);
+    setPickReuploadOpen(false);
+    // Defer so the pick modal unmounts before the native file dialog opens.
+    window.setTimeout(() => reuploadFileRef.current?.click(), 0);
+  }
+
+  async function handleReuploadFile(file: File) {
+    if (!reuploadTargetId) {
+      setError("Pick which character to update first.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const preview = await api.previewCharacter(file, reuploadTargetId);
+      setReuploadFile(file);
+      setReuploadPreview(preview);
+    } catch (e) {
+      setError(String(e));
+      clearReuploadWizard();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmReupload() {
+    if (!reuploadFile || !reuploadTargetId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await api.uploadCharacter(reuploadFile, reuploadTargetId);
+      clearReuploadWizard();
+      await refresh();
+      setSelectedId(out.character.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadReuploadAsNew() {
+    if (!reuploadFile) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const out = await api.uploadCharacter(reuploadFile);
+      clearReuploadWizard();
       await refresh();
       setSelectedId(out.character.id);
     } catch (e) {
@@ -238,17 +379,26 @@ export default function App() {
               }
               setBusy(true);
               try {
+                // Always ask the API to run quit-dm.bat (kills API/UI/Discord terminals).
+                await api.shutdown();
                 if (window.dmDesktop?.quitAll) {
                   await window.dmDesktop.quitAll();
                   return;
                 }
-                await api.shutdown();
                 window.close();
               } catch {
                 try {
                   await api.shutdown();
                 } catch {
                   /* ignore — process may already be dying */
+                }
+                if (window.dmDesktop?.quitAll) {
+                  try {
+                    await window.dmDesktop.quitAll();
+                  } catch {
+                    /* ignore */
+                  }
+                  return;
                 }
                 window.close();
               } finally {
@@ -320,21 +470,122 @@ export default function App() {
                 }}
               />
             </label>
-            {selected && (
-              <label className="btn file-btn">
-                Re-upload
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleUpload(f, selected.id);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
+            <button type="button" className="btn" disabled={busy} onClick={startReupload}>
+              Re-upload
+            </button>
+            <input
+              ref={reuploadFileRef}
+              type="file"
+              accept="application/pdf"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleReuploadFile(f);
+                e.target.value = "";
+              }}
+            />
           </div>
+
+          {pickReuploadOpen && (
+            <div className="reupload-pick" role="dialog" aria-label="Choose character to update">
+              <strong>Which character are you updating?</strong>
+              <p className="muted small">Pick one, then choose the new D&amp;D Beyond PDF.</p>
+              <ul className="reupload-pick-list">
+                {characters.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      className="btn reupload-pick-item"
+                      disabled={busy}
+                      onClick={() => pickReuploadTarget(c.id)}
+                    >
+                      <span className="reupload-pick-name">{c.name}</span>
+                      <span className="muted small">{c.class_level || `Level ${c.level}`}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <button type="button" className="btn ghost" onClick={clearReuploadWizard}>
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {reuploadTargetId && !reuploadPreview && !pickReuploadOpen && (
+            <div className="reupload-pick">
+              <strong>
+                Updating {characters.find((c) => c.id === reuploadTargetId)?.name || "character"}
+              </strong>
+              <p className="muted small">Choose the new PDF in the file dialog, or cancel.</p>
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => reuploadFileRef.current?.click()}
+                >
+                  Choose PDF
+                </button>
+                <button type="button" className="btn ghost" onClick={clearReuploadWizard}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {reuploadPreview && (
+            <div className="reupload-review" role="dialog" aria-label="Confirm character update">
+              <strong>Updating {reuploadPreview.current_name}</strong>
+              {reuploadPreview.name_mismatch && (
+                <p className="reupload-warn">
+                  This PDF looks like <em>{reuploadPreview.parsed_name}</em>, not{" "}
+                  {reuploadPreview.current_name}. Update the selected sheet anyway, or add it as a
+                  new party member.
+                </p>
+              )}
+              {reuploadPreview.changes.length === 0 ? (
+                <p className="muted">No differences detected.</p>
+              ) : (
+                <ul className="change-list">
+                  {reuploadPreview.changes.map((ch: CharacterChange) => (
+                    <li key={`${ch.label}-${ch.from}-${ch.to}`}>
+                      <span className="change-label">{ch.label}</span>
+                      <span className="change-values">
+                        <span className="change-from">{ch.from}</span>
+                        <span className="change-arrow" aria-hidden>
+                          →
+                        </span>
+                        <span className="change-to">{ch.to}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => void confirmReupload()}
+                >
+                  Confirm update
+                </button>
+                {reuploadPreview.name_mismatch && (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={busy}
+                    onClick={() => void uploadReuploadAsNew()}
+                  >
+                    Upload as new character
+                  </button>
+                )}
+                <button type="button" className="btn ghost" disabled={busy} onClick={clearReuploadWizard}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="party-list">
             {characters.length === 0 && (
@@ -498,17 +749,6 @@ export default function App() {
                   ))}
                   <button className="btn primary" onClick={() => void saveEdits()} disabled={busy}>
                     Save changes
-                  </button>
-                </div>
-              )}
-              {diff && (
-                <div className="diff-box">
-                  <strong>Re-upload diff</strong>
-                  <pre style={{ whiteSpace: "pre-wrap", margin: "0.4rem 0 0" }}>
-                    {JSON.stringify(diff, null, 2)}
-                  </pre>
-                  <button className="btn ghost" onClick={() => setDiff(null)}>
-                    Dismiss
                   </button>
                 </div>
               )}
@@ -744,195 +984,582 @@ export default function App() {
           )}
         </section>
 
-        <aside className="panel">
-          <h2>Encounter</h2>
-          <p className="section-note">
-            {monsters.length} SRD 5.1 monsters (Open5e). Not the full D&D Beyond catalog.
-            Examples: “stabs orc A” (attack vs AC), “persuades the guard” (Persuasion vs DC),
-            “seduces Wolf A” (Animal Handling — not an attack).
-          </p>
-          <div className="spawn-row">
-            {monsters.find((m) => m.id === spawnId)?.image_url && (
-              <img
-                className="spawn-preview"
-                src={mediaUrlSync(monsters.find((m) => m.id === spawnId)?.image_url, apiBase)}
-                alt=""
-              />
-            )}
-            <input
-              className="btn spawn-filter"
-              placeholder="Filter monsters…"
-              value={monsterFilter}
-              onChange={(e) => setMonsterFilter(e.target.value)}
-            />
-            <select
-              className="btn"
-              value={
-                filteredMonsters.some((m) => m.id === spawnId)
-                  ? spawnId
-                  : filteredMonsters[0]?.id || ""
-              }
-              onChange={(e) => setSpawnId(e.target.value)}
-            >
-              {filteredMonsters.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} · CR {m.cr || "?"} · AC {m.ac} · HP {m.hp}
-                </option>
-              ))}
-            </select>
+        <aside className="panel rail-panel">
+          <div className="rail-tabs" role="tablist" aria-label="Encounter panels">
             <button
-              className="btn primary"
-              disabled={busy || !(filteredMonsters.some((m) => m.id === spawnId) ? spawnId : filteredMonsters[0]?.id)}
-              onClick={async () => {
-                const id =
-                  filteredMonsters.some((m) => m.id === spawnId)
-                    ? spawnId
-                    : filteredMonsters[0]?.id;
-                if (!id) return;
-                await api.spawnEnemy(id, 1);
-                setSpawnId(id);
-                setEncounter(await api.listEncounter());
-              }}
+              type="button"
+              role="tab"
+              aria-selected={rightTab === "foes"}
+              className={`rail-tab ${rightTab === "foes" ? "active" : ""}`}
+              onClick={() => setRightTab("foes")}
             >
-              Spawn
+              Foes ({encounter.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightTab === "scene"}
+              className={`rail-tab ${rightTab === "scene" ? "active" : ""}`}
+              onClick={() => setRightTab("scene")}
+            >
+              Scene ({scene.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightTab === "log"}
+              className={`rail-tab ${rightTab === "log" ? "active" : ""}`}
+              onClick={() => setRightTab("log")}
+            >
+              Log
             </button>
           </div>
-          <div className="party-list" style={{ marginTop: "0.75rem" }}>
-            {encounter.length === 0 && (
-              <p className="muted">No enemies yet. Spawn an orc, or name one in the query.</p>
-            )}
-            {encounter.map((e) => {
-              const pct = e.max_hp > 0 ? Math.max(0, Math.min(100, (e.current_hp / e.max_hp) * 100)) : 0;
-              return (
-              <div key={e.id} className="char-card enemy-card">
-                <div className="enemy-row">
-                  <img
-                    className="enemy-portrait"
-                    src={mediaUrlSync(e.image_url, apiBase)}
-                    alt={e.label}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong>{e.label}</strong>
-                    <div className="char-meta">
-                      <span>AC {e.ac}</span>
-                      <span>
-                        HP {e.current_hp}/{e.max_hp}
-                      </span>
+
+          {rightTab === "foes" && (
+            <div className="rail-body" role="tabpanel">
+              <p className="section-note">Combat foes — e.g. “stabs orc A”.</p>
+              <div className="row" style={{ marginBottom: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => {
+                    setShowCustomInModal(false);
+                    setAddModal("monster");
+                  }}
+                >
+                  Add foe
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={busy || encounter.length === 0}
+                  onClick={() => api.clearEncounter().then(refresh)}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="party-list rail-list">
+                {encounter.length === 0 && (
+                  <p className="muted">No enemies. Add a foe or name one in the query.</p>
+                )}
+                {encounter.map((e) => {
+                  const pct =
+                    e.max_hp > 0 ? Math.max(0, Math.min(100, (e.current_hp / e.max_hp) * 100)) : 0;
+                  return (
+                    <div key={e.id} className="char-card enemy-card">
+                      <div className="enemy-row">
+                        <img
+                          className="enemy-portrait"
+                          src={mediaUrlSync(e.image_url, apiBase)}
+                          alt={e.label}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{e.label}</strong>
+                          <div className="char-meta">
+                            <span>AC {e.ac}</span>
+                            <span>
+                              HP {e.current_hp}/{e.max_hp}
+                            </span>
+                          </div>
+                          <div className="hp-bar" title={`${pct.toFixed(0)}%`}>
+                            <span style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="row" style={{ marginTop: "0.4rem" }}>
+                        <button
+                          className="btn ghost"
+                          onClick={async () => {
+                            const raw = window.prompt("Set current HP", String(e.current_hp));
+                            if (raw == null) return;
+                            await api.setEnemyHp(e.id, Number(raw));
+                            setEncounter(await api.listEncounter());
+                          }}
+                        >
+                          Set HP
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={async () => {
+                            await api.removeEnemy(e.id);
+                            setEncounter(await api.listEncounter());
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                    <div className="hp-bar" title={`${pct.toFixed(0)}%`}>
-                      <span style={{ width: `${pct}%` }} />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {rightTab === "scene" && (
+            <div className="rail-body" role="tabpanel">
+              <p className="section-note">Social cast — e.g. “persuades the bartender”.</p>
+              <div className="row" style={{ marginBottom: "0.5rem" }}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={busy}
+                  onClick={() => {
+                    setShowCustomInModal(false);
+                    setAddModal("npc");
+                  }}
+                >
+                  Add NPC
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={busy || scene.length === 0}
+                  onClick={() => api.clearScene().then(refresh)}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="party-list rail-list">
+                {scene.length === 0 && (
+                  <p className="muted">No scene NPCs. Add a bartender, or name one in the query.</p>
+                )}
+                {scene.map((e) => {
+                  const pct =
+                    e.max_hp > 0 ? Math.max(0, Math.min(100, (e.current_hp / e.max_hp) * 100)) : 0;
+                  return (
+                    <div key={e.id} className="char-card enemy-card">
+                      <div className="enemy-row">
+                        <img
+                          className="enemy-portrait"
+                          src={mediaUrlSync(e.image_url, apiBase)}
+                          alt={e.label}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong>{e.label}</strong>
+                          <div className="char-meta">
+                            <span className={`attitude-pill attitude-${e.attitude || "indifferent"}`}>
+                              {e.attitude || "indifferent"}
+                            </span>
+                            <span>AC {e.ac}</span>
+                            <span>
+                              HP {e.current_hp}/{e.max_hp}
+                            </span>
+                          </div>
+                          <div className="hp-bar" title={`${pct.toFixed(0)}%`}>
+                            <span style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="row" style={{ marginTop: "0.4rem" }}>
+                        <button
+                          className="btn ghost"
+                          onClick={async () => {
+                            const raw = window.prompt("Set current HP", String(e.current_hp));
+                            if (raw == null) return;
+                            await api.setSceneNpcHp(e.id, Number(raw));
+                            setScene(await api.listScene());
+                          }}
+                        >
+                          Set HP
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={async () => {
+                            const next = window.prompt(
+                              "Attitude (friendly / indifferent / hostile)",
+                              e.attitude || "indifferent"
+                            );
+                            if (next == null || !next.trim()) return;
+                            await api.setSceneNpcAttitude(e.id, next.trim().toLowerCase());
+                            setScene(await api.listScene());
+                          }}
+                        >
+                          Attitude
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={async () => {
+                            await api.removeSceneNpc(e.id);
+                            setScene(await api.listScene());
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {rightTab === "log" && (
+            <div className="rail-body" role="tabpanel">
+              <p className="section-note">
+                Session memory{activeSession ? ` · ${activeSession.name}` : ""}
+              </p>
+              <div className="log-list rail-list">
+                {events.length === 0 && <p className="muted">No rulings yet this session.</p>}
+                {[...events].reverse().map((ev) => (
+                  <div key={ev.id} className="log-item">
+                    <div className="q">{ev.query}</div>
+                    <div className="a">{ev.result.roll_line}</div>
                   </div>
-                </div>
-                <div className="row" style={{ marginTop: "0.4rem" }}>
-                  <button
-                    className="btn ghost"
-                    onClick={async () => {
-                      const raw = window.prompt("Set current HP", String(e.current_hp));
-                      if (raw == null) return;
-                      await api.setEnemyHp(e.id, Number(raw));
-                      setEncounter(await api.listEncounter());
-                    }}
-                  >
-                    Set HP
-                  </button>
-                  <button
-                    className="btn ghost"
-                    onClick={async () => {
-                      await api.removeEnemy(e.id);
-                      setEncounter(await api.listEncounter());
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
+                ))}
               </div>
-            );})}
-          </div>
-          <div className="row" style={{ marginTop: "0.5rem" }}>
-            <button className="btn ghost" onClick={() => api.clearEncounter().then(refresh)}>
-              Clear encounter
-            </button>
-          </div>
-
-          <h2 style={{ marginTop: "1.25rem" }}>Custom monster</h2>
-          <div className="edit-form">
-            <label>
-              Name
-              <input
-                value={customMonster.name}
-                onChange={(e) => setCustomMonster((c) => ({ ...c, name: e.target.value }))}
-              />
-            </label>
-            <label>
-              AC
-              <input
-                type="number"
-                value={customMonster.ac}
-                onChange={(e) =>
-                  setCustomMonster((c) => ({ ...c, ac: Number(e.target.value) }))
-                }
-              />
-            </label>
-            <label>
-              HP
-              <input
-                type="number"
-                value={customMonster.hp}
-                onChange={(e) =>
-                  setCustomMonster((c) => ({ ...c, hp: Number(e.target.value) }))
-                }
-              />
-            </label>
-            <label className="btn file-btn">
-              Portrait image
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] || null;
-                  setCustomMonster((c) => ({ ...c, image: f }));
-                }}
-              />
-            </label>
-            {customMonster.image && (
-              <span className="muted" style={{ fontSize: "0.8rem" }}>
-                {customMonster.image.name}
-              </span>
-            )}
-            <button
-              className="btn"
-              disabled={busy || !customMonster.name.trim()}
-              onClick={async () => {
-                const saved = await api.addCustomMonster({
-                  name: customMonster.name.trim(),
-                  ac: customMonster.ac,
-                  hp: customMonster.hp,
-                  image: customMonster.image,
-                });
-                setMonsters(await api.listMonsters());
-                setSpawnId(saved.id);
-                setCustomMonster({ name: "", ac: 13, hp: 15, image: null });
-              }}
-            >
-              Save to bestiary
-            </button>
-          </div>
-
-          <h2 style={{ marginTop: "1.25rem" }}>
-            Session memory{activeSession ? ` · ${activeSession.name}` : ""}
-          </h2>
-          <div className="log-list" style={{ maxHeight: "240px" }}>
-            {events.length === 0 && <p className="muted">No rulings yet this session.</p>}
-            {[...events].reverse().map((ev) => (
-              <div key={ev.id} className="log-item">
-                <div className="q">{ev.query}</div>
-                <div className="a">{ev.result.roll_line}</div>
-              </div>
-            ))}
-          </div>
+            </div>
+          )}
         </aside>
       </main>
+
+      {addModal && (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAddModal(null);
+          }}
+        >
+          <div
+            className="modal-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label={addModal === "monster" ? "Add foe" : "Add scene NPC"}
+          >
+            <div className="modal-header">
+              <h2>{addModal === "monster" ? "Add foe" : "Add scene NPC"}</h2>
+              <button type="button" className="btn ghost" onClick={() => setAddModal(null)}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              {addModal === "monster" ? (
+                <>
+                  <p className="muted small">{monsters.length} SRD monsters (Open5e).</p>
+                  <div className="spawn-row modal-spawn">
+                    {monsters.find((m) => m.id === spawnId)?.image_url && (
+                      <img
+                        className="spawn-preview"
+                        src={mediaUrlSync(
+                          monsters.find((m) => m.id === spawnId)?.image_url,
+                          apiBase
+                        )}
+                        alt=""
+                      />
+                    )}
+                    <input
+                      className="btn spawn-filter"
+                      placeholder="Filter monsters…"
+                      value={monsterFilter}
+                      onChange={(e) => setMonsterFilter(e.target.value)}
+                      autoFocus
+                    />
+                    <select
+                      className="btn"
+                      value={
+                        filteredMonsters.some((m) => m.id === spawnId)
+                          ? spawnId
+                          : filteredMonsters[0]?.id || ""
+                      }
+                      onChange={(e) => setSpawnId(e.target.value)}
+                    >
+                      {filteredMonsters.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} · CR {m.cr || "?"} · AC {m.ac} · HP {m.hp}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn primary"
+                      disabled={
+                        busy ||
+                        !(filteredMonsters.some((m) => m.id === spawnId)
+                          ? spawnId
+                          : filteredMonsters[0]?.id)
+                      }
+                      onClick={async () => {
+                        const id = filteredMonsters.some((m) => m.id === spawnId)
+                          ? spawnId
+                          : filteredMonsters[0]?.id;
+                        if (!id) return;
+                        setBusy(true);
+                        try {
+                          await api.spawnEnemy(id, 1);
+                          setSpawnId(id);
+                          setEncounter(await api.listEncounter());
+                          setRightTab("foes");
+                          setAddModal(null);
+                        } catch (e) {
+                          setError(String(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Spawn
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    style={{ marginTop: "0.75rem" }}
+                    onClick={() => setShowCustomInModal((v) => !v)}
+                  >
+                    {showCustomInModal ? "Hide custom monster" : "Custom monster…"}
+                  </button>
+                  {showCustomInModal && (
+                    <div className="edit-form" style={{ marginTop: "0.5rem" }}>
+                      <label>
+                        Name
+                        <input
+                          value={customMonster.name}
+                          onChange={(e) =>
+                            setCustomMonster((c) => ({ ...c, name: e.target.value }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        AC
+                        <input
+                          type="number"
+                          value={customMonster.ac}
+                          onChange={(e) =>
+                            setCustomMonster((c) => ({ ...c, ac: Number(e.target.value) }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        HP
+                        <input
+                          type="number"
+                          value={customMonster.hp}
+                          onChange={(e) =>
+                            setCustomMonster((c) => ({ ...c, hp: Number(e.target.value) }))
+                          }
+                        />
+                      </label>
+                      <label className="btn file-btn">
+                        Portrait image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] || null;
+                            setCustomMonster((c) => ({ ...c, image: f }));
+                          }}
+                        />
+                      </label>
+                      <button
+                        className="btn"
+                        disabled={busy || !customMonster.name.trim()}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            const saved = await api.addCustomMonster({
+                              name: customMonster.name.trim(),
+                              ac: customMonster.ac,
+                              hp: customMonster.hp,
+                              image: customMonster.image,
+                            });
+                            setMonsters(await api.listMonsters());
+                            setSpawnId(saved.id);
+                            setMonsterFilter(saved.name);
+                            setCustomMonster({ name: "", ac: 13, hp: 15, image: null });
+                            setAddModal(null);
+                            setRightTab("foes");
+                          } catch (e) {
+                            setError(String(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Save to bestiary
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="muted small">{npcs.length} scene NPCs in catalog.</p>
+                  <div className="spawn-row modal-spawn">
+                    {npcs.find((n) => n.id === spawnNpcId)?.image_url && (
+                      <img
+                        className="spawn-preview"
+                        src={mediaUrlSync(
+                          npcs.find((n) => n.id === spawnNpcId)?.image_url,
+                          apiBase
+                        )}
+                        alt=""
+                      />
+                    )}
+                    <input
+                      className="btn spawn-filter"
+                      placeholder="Filter NPCs… (bartender, mira…)"
+                      value={npcFilter}
+                      onChange={(e) => setNpcFilter(e.target.value)}
+                      autoFocus
+                    />
+                    <select
+                      className="btn"
+                      value={
+                        filteredNpcs.some((n) => n.id === spawnNpcId)
+                          ? spawnNpcId
+                          : filteredNpcs[0]?.id || ""
+                      }
+                      onChange={(e) => setSpawnNpcId(e.target.value)}
+                    >
+                      {filteredNpcs.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.name} · {n.role || "NPC"} · {n.attitude || "?"} · AC {n.ac}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      className="btn primary"
+                      disabled={
+                        busy ||
+                        !(filteredNpcs.some((n) => n.id === spawnNpcId)
+                          ? spawnNpcId
+                          : filteredNpcs[0]?.id)
+                      }
+                      onClick={async () => {
+                        const id = filteredNpcs.some((n) => n.id === spawnNpcId)
+                          ? spawnNpcId
+                          : filteredNpcs[0]?.id;
+                        if (!id) return;
+                        setBusy(true);
+                        try {
+                          await api.spawnNpc(id, 1);
+                          setSpawnNpcId(id);
+                          setScene(await api.listScene());
+                          setRightTab("scene");
+                          setAddModal(null);
+                        } catch (e) {
+                          setError(String(e));
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Spawn
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    style={{ marginTop: "0.75rem" }}
+                    onClick={() => setShowCustomInModal((v) => !v)}
+                  >
+                    {showCustomInModal ? "Hide custom NPC" : "Custom NPC…"}
+                  </button>
+                  {showCustomInModal && (
+                    <div className="edit-form" style={{ marginTop: "0.5rem" }}>
+                      <label>
+                        Name
+                        <input
+                          value={customNpc.name}
+                          onChange={(e) => setCustomNpc((c) => ({ ...c, name: e.target.value }))}
+                        />
+                      </label>
+                      <label>
+                        Role
+                        <input
+                          value={customNpc.role}
+                          onChange={(e) => setCustomNpc((c) => ({ ...c, role: e.target.value }))}
+                          placeholder="Bartender"
+                        />
+                      </label>
+                      <label>
+                        Attitude
+                        <select
+                          className="btn"
+                          value={customNpc.attitude}
+                          onChange={(e) =>
+                            setCustomNpc((c) => ({ ...c, attitude: e.target.value }))
+                          }
+                        >
+                          <option value="friendly">friendly</option>
+                          <option value="indifferent">indifferent</option>
+                          <option value="hostile">hostile</option>
+                        </select>
+                      </label>
+                      <label>
+                        AC
+                        <input
+                          type="number"
+                          value={customNpc.ac}
+                          onChange={(e) =>
+                            setCustomNpc((c) => ({ ...c, ac: Number(e.target.value) }))
+                          }
+                        />
+                      </label>
+                      <label>
+                        HP
+                        <input
+                          type="number"
+                          value={customNpc.hp}
+                          onChange={(e) =>
+                            setCustomNpc((c) => ({ ...c, hp: Number(e.target.value) }))
+                          }
+                        />
+                      </label>
+                      <label className="btn file-btn">
+                        Portrait image
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] || null;
+                            setCustomNpc((c) => ({ ...c, image: f }));
+                          }}
+                        />
+                      </label>
+                      <button
+                        className="btn"
+                        disabled={busy || !customNpc.name.trim()}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            const saved = await api.addCustomNpc({
+                              name: customNpc.name.trim(),
+                              ac: customNpc.ac,
+                              hp: customNpc.hp,
+                              attitude: customNpc.attitude,
+                              role: customNpc.role.trim(),
+                              image: customNpc.image,
+                            });
+                            setNpcs(await api.listNpcs());
+                            setSpawnNpcId(saved.id);
+                            setNpcFilter(saved.name);
+                            setCustomNpc({
+                              name: "",
+                              ac: 12,
+                              hp: 12,
+                              attitude: "indifferent",
+                              role: "",
+                              image: null,
+                            });
+                            setAddModal(null);
+                            setRightTab("scene");
+                          } catch (e) {
+                            setError(String(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Save to scene catalog
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

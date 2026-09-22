@@ -89,11 +89,22 @@ function registerHotkeys() {
 }
 
 function runQuitScript() {
-  const script = path.join(ROOT, "scripts", "quit-dm.bat");
+  const ps1 = path.join(ROOT, "scripts", "quit-dm.ps1");
+  const bat = path.join(ROOT, "scripts", "quit-dm.bat");
   const fs = require("fs");
-  if (!fs.existsSync(script)) return Promise.resolve(false);
+  if (fs.existsSync(ps1)) {
+    return new Promise((resolve) => {
+      execFile(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1],
+        { windowsHide: true },
+        () => resolve(true)
+      );
+    });
+  }
+  if (!fs.existsSync(bat)) return Promise.resolve(false);
   return new Promise((resolve) => {
-    execFile("cmd.exe", ["/c", script], { windowsHide: true }, () => resolve(true));
+    execFile("cmd.exe", ["/c", bat], { windowsHide: true }, () => resolve(true));
   });
 }
 
@@ -101,6 +112,23 @@ async function quitEverything() {
   if (quitting) return { ok: true };
   quitting = true;
   try {
+    // Prefer HTTP shutdown so start-dev terminal windows are killed too.
+    await new Promise((resolve) => {
+      const req = http.request(
+        `${API_BASE}/shutdown`,
+        { method: "POST", timeout: 2000 },
+        (res) => {
+          res.resume();
+          resolve();
+        }
+      );
+      req.on("error", () => resolve());
+      req.on("timeout", () => {
+        req.destroy();
+        resolve();
+      });
+      req.end();
+    });
     if (apiProcess && !apiProcess.killed) {
       try {
         apiProcess.kill();

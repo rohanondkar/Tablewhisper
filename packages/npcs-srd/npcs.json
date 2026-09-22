@@ -1,0 +1,307 @@
+{
+  "id": "npcs-srd",
+  "name": "Tavern & scene NPCs",
+  "version": "1.0.0",
+  "description": "Friendly/indifferent cast for social scenes (not combat Encounter).",
+  "npcs": [
+    {
+      "id": "mira",
+      "name": "Mira",
+      "aliases": [
+        "bartender",
+        "barkeep",
+        "mira the bartender"
+      ],
+      "role": "Bartender",
+      "attitude": "friendly",
+      "ac": 12,
+      "hp": 18,
+      "social": {
+        "persuasion_dc": 12,
+        "deception_dc": 13,
+        "intimidation_dc": 14,
+        "insight_dc": 13
+      },
+      "notes": "Human bartender; knows every regular.",
+      "image": "mira.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "tamsin",
+      "name": "Tamsin",
+      "aliases": [
+        "barmaid",
+        "server",
+        "waitress"
+      ],
+      "role": "Barmaid",
+      "attitude": "friendly",
+      "ac": 11,
+      "hp": 12,
+      "social": {
+        "persuasion_dc": 11,
+        "deception_dc": 12,
+        "intimidation_dc": 13,
+        "insight_dc": 12
+      },
+      "notes": "Halfling server; quick with gossip.",
+      "image": "tamsin.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "harlan",
+      "name": "Harlan",
+      "aliases": [
+        "innkeeper",
+        "landlord"
+      ],
+      "role": "Innkeeper",
+      "attitude": "indifferent",
+      "ac": 13,
+      "hp": 22,
+      "social": {
+        "persuasion_dc": 14,
+        "deception_dc": 14,
+        "intimidation_dc": 13,
+        "insight_dc": 15
+      },
+      "notes": "Dwarf owner; fair but firm on tab.",
+      "image": "harlan.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "cole",
+      "name": "Cole",
+      "aliases": [
+        "guard",
+        "door guard",
+        "bouncer"
+      ],
+      "role": "Door guard",
+      "attitude": "indifferent",
+      "ac": 16,
+      "hp": 32,
+      "social": {
+        "persuasion_dc": 15,
+        "deception_dc": 14,
+        "intimidation_dc": 12,
+        "insight_dc": 13
+      },
+      "notes": "Human guard; watches for trouble.",
+      "image": "cole.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "brenna",
+      "name": "Brenna",
+      "aliases": [
+        "merchant",
+        "trader"
+      ],
+      "role": "Traveling merchant",
+      "attitude": "indifferent",
+      "ac": 12,
+      "hp": 16,
+      "social": {
+        "persuasion_dc": 13,
+        "deception_dc": 15,
+        "intimidation_dc": 14,
+        "insight_dc": 14
+      },
+      "notes": "Sells curios; drives a hard bargain.",
+      "image": "brenna.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "lilo",
+      "name": "Lilo",
+      "aliases": [
+        "bard",
+        "singer",
+        "minstrel"
+      ],
+      "role": "Tavern bard",
+      "attitude": "friendly",
+      "ac": 13,
+      "hp": 20,
+      "social": {
+        "persuasion_dc": 11,
+        "deception_dc": 12,
+        "intimidation_dc": 15,
+        "insight_dc": 12,
+        "performance_dc": 10
+      },
+      "notes": "Elf performer; loves an audience.",
+      "image": "lilo.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "vex",
+      "name": "Vex",
+      "aliases": [
+        "rogue",
+        "shady patron",
+        "thief"
+      ],
+      "role": "Shady patron",
+      "attitude": "hostile",
+      "ac": 14,
+      "hp": 24,
+      "social": {
+        "persuasion_dc": 16,
+        "deception_dc": 14,
+        "intimidation_dc": 13,
+        "insight_dc": 15
+      },
+      "notes": "Keeps to the corner booth.",
+      "image": "vex.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "elara",
+      "name": "Elara",
+      "aliases": [
+        "priest",
+        "cleric",
+        "healer"
+      ],
+      "role": "Traveling priest",
+      "attitude": "friendly",
+      "ac": 15,
+      "hp": 28,
+      "social": {
+        "persuasion_dc": 12,
+        "deception_dc": 15,
+        "intimidation_dc": 14,
+        "insight_dc": 13
+      },
+      "notes": "Offers healing for a donation.",
+      "image": "elara.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "garr",
+      "name": "Garr",
+      "aliases": [
+        "blacksmith",
+        "smith"
+      ],
+      "role": "Blacksmith",
+      "attitude": "indifferent",
+      "ac": 14,
+      "hp": 30,
+      "social": {
+        "persuasion_dc": 13,
+        "deception_dc": 14,
+        "intimidation_dc": 12,
+        "insight_dc": 13
+      },
+      "notes": "Repairs gear between drinks.",
+      "image": "garr.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    },
+    {
+      "id": "pip",
+      "name": "Pip",
+      "aliases": [
+        "stable hand",
+        "stableboy",
+        "groom"
+      ],
+      "role": "Stable hand",
+      "attitude": "friendly",
+      "ac": 10,
+      "hp": 9,
+      "social": {
+        "persuasion_dc": 10,
+        "deception_dc": 11,
+        "intimidation_dc": 14,
+        "insight_dc": 11,
+        "animal_handling_dc": 10
+      },
+      "notes": "Knows every horse in town.",
+      "image": "pip.svg",
+      "attacks": [
+        {
+          "name": "Improvised",
+          "attack_bonus": 2,
+          "damage": "1d4",
+          "damage_type": "bludgeoning"
+        }
+      ],
+      "kind": "npc"
+    }
+  ]
+}

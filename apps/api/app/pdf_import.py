@@ -292,6 +292,7 @@ def parse_dndbeyond_pdf(pdf_path: Path, character_id: str | None = None) -> dict
 def character_diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     keys = [
         "name",
+        "player_name",
         "class_level",
         "level",
         "species",
@@ -301,21 +302,201 @@ def character_diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
         "initiative",
         "max_hp",
         "current_hp",
+        "temp_hp",
         "speed",
         "passive_perception",
+        "passive_insight",
+        "passive_investigation",
+        "hit_dice",
+        "features",
+        "proficiencies",
     ]
     changed: dict[str, Any] = {}
     for key in keys:
         if old.get(key) != new.get(key):
             changed[key] = {"from": old.get(key), "to": new.get(key)}
-    for ability, vals in new.get("abilities", {}).items():
-        old_vals = old.get("abilities", {}).get(ability, {})
+
+    old_cur = old.get("currency") or {}
+    new_cur = new.get("currency") or {}
+    if old_cur != new_cur:
+        changed["currency"] = {"from": old_cur, "to": new_cur}
+
+    for ability, vals in (new.get("abilities") or {}).items():
+        old_vals = (old.get("abilities") or {}).get(ability, {})
         if old_vals != vals:
             changed[f"ability.{ability}"] = {"from": old_vals, "to": vals}
-    for skill, vals in new.get("skills", {}).items():
-        old_vals = old.get("skills", {}).get(skill, {})
+
+    for ability, vals in (new.get("saves") or {}).items():
+        old_vals = (old.get("saves") or {}).get(ability, {})
+        interesting = {k: vals.get(k) for k in ("modifier", "proficient")}
+        old_interesting = {k: old_vals.get(k) for k in ("modifier", "proficient")}
+        if interesting != old_interesting:
+            changed[f"save.{ability}"] = {"from": old_interesting, "to": interesting}
+
+    for skill, vals in (new.get("skills") or {}).items():
+        old_vals = (old.get("skills") or {}).get(skill, {})
         interesting = {k: vals.get(k) for k in ("modifier", "proficient", "expertise")}
         old_interesting = {k: old_vals.get(k) for k in ("modifier", "proficient", "expertise")}
         if interesting != old_interesting:
             changed[f"skill.{skill}"] = {"from": old_interesting, "to": interesting}
+
+    old_atks = _attacks_summary(old.get("attacks") or [])
+    new_atks = _attacks_summary(new.get("attacks") or [])
+    if old_atks != new_atks:
+        changed["attacks"] = {"from": old_atks, "to": new_atks}
+
     return changed
+
+
+_FIELD_LABELS: dict[str, str] = {
+    "name": "Name",
+    "player_name": "Player",
+    "class_level": "Class / level",
+    "level": "Level",
+    "species": "Species",
+    "background": "Background",
+    "proficiency_bonus": "Proficiency bonus",
+    "ac": "Armor Class",
+    "initiative": "Initiative",
+    "max_hp": "Max HP",
+    "current_hp": "Current HP",
+    "temp_hp": "Temp HP",
+    "speed": "Speed",
+    "passive_perception": "Passive Perception",
+    "passive_insight": "Passive Insight",
+    "passive_investigation": "Passive Investigation",
+    "hit_dice": "Hit dice",
+    "features": "Features & traits",
+    "proficiencies": "Proficiencies & languages",
+    "currency": "Currency",
+    "attacks": "Attacks",
+}
+
+_ABILITY_LABELS: dict[str, str] = {
+    "strength": "Strength",
+    "dexterity": "Dexterity",
+    "constitution": "Constitution",
+    "intelligence": "Intelligence",
+    "wisdom": "Wisdom",
+    "charisma": "Charisma",
+}
+
+
+def _attacks_summary(attacks: list[Any]) -> str:
+    lines: list[str] = []
+    for atk in attacks:
+        if not isinstance(atk, dict):
+            continue
+        name = (atk.get("name") or "").strip()
+        if not name:
+            continue
+        bonus = (atk.get("attack_bonus") or "").strip()
+        dmg = (atk.get("damage") or "").strip()
+        bits = [name]
+        if bonus:
+            bits.append(f"atk {bonus}")
+        if dmg:
+            bits.append(f"dmg {dmg}")
+        lines.append(" · ".join(bits))
+    return "; ".join(lines) if lines else "(none)"
+
+
+def _fmt_mod(value: Any) -> str:
+    if value is None or value == "":
+        return "—"
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, (int, float)):
+        n = int(value)
+        return f"+{n}" if n >= 0 else str(n)
+    return str(value)
+
+
+def _fmt_display(value: Any, *, kind: str = "plain") -> str:
+    if value is None or value == "":
+        return "—"
+    if kind == "ability" and isinstance(value, dict):
+        score = value.get("score", "—")
+        mod = _fmt_mod(value.get("modifier"))
+        return f"{score} ({mod})"
+    if kind == "save" and isinstance(value, dict):
+        parts = [_fmt_mod(value.get("modifier"))]
+        if value.get("proficient"):
+            parts.append("proficient")
+        return " · ".join(parts)
+    if kind == "skill" and isinstance(value, dict):
+        parts = [_fmt_mod(value.get("modifier"))]
+        if value.get("expertise"):
+            parts.append("expertise")
+        elif value.get("proficient"):
+            parts.append("proficient")
+        return " · ".join(parts)
+    if kind == "currency" and isinstance(value, dict):
+        order = ("pp", "gp", "ep", "sp", "cp")
+        bits = [f"{value.get(k, 0)}{k}" for k in order if value.get(k)]
+        return " ".join(bits) if bits else "0"
+    if isinstance(value, str) and "\n" in value:
+        lines = [ln.strip() for ln in value.splitlines() if ln.strip()]
+        if len(lines) > 3:
+            return "; ".join(lines[:3]) + f" (+{len(lines) - 3} more)"
+        return "; ".join(lines) if lines else "—"
+    if isinstance(value, (dict, list)):
+        return str(value)
+    return str(value)
+
+
+def format_character_changes(diff: dict[str, Any]) -> list[dict[str, str]]:
+    """Turn a character_diff into DM-facing {label, from, to} rows (no raw JSON)."""
+    rows: list[dict[str, str]] = []
+    for key, pair in diff.items():
+        if not isinstance(pair, dict):
+            continue
+        old_v, new_v = pair.get("from"), pair.get("to")
+        if key.startswith("ability."):
+            aid = key.split(".", 1)[1]
+            label = _ABILITY_LABELS.get(aid, aid.title())
+            rows.append(
+                {
+                    "label": label,
+                    "from": _fmt_display(old_v, kind="ability"),
+                    "to": _fmt_display(new_v, kind="ability"),
+                }
+            )
+        elif key.startswith("save."):
+            aid = key.split(".", 1)[1]
+            label = f"{_ABILITY_LABELS.get(aid, aid.title())} save"
+            rows.append(
+                {
+                    "label": label,
+                    "from": _fmt_display(old_v, kind="save"),
+                    "to": _fmt_display(new_v, kind="save"),
+                }
+            )
+        elif key.startswith("skill."):
+            sid = key.split(".", 1)[1]
+            label = SKILL_NAMES.get(sid, sid.replace("_", " ").title())
+            rows.append(
+                {
+                    "label": label,
+                    "from": _fmt_display(old_v, kind="skill"),
+                    "to": _fmt_display(new_v, kind="skill"),
+                }
+            )
+        elif key == "currency":
+            rows.append(
+                {
+                    "label": _FIELD_LABELS["currency"],
+                    "from": _fmt_display(old_v, kind="currency"),
+                    "to": _fmt_display(new_v, kind="currency"),
+                }
+            )
+        else:
+            label = _FIELD_LABELS.get(key, key.replace("_", " ").title())
+            rows.append(
+                {
+                    "label": label,
+                    "from": _fmt_display(old_v),
+                    "to": _fmt_display(new_v),
+                }
+            )
+    return rows

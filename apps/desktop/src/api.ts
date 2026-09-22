@@ -41,6 +41,20 @@ export interface Character {
   updated_at: string;
 }
 
+export interface CharacterChange {
+  label: string;
+  from: string;
+  to: string;
+}
+
+export interface CharacterPreview {
+  replace_id: string;
+  current_name: string;
+  parsed_name: string;
+  name_mismatch: boolean;
+  changes: CharacterChange[];
+}
+
 export interface CheckResult {
   character: string | null;
   character_id: string | null;
@@ -101,6 +115,31 @@ export interface EncounterEnemy {
   ac: number;
   max_hp: number;
   current_hp: number;
+  image_url?: string;
+}
+
+export interface NpcTemplate {
+  id: string;
+  name: string;
+  ac: number;
+  hp: number;
+  role?: string;
+  attitude?: string;
+  aliases?: string[];
+  notes?: string;
+  social?: Record<string, number | string | undefined>;
+  image_url?: string;
+}
+
+export interface SceneNpc {
+  id: string;
+  label: string;
+  npc_id: string;
+  name: string;
+  ac: number;
+  max_hp: number;
+  current_hp: number;
+  attitude: string;
   image_url?: string;
 }
 
@@ -192,7 +231,20 @@ export const api = {
     if (replaceId) form.append("replace_id", replaceId);
     const res = await fetch(`${base}/characters/upload`, { method: "POST", body: form });
     if (!res.ok) throw new Error(await res.text());
-    return res.json() as Promise<{ character: Character; diff?: Record<string, unknown> }>;
+    return res.json() as Promise<{
+      character: Character;
+      diff?: Record<string, unknown>;
+      changes?: CharacterChange[];
+    }>;
+  },
+  previewCharacter: async (file: File, replaceId: string) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    form.append("replace_id", replaceId);
+    const res = await fetch(`${base}/characters/preview`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<CharacterPreview>;
   },
   query: (text: string, characterId?: string | null) =>
     request<CheckResult>("/query", {
@@ -274,5 +326,48 @@ export const api = {
     const res = await fetch(`${base}/monsters/custom`, { method: "POST", body: form });
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<MonsterTemplate>;
+  },
+  listNpcs: () => request<NpcTemplate[]>("/npcs"),
+  listScene: () => request<SceneNpc[]>("/scene"),
+  spawnNpc: (npcId: string, count = 1, label?: string) =>
+    request<SceneNpc[]>("/scene/spawn", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ npc_id: npcId, count, label: label || null }),
+    }),
+  clearScene: () => request<{ ok: boolean }>("/scene", { method: "DELETE" }),
+  removeSceneNpc: (id: string) =>
+    request<{ ok: boolean }>(`/scene/${id}`, { method: "DELETE" }),
+  setSceneNpcHp: (id: string, currentHp: number) =>
+    request<SceneNpc>(`/scene/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_hp: currentHp }),
+    }),
+  setSceneNpcAttitude: (id: string, attitude: string) =>
+    request<SceneNpc>(`/scene/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attitude }),
+    }),
+  addCustomNpc: async (fields: {
+    name: string;
+    ac: number;
+    hp: number;
+    attitude?: string;
+    role?: string;
+    image?: File | null;
+  }) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("name", fields.name);
+    form.append("ac", String(fields.ac));
+    form.append("hp", String(fields.hp));
+    form.append("attitude", fields.attitude || "indifferent");
+    form.append("role", fields.role || "");
+    if (fields.image) form.append("image", fields.image);
+    const res = await fetch(`${base}/npcs/custom`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<NpcTemplate>;
   },
 };
