@@ -5,6 +5,7 @@ import {
   type Character,
   type CharacterChange,
   type CharacterPreview,
+  type CheckParticipant,
   type CheckResult,
   type EncounterEnemy,
   type MonsterTemplate,
@@ -15,8 +16,78 @@ import {
   type SessionInfo,
   type StatusInfo,
 } from "./api";
+import MapPanel from "./map/MapPanel";
+import MapErrorBoundary from "./map/MapErrorBoundary";
+import PicturesPanel from "./map/PicturesPanel";
+import { CREATURE_SIZES } from "./map/sizes";
 
 const API_BASE = "http://127.0.0.1:8766";
+
+function initialsFor(label: string): string {
+  return (
+    label
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "?"
+  );
+}
+
+function InvolvedFace({
+  label,
+  imageUrl,
+  apiBase,
+}: {
+  label: string;
+  imageUrl?: string | null;
+  apiBase: string;
+}) {
+  const [broken, setBroken] = useState(false);
+  const src = imageUrl && !broken ? mediaUrlSync(imageUrl, apiBase) : "";
+  if (!src) {
+    return <div className="avatar initials involved-face">{initialsFor(label)}</div>;
+  }
+  return (
+    <img
+      className="involved-face"
+      src={src}
+      alt={label}
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
+function roleLabel(role: string): string {
+  if (role === "rolling") return "Rolling";
+  if (role === "target") return "Target";
+  return "Subject";
+}
+
+function catalogPortrait(
+  person: CheckParticipant & { templateId?: string | null },
+  characters: Character[],
+  scene: SceneNpc[],
+  npcs: NpcTemplate[],
+  encounter: EncounterEnemy[],
+  monsters: MonsterTemplate[]
+): string | null {
+  if (person.image_url) return person.image_url;
+  const name = person.label.toLowerCase();
+  const ids = [person.id, person.templateId].filter((id): id is string => Boolean(id));
+  const hasId = (id: string | null | undefined) => Boolean(id && ids.includes(id));
+  return (
+    characters.find((c) => hasId(c.id) || c.name.toLowerCase() === name)?.image_url ||
+    scene.find(
+      (s) => hasId(s.id) || hasId(s.npc_id) || s.label.toLowerCase() === name || s.name.toLowerCase() === name
+    )?.image_url ||
+    npcs.find((n) => hasId(n.id) || n.name.toLowerCase() === name)?.image_url ||
+    encounter.find((e) => hasId(e.id) || hasId(e.monster_id) || e.label.toLowerCase() === name)
+      ?.image_url ||
+    monsters.find((m) => hasId(m.id) || m.name.toLowerCase() === name)?.image_url ||
+    null
+  );
+}
 
 const CR_OPTIONS = [
   "0",
@@ -114,7 +185,8 @@ export default function App() {
     image: null as File | null,
   });
   const [apiBase, setApiBase] = useState(API_BASE);
-  const [rightTab, setRightTab] = useState<"foes" | "scene" | "log">("foes");
+  const [rightTab, setRightTab] = useState<"foes" | "scene" | "log" | "pictures">("foes");
+  const [viewMode, setViewMode] = useState<"console" | "map">("console");
   const [addModal, setAddModal] = useState<null | "monster" | "npc">(null);
   const [showCustomInModal, setShowCustomInModal] = useState(false);
   const [spawnTune, setSpawnTune] = useState({ cr: "0", xp: 10, ac: 10, hp: 10 });
@@ -135,6 +207,41 @@ export default function App() {
     () => characters.find((c) => c.id === selectedId) || null,
     [characters, selectedId]
   );
+  const involved = useMemo(() => {
+    if (!result) return [] as CheckParticipant[];
+    const raw: Array<CheckParticipant & { templateId?: string | null }> =
+      result.participants && result.participants.length > 0
+        ? result.participants
+        : [
+            ...(result.character
+              ? [
+                  {
+                    id: result.character_id,
+                    label: result.character,
+                    role: "rolling",
+                    kind: "character",
+                    image_url: null,
+                  },
+                ]
+              : []),
+            ...(result.target
+              ? [
+                  {
+                    id: result.target.id,
+                    label: result.target.label,
+                    role: result.check_type === "attack" ? "target" : "subject",
+                    kind: result.target.kind,
+                    image_url: result.target.image_url,
+                    templateId: result.target.npc_id || result.target.monster_id,
+                  },
+                ]
+              : []),
+          ];
+    return raw.map((person) => ({
+      ...person,
+      image_url: catalogPortrait(person, characters, scene, npcs, encounter, monsters),
+    }));
+  }, [result, characters, scene, npcs, encounter, monsters]);
   const activeSession = useMemo(
     () => sessions.find((s) => s.active) || sessions[0] || null,
     [sessions]
@@ -365,7 +472,15 @@ export default function App() {
       setEncounter(await api.listEncounter());
       setScene(await api.listScene().catch(() => []));
     } catch (e) {
-      setError(String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setResult(null);
+        setError(
+          "The API did not answer, so this is not a new ruling. The previous result was cleared. Check that the API is running, then try again."
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -513,6 +628,22 @@ export default function App() {
           </div>
         </div>
         <div className="top-actions">
+          <div className="view-toggle">
+            <button
+              type="button"
+              className={`btn ghost ${viewMode === "console" ? "active-tab" : ""}`}
+              onClick={() => setViewMode("console")}
+            >
+              Console
+            </button>
+            <button
+              type="button"
+              className={`btn ghost ${viewMode === "map" ? "active-tab" : ""}`}
+              onClick={() => setViewMode("map")}
+            >
+              Map
+            </button>
+          </div>
           <span className={`pill ${status?.ollama.available ? "on" : "off"}`}>
             Ollama {status?.ollama.available ? "ready" : "offline"}
           </span>
@@ -640,6 +771,27 @@ export default function App() {
         ))}
       </div>
 
+      {viewMode === "map" ? (
+        <MapErrorBoundary onError={(msg) => setError(msg)}>
+          <MapPanel
+            characters={characters}
+            encounter={encounter}
+            scene={scene}
+            monsters={monsters}
+            npcs={npcs}
+            onError={(msg) => setError(msg)}
+            onEncounterChange={async () => {
+              setEncounter(await api.listEncounter());
+            }}
+            onSceneChange={async () => {
+              setScene(await api.listScene());
+            }}
+            onCharactersChange={async () => {
+              setCharacters(await api.listCharacters());
+            }}
+          />
+        </MapErrorBoundary>
+      ) : (
       <main className="layout">
         <aside className="panel stack">
           <h2>Party</h2>
@@ -707,6 +859,7 @@ export default function App() {
                     <strong>{c.name}</strong>
                     <small>
                       L{c.level} · {c.class_level} · {c.species}
+                      {c.size ? ` · ${c.size}` : ""}
                     </small>
                   </div>
                 </div>
@@ -778,6 +931,19 @@ export default function App() {
                         setEditDraft((d) => ({ ...d, level: Number(e.target.value) }))
                       }
                     />
+                  </label>
+                  <label>
+                    Size
+                    <select
+                      value={String(editDraft.size ?? selected?.size ?? "Medium")}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, size: e.target.value }))}
+                    >
+                      {CREATURE_SIZES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label>
                     Max HP
@@ -904,55 +1070,67 @@ export default function App() {
           {error && <div className="error">{error}</div>}
 
           {result && (
-            <div className="result-card">
+            <div
+              className={
+                result.check_type === "impossible" || result.possible === false
+                  ? "result-card result-card--impossible"
+                  : "result-card"
+              }
+            >
               <div className="muted">
                 {result.source} · confidence {Math.round(result.confidence * 100)}%
               </div>
+              {(result.check_type === "impossible" || result.possible === false) && (
+                <div className="impossible-banner">Not possible</div>
+              )}
               <div className="roll-line">{result.roll_line}</div>
-              {result.target && (
-                <div className="target-banner">
-                  <img
-                    src={mediaUrlSync(
-                      encounter.find((e) => e.id === result.target?.id)?.image_url ||
-                        monsters.find((m) => m.id === result.target?.monster_id)?.image_url,
-                      apiBase
-                    )}
-                    alt={result.target.label}
-                  />
-                  <div>
-                    <strong>
-                      {result.check_type === "attack" ? "Target" : "Subject"}:{" "}
-                      {result.target.label}
-                    </strong>
-                    <div className="muted" style={{ fontSize: "0.9rem" }}>
-                      {result.check_type === "attack" ? (
-                        <>
-                          AC {result.target.ac} · HP {result.target.current_hp}/
-                          {result.target.max_hp}
-                          {result.to_hit_needed != null
-                            ? ` · need ${result.to_hit_needed}+ on d20`
-                            : ""}
-                        </>
-                      ) : (
-                        <>
-                          {result.suggested_dc != null
-                            ? `DC ${result.suggested_dc}${
-                                result.dc_label ? ` (${result.dc_label})` : ""
-                              }`
-                            : "No fixed DC"}
-                          {result.target.current_hp != null
-                            ? ` · HP ${result.target.current_hp}/${result.target.max_hp}`
-                            : ""}
-                        </>
-                      )}
+              {involved.length > 0 && (
+                <div className="involved-row">
+                  {involved.map((person) => (
+                    <div className="involved-card" key={`${person.kind || "p"}-${person.id || person.label}`}>
+                      <InvolvedFace label={person.label} imageUrl={person.image_url} apiBase={apiBase} />
+                      <div>
+                        <strong>
+                          {roleLabel(person.role)}: {person.label}
+                        </strong>
+                        {person.role !== "rolling" && result.target?.label === person.label && (
+                          <div className="muted" style={{ fontSize: "0.9rem" }}>
+                            {result.check_type === "attack" ? (
+                              <>
+                                AC {result.target.ac} · HP {result.target.current_hp}/
+                                {result.target.max_hp}
+                                {result.to_hit_needed != null
+                                  ? ` · need ${result.to_hit_needed}+ on d20`
+                                  : ""}
+                              </>
+                            ) : (
+                              <>
+                                {result.suggested_dc != null
+                                  ? `DC ${result.suggested_dc}${
+                                      result.dc_label ? ` (${result.dc_label})` : ""
+                                    }`
+                                  : "No fixed DC"}
+                                {result.target.current_hp != null
+                                  ? ` · HP ${result.target.current_hp}/${result.target.max_hp}`
+                                  : ""}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
               <div className="result-grid">
                 <div>
                   <span>Character</span>
-                  <div>{result.character || "—"}</div>
+                  <div>
+                    {involved
+                      .filter((person) => person.role === "rolling")
+                      .map((person) => person.label)
+                      .join(", ") || result.character || "—"}
+                  </div>
                 </div>
                 <div>
                   <span>Check</span>
@@ -1003,6 +1181,11 @@ export default function App() {
                       </div>
                     </div>
                   </>
+                ) : result.check_type === "impossible" || result.possible === false ? (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <span>Ruling</span>
+                    <div>No roll — action cannot be attempted as stated</div>
+                  </div>
                 ) : (
                   <>
                     <div>
@@ -1161,6 +1344,15 @@ export default function App() {
               onClick={() => setRightTab("log")}
             >
               Log
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={rightTab === "pictures"}
+              className={`rail-tab ${rightTab === "pictures" ? "active" : ""}`}
+              onClick={() => setRightTab("pictures")}
+            >
+              Pictures
             </button>
           </div>
 
@@ -1365,8 +1557,28 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {rightTab === "pictures" && (
+            <PicturesPanel
+              characters={characters}
+              monsters={monsters}
+              npcs={npcs}
+              onError={(msg) => setError(msg)}
+              onRefresh={async () => {
+                const [chars, mons, npcList] = await Promise.all([
+                  api.listCharacters(),
+                  api.listMonsters(),
+                  api.listNpcs(),
+                ]);
+                setCharacters(chars);
+                setMonsters(mons);
+                setNpcs(npcList);
+              }}
+            />
+          )}
         </aside>
       </main>
+      )}
 
       {xpAward && (
         <div

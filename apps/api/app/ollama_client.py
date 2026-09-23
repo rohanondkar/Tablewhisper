@@ -115,9 +115,16 @@ def interpret(
         "Saving throws and initiative are never attacks. "
         "For attacks: suggested_dc must be null (attacks target Armor Class, not a DC); "
         "prefer the matching weapon from the character's attacks list. "
+        "If the character clearly lacks required gear (e.g. wants to shoot but has no bow/"
+        "crossbow/firearm in attacks), set check_type to 'impossible', suggested_dc null, "
+        "and explain in notes — do not invent an attack roll. "
         "Prefer skill checks over raw ability checks when a skill fits (Stealth, Perception, etc.). "
+        "Pick suggested_dc from the dc_bands ladder (5/10/15/20/25/30) based on how hard the fiction sounds — "
+        "do not default everything to 15. "
+        "Set confidence honestly between 0 and 1: high only when the check type/skill is clear; "
+        "use mid values for plausible guesses and low when ambiguous. Never always return 0.9. "
         "If multiple characters are affected, pick the named one or the most likely. "
-        "Do not invent PHB-only rules; stay within the provided rules pack."
+        "Do not invent PHB-only rules; stay within the provided rules pack (aligned with free Basic Rules)."
     )
     user = {
         "query": query,
@@ -129,7 +136,7 @@ def interpret(
         "schema": {
             "character": "string|null name",
             "character_id": "string|null",
-            "check_type": "skill|save|ability|attack|initiative|other",
+            "check_type": "skill|save|ability|attack|initiative|impossible|other",
             "ability": "strength|dexterity|constitution|intelligence|wisdom|charisma|null",
             "skill": "skill id or null",
             "suggested_dc": "int|null",

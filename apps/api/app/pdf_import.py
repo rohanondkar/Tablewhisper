@@ -9,6 +9,8 @@ from typing import Any
 from pypdf import PdfReader
 from pypdf.generic import IndirectObject
 
+from .creature_size import size_from_species
+
 
 ABILITY_MAP = {
     "STR": "strength",
@@ -253,6 +255,7 @@ def parse_dndbeyond_pdf(pdf_path: Path, character_id: str | None = None) -> dict
         "class_level": class_level,
         "level": _level_from_class(class_level),
         "species": raw.get("RACE") or raw.get("RACE2") or "",
+        "size": size_from_species(raw.get("RACE") or raw.get("RACE2") or ""),
         "background": raw.get("BACKGROUND") or raw.get("BACKGROUND2") or "",
         "proficiency_bonus": _parse_mod(raw.get("ProfBonus", "+2")),
         "abilities": abilities,
@@ -296,6 +299,7 @@ def character_diff(old: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
         "class_level",
         "level",
         "species",
+        "size",
         "background",
         "proficiency_bonus",
         "ac",
@@ -354,6 +358,7 @@ _FIELD_LABELS: dict[str, str] = {
     "class_level": "Class / level",
     "level": "Level",
     "species": "Species",
+    "size": "Size",
     "background": "Background",
     "proficiency_bonus": "Proficiency bonus",
     "ac": "Armor Class",

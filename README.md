@@ -139,11 +139,44 @@ Or in a browser: http://127.0.0.1:8766/health → `{"status":"ok"}`
 ### Rulings
 
 1. Type a situation in **What needs a roll?** → **Resolve check**.
-2. Examples:
-   - `Shardon stabs orc A` — attack vs AC (combat foe)
+2. A clear rules match skips Ollama. Confidence follows how specific the match is, using the Basic Rules DC ladder (very easy 5 through nearly impossible 30). Words like “easy” or “sheer cliff” move the DC.
+3. The result card shows a portrait for everyone the sentence names: the character who is rolling, and each NPC or creature involved. A party member with no uploaded portrait keeps their initials.
+4. If the API is not running, the red line says so and clears the previous card, so an old ruling is not left up as if it were the new one.
+5. Examples:
+   - `Shardon stabs orc A` — attack vs AC (combat foe). Tags need a separator: `Orc A` or `orc-2`.
+   - `Shardon tries to kiss Mira` — Persuasion against Mira’s social DC
    - `Shardon persuades the bartender` — Persuasion vs that NPC’s social DC
-   - `seduces Wolf A` — Animal Handling (not an attack)
-3. Voice (optional): **Start listening** while Discord/desktop audio plays → **Ctrl+N** (Electron) or **Ctrl+N capture**.
+   - `pet the wolf` — Animal Handling for a beast or mount
+   - `Shardon climbs the rope` — Athletics; “easy” / “hard” wording adjusts the DC
+6. Voice (optional): **Start listening** while Discord/desktop audio plays → **Ctrl+N** (Electron) or **Ctrl+N capture**.
+
+Social and exploration verbs (kiss, sneak, look around, climb, and the rest of the catalog) map to a skill. An attack verb such as stab, punch, or assault stays an attack when it is the action.
+
+### Map
+
+Open **Map** in the top bar. This is a DM-only battle map for screen share. Players do not get their own client.
+
+| Control | What it does |
+|---------|----------------|
+| **Upload map** | Sets the background image. The picture fills the current map area. |
+| **Map area** | **Squares wide** / **squares tall**, then **Set size**. Each square stays the same pixel size; a larger area adds squares. |
+| **Calibrate grid** | Changes pixels per square, offset, and feet per square when a printed grid on the image needs to line up. |
+| **+ Scene** | Another map in the same session. |
+| **Sync tokens** | Places party, foe, and scene tokens already in the console. |
+| **Player preview** | Shows fog the way a shared screen should look. |
+| **Vision** | Optional yellow vision and light rings. Off by default. |
+
+Tools along the map: **Select**, **Move map** (or hold Space / middle-mouse), **Ruler**, **Fog**, **Reveal**, **Wall**, **Door**, **Light**, **Portal**. Drag tokens; they snap to the grid. Footprint follows 5e size (Medium is 1 square, Gargantuan is 4).
+
+Token art comes from `packages\token-portraits`. A custom upload in **Pictures** wins. A player character with no portrait stays an initials tile on the map and on the ruling card.
+
+### Pictures
+
+The right rail **Pictures** tab uploads a portrait for a character, scene NPC, or monster. That file is what the map token and the resolve card use.
+
+### XP
+
+Defeat and milestone awards are on the ruling card and the foe list. Party level tracks XP from those awards.
 
 ### Right rail — Foes / Scene / Log
 
@@ -177,7 +210,7 @@ Otherwise in each terminal: `Ctrl+C`, or close the window.
 |---------|-----|
 | `Unable to copy ... python.exe` into `.venv` | Close terminals using the API, then `rmdir /s /q .venv` and recreate (setup steps above) |
 | Port 8766 / 5173 in use | Run Quit / `scripts\quit-dm.bat`, or close the other API/UI windows |
-| UI can’t reach API | Confirm API window is running uvicorn |
+| UI can’t reach API | The resolve line says the API did not answer. Start the API (`start-dev.bat` option **1**, or the uvicorn command above), then **Resolve check** again |
 | CSS / Vite overlay error | Hard-refresh (`Ctrl+F5`); ensure UI terminal is still running |
 | `python` not found | Reinstall Python with PATH, or use `py -3` instead of `python` |
 | Ollama offline | Install Ollama, run `ollama pull llama3.2`, keep Ollama running |
@@ -199,11 +232,12 @@ py -3 -m venv .venv
 
 | Path | What |
 |------|------|
-| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs) |
-| `apps\desktop` | React + Electron UI |
-| `packages\rules-dnd5e` | 5e SRD rules |
+| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs, battle maps) |
+| `apps\desktop` | React + Electron UI (console and map) |
+| `packages\rules-dnd5e` | 5e SRD rules, DC ladder, and check-verb guidance |
 | `packages\monsters-srd` | All 322 WOTC SRD 5.1 monsters (Open5e; not full DDB) |
-| `packages\npcs-srd` | Tavern / scene NPC cast (social DCs, attitudes) |
+| `packages\npcs-srd` | Tavern / scene NPC cast (social DCs, attitudes, portraits) |
+| `packages\token-portraits` | Circular token art used on the map and ruling card |
 | `scripts\import_open5e_monsters.py` | Re-fetch SRD monster pack |
 | `scripts\quit-dm.bat` / `quit-dm.ps1` | Force-close API/UI terminals + free ports |
 | `packages\rules-custom-blank` | Template for next game |

@@ -15,11 +15,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, ollama_client, query_engine, rules, voice, monsters, npcs, xp as xp_mod
+from . import db, ollama_client, query_engine, rules, voice, monsters, npcs, maps, xp as xp_mod
 from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
 from .npcs import CUSTOM_IMAGE_DIR as NPC_CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR as NPC_SRD_IMAGE_DIR
+from .maps import MAP_IMAGE_DIR, MAP_FOG_DIR
+from .portraits import CHAR_IMAGE_DIR
+from .token_art import TOKEN_DIR
+from .creature_size import SIZES, normalize_size
 
 
 @asynccontextmanager
@@ -27,10 +31,16 @@ async def lifespan(_app: FastAPI):
     db.init_db()
     monsters.ensure_encounter_tables()
     npcs.ensure_scene_tables()
+    maps.ensure_map_tables()
     CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     NPC_SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    MAP_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    MAP_FOG_DIR.mkdir(parents=True, exist_ok=True)
+    CHAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    monsters.reload_catalog()
+    npcs.reload_catalog()
     yield
 
 
@@ -54,6 +64,13 @@ app.mount(
     StaticFiles(directory=str(CUSTOM_IMAGE_DIR)),
     name="monster_custom",
 )
+# Built-in circular creature / NPC token portraits
+TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/tokens",
+    StaticFiles(directory=str(TOKEN_DIR)),
+    name="token_portraits",
+)
 # NPC portraits
 NPC_SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,6 +83,24 @@ app.mount(
     "/media/npcs/custom",
     StaticFiles(directory=str(NPC_CUSTOM_IMAGE_DIR)),
     name="npc_custom",
+)
+MAP_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+MAP_FOG_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/maps/images",
+    StaticFiles(directory=str(MAP_IMAGE_DIR)),
+    name="map_images",
+)
+app.mount(
+    "/media/maps/fog",
+    StaticFiles(directory=str(MAP_FOG_DIR)),
+    name="map_fog",
+)
+CHAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/characters",
+    StaticFiles(directory=str(CHAR_IMAGE_DIR)),
+    name="character_images",
 )
 
 
@@ -86,6 +121,8 @@ class CharacterPatch(BaseModel):
     name: str | None = None
     level: int | None = None
     class_level: str | None = None
+    species: str | None = None
+    size: str | None = None
     max_hp: int | None = None
     current_hp: int | None = None
     ac: int | None = None
@@ -205,6 +242,7 @@ def remove_character(char_id: str) -> dict[str, bool]:
     ok = db.delete_character(char_id)
     if not ok:
         raise HTTPException(404, "Character not found")
+    maps.delete_tokens_by_ref("pc", char_id)
     return {"ok": True}
 
 
@@ -226,12 +264,78 @@ def patch_character(char_id: str, body: CharacterPatch) -> dict[str, Any]:
             merged_skills[sid] = base
         current["skills"] = merged_skills
     current.update(patch)
+    if "size" in patch:
+        current["size"] = normalize_size(patch["size"])
     if "level" in patch and "class_level" not in patch:
         # keep class name prefix if present
         class_level = current.get("class_level") or ""
         name_part = class_level.rsplit(" ", 1)[0] if class_level else "Level"
         current["class_level"] = f"{name_part} {patch['level']}"
     return db.public_character(db.upsert_character(current))
+
+
+@app.post("/characters/{char_id}/image")
+async def upload_character_image(char_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    current = db.get_character(char_id)
+    if not current:
+        raise HTTPException(404, "Character not found")
+    CHAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "portrait.png").suffix.lower() or ".png"
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif"}:
+        ext = ".png"
+    fname = f"{char_id}{ext}"
+    dest = CHAR_IMAGE_DIR / fname
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    current["image"] = fname
+    return db.public_character(db.upsert_character(current))
+
+
+def _place_on_active_map(kind: str, entities: list[dict[str, Any]]) -> None:
+    """Best-effort: add map tokens for newly spawned encounter/scene rows."""
+    try:
+        m = maps.active_map()
+        if not m:
+            return
+        existing = {(t["kind"], t["ref_id"]) for t in maps.list_tokens(m["id"])}
+        gs = float(m["grid_size_px"])
+        ox = float(m["grid_offset_x"])
+        oy = float(m["grid_offset_y"])
+        i = 0
+        for e in entities:
+            key = (kind, e["id"])
+            if key in existing:
+                continue
+            col = i % 8
+            row = i // 8
+            i += 1
+            size = e.get("size") or "Medium"
+            maps.add_token(
+                m["id"],
+                {
+                    "kind": kind,
+                    "ref_id": e["id"],
+                    "label": e.get("label") or e.get("name") or kind,
+                    "x": ox + gs * (2 + col),
+                    "y": oy + gs * (2 + row),
+                    "size": size,
+                    "size_sq": e.get("size_sq"),
+                    "vision_ft": 60,
+                    "show_vision": False,
+                    "image_url": e.get("image_url")
+                    if kind == "pc"
+                    else (
+                        e.get("image_url")
+                        or (
+                            "/media/tokens/token-npc-generic.png"
+                            if kind == "npc"
+                            else "/media/tokens/token-humanoid.png"
+                        )
+                    ),
+                },
+            )
+    except Exception:
+        pass
 
 
 @app.post("/xp/award")
@@ -563,6 +667,22 @@ async def add_custom_monster(
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.post("/monsters/{monster_id}/image")
+async def upload_monster_image(monster_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "token.png").suffix.lower() or ".png"
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
+        ext = ".png"
+    fname = f"{monster_id}{ext}"
+    dest = CUSTOM_IMAGE_DIR / fname
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        return monsters.set_monster_image(monster_id, fname)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 @app.get("/encounter")
 def get_encounter() -> list[dict[str, Any]]:
     return monsters.list_encounter()
@@ -571,7 +691,7 @@ def get_encounter() -> list[dict[str, Any]]:
 @app.post("/encounter/spawn")
 def spawn_encounter(body: SpawnRequest) -> list[dict[str, Any]]:
     try:
-        return monsters.spawn_enemy(
+        spawned = monsters.spawn_enemy(
             body.monster_id,
             label=body.label,
             count=body.count,
@@ -580,6 +700,8 @@ def spawn_encounter(body: SpawnRequest) -> list[dict[str, Any]]:
             ac=body.ac,
             hp=body.hp,
         )
+        _place_on_active_map("enemy", spawned)
+        return spawned
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -594,6 +716,7 @@ def clear_encounter() -> dict[str, bool]:
 def delete_enemy(enemy_id: str) -> dict[str, bool]:
     if not monsters.remove_enemy(enemy_id):
         raise HTTPException(404, "Enemy not found")
+    maps.delete_tokens_by_ref("enemy", enemy_id)
     return {"ok": True}
 
 
@@ -623,6 +746,7 @@ async def add_custom_npc(
     hp: int = Form(10),
     attitude: str = Form("indifferent"),
     role: str = Form(""),
+    size: str = Form("Medium"),
     image: UploadFile | None = File(None),
 ) -> dict[str, Any]:
     mid = name.lower().replace(" ", "-")
@@ -631,6 +755,7 @@ async def add_custom_npc(
         "name": name,
         "ac": ac,
         "hp": hp,
+        "size": normalize_size(size),
         "aliases": [],
         "attitude": attitude or "indifferent",
         "role": role or "Custom NPC",
@@ -653,11 +778,27 @@ async def add_custom_npc(
             shutil.copyfileobj(image.file, out)
         data["image"] = fname
     else:
-        data["image"] = "generic.svg"
+        data["image"] = "tokens/token_00.jpg"
     try:
         return npcs.save_custom_npc(data)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/npcs/{npc_id}/image")
+async def upload_npc_image(npc_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "token.png").suffix.lower() or ".png"
+    if ext not in {".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif"}:
+        ext = ".png"
+    fname = f"{npc_id}{ext}"
+    dest = NPC_CUSTOM_IMAGE_DIR / fname
+    with dest.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        return npcs.set_npc_image(npc_id, fname)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @app.get("/scene")
@@ -668,7 +809,7 @@ def get_scene() -> list[dict[str, Any]]:
 @app.post("/scene/spawn")
 def spawn_scene(body: NpcSpawnRequest) -> list[dict[str, Any]]:
     try:
-        return npcs.spawn_npc(
+        spawned = npcs.spawn_npc(
             body.npc_id,
             label=body.label,
             count=body.count,
@@ -677,6 +818,8 @@ def spawn_scene(body: NpcSpawnRequest) -> list[dict[str, Any]]:
             ac=body.ac,
             hp=body.hp,
         )
+        _place_on_active_map("npc", spawned)
+        return spawned
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -691,6 +834,7 @@ def clear_scene_route() -> dict[str, bool]:
 def delete_scene_npc(npc_instance_id: str) -> dict[str, bool]:
     if not npcs.remove_scene_npc(npc_instance_id):
         raise HTTPException(404, "Scene NPC not found")
+    maps.delete_tokens_by_ref("npc", npc_instance_id)
     return {"ok": True}
 
 
@@ -711,6 +855,344 @@ def patch_scene_npc(npc_instance_id: str, body: SceneNpcPatch) -> dict[str, Any]
     )
     assert updated is not None
     return updated
+
+
+# ----- Battle maps -----
+
+
+class MapCreate(BaseModel):
+    name: str = "Map"
+
+
+class MapPatch(BaseModel):
+    name: str | None = None
+    width: float | None = None
+    height: float | None = None
+    grid_size_px: float | None = None
+    grid_offset_x: float | None = None
+    grid_offset_y: float | None = None
+    feet_per_square: float | None = None
+    show_grid_overlay: bool | None = None
+
+
+class TokenBody(BaseModel):
+    kind: str = "custom"
+    ref_id: str | None = None
+    label: str = "Token"
+    x: float = 0
+    y: float = 0
+    rotation: float = 0
+    size: str | None = "Medium"
+    size_sq: float | None = None
+    vision_ft: float | None = 60
+    light_bright_ft: float | None = 0
+    light_dim_ft: float | None = 0
+    show_vision: bool | None = True
+    image_url: str | None = None
+    data: dict[str, Any] | None = None
+
+
+class TokenPatch(BaseModel):
+    label: str | None = None
+    x: float | None = None
+    y: float | None = None
+    rotation: float | None = None
+    size: str | None = None
+    size_sq: float | None = None
+    vision_ft: float | None = None
+    light_bright_ft: float | None = None
+    light_dim_ft: float | None = None
+    show_vision: bool | None = None
+    image_url: str | None = None
+
+
+class WallBody(BaseModel):
+    points: list[float]
+    door: bool = False
+    door_open: bool = False
+    block_movement: bool = True
+    block_sight: bool = True
+
+
+class WallPatch(BaseModel):
+    points: list[float] | None = None
+    door: bool | None = None
+    door_open: bool | None = None
+    block_movement: bool | None = None
+    block_sight: bool | None = None
+
+
+class LightBody(BaseModel):
+    x: float = 0
+    y: float = 0
+    bright_ft: float = 20
+    dim_ft: float = 20
+
+
+class LightPatch(BaseModel):
+    x: float | None = None
+    y: float | None = None
+    bright_ft: float | None = None
+    dim_ft: float | None = None
+
+
+class PortalBody(BaseModel):
+    x: float = 0
+    y: float = 0
+    radius: float = 40
+    target_map_id: str
+    target_x: float = 0
+    target_y: float = 0
+    label: str = "Portal"
+
+
+class PortalPatch(BaseModel):
+    x: float | None = None
+    y: float | None = None
+    radius: float | None = None
+    target_map_id: str | None = None
+    target_x: float | None = None
+    target_y: float | None = None
+    label: str | None = None
+
+
+class TraverseBody(BaseModel):
+    token_ids: list[str] = Field(default_factory=list)
+
+
+@app.get("/maps")
+def get_maps() -> list[dict[str, Any]]:
+    return maps.list_maps()
+
+
+@app.post("/maps")
+def post_map(body: MapCreate) -> dict[str, Any]:
+    return maps.create_map(body.name)
+
+
+@app.get("/maps/active")
+def get_active_map() -> dict[str, Any]:
+    m = maps.active_map()
+    if not m:
+        raise HTTPException(404, "No map yet")
+    state = maps.full_map_state(m["id"])
+    assert state is not None
+    return state
+
+
+@app.get("/maps/{map_id}")
+def get_map_state(map_id: str) -> dict[str, Any]:
+    state = maps.full_map_state(map_id)
+    if not state:
+        raise HTTPException(404, "Map not found")
+    return state
+
+
+@app.post("/maps/{map_id}/activate")
+def activate_map_route(map_id: str) -> dict[str, Any]:
+    m = maps.activate_map(map_id)
+    if not m:
+        raise HTTPException(404, "Map not found")
+    return maps.full_map_state(map_id)  # type: ignore[return-value]
+
+
+@app.patch("/maps/{map_id}")
+def patch_map_route(map_id: str, body: MapPatch) -> dict[str, Any]:
+    m = maps.patch_map(map_id, body.model_dump(exclude_none=True))
+    if not m:
+        raise HTTPException(404, "Map not found")
+    return m
+
+
+@app.delete("/maps/{map_id}")
+def delete_map_route(map_id: str) -> dict[str, bool]:
+    if not maps.delete_map(map_id):
+        raise HTTPException(404, "Map not found")
+    return {"ok": True}
+
+
+@app.post("/maps/{map_id}/background")
+async def upload_map_background(
+    map_id: str,
+    file: UploadFile = File(...),
+    width: float | None = Form(None),
+    height: float | None = Form(None),
+) -> dict[str, Any]:
+    if not maps.get_map(map_id):
+        raise HTTPException(404, "Map not found")
+    MAP_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = MAP_IMAGE_DIR / f"_tmp_{uuid.uuid4().hex}"
+    with tmp.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        m = maps.set_background(
+            map_id,
+            tmp,
+            file.filename or "map.png",
+            width=width,
+            height=height,
+        )
+    finally:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+    if not m:
+        raise HTTPException(404, "Map not found")
+    return m
+
+
+@app.post("/maps/{map_id}/tokens/sync")
+def sync_map_tokens(map_id: str) -> list[dict[str, Any]]:
+    try:
+        return maps.sync_tokens(map_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/maps/{map_id}/tokens")
+def get_map_tokens(map_id: str) -> list[dict[str, Any]]:
+    if not maps.get_map(map_id):
+        raise HTTPException(404, "Map not found")
+    return maps.list_tokens(map_id)
+
+
+@app.post("/maps/{map_id}/tokens")
+def post_map_token(map_id: str, body: TokenBody) -> dict[str, Any]:
+    try:
+        # exclude_unset so omitted image_url gets kind-based defaults (PC = none).
+        return maps.add_token(map_id, body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/maps/tokens/{token_id}")
+def patch_map_token(token_id: str, body: TokenPatch) -> dict[str, Any]:
+    t = maps.patch_token(token_id, body.model_dump(exclude_none=True))
+    if not t:
+        raise HTTPException(404, "Token not found")
+    return t
+
+
+@app.delete("/maps/tokens/{token_id}")
+def delete_map_token(token_id: str) -> dict[str, bool]:
+    if not maps.delete_token(token_id):
+        raise HTTPException(404, "Token not found")
+    return {"ok": True}
+
+
+@app.get("/maps/{map_id}/walls")
+def get_walls(map_id: str) -> list[dict[str, Any]]:
+    return maps.list_walls(map_id)
+
+
+@app.post("/maps/{map_id}/walls")
+def post_wall(map_id: str, body: WallBody) -> dict[str, Any]:
+    try:
+        return maps.add_wall(map_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/maps/walls/{wall_id}")
+def patch_wall_route(wall_id: str, body: WallPatch) -> dict[str, Any]:
+    w = maps.patch_wall(wall_id, body.model_dump(exclude_none=True))
+    if not w:
+        raise HTTPException(404, "Wall not found")
+    return w
+
+
+@app.delete("/maps/walls/{wall_id}")
+def delete_wall_route(wall_id: str) -> dict[str, bool]:
+    if not maps.delete_wall(wall_id):
+        raise HTTPException(404, "Wall not found")
+    return {"ok": True}
+
+
+@app.get("/maps/{map_id}/lights")
+def get_lights(map_id: str) -> list[dict[str, Any]]:
+    return maps.list_lights(map_id)
+
+
+@app.post("/maps/{map_id}/lights")
+def post_light(map_id: str, body: LightBody) -> dict[str, Any]:
+    try:
+        return maps.add_light(map_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/maps/lights/{light_id}")
+def patch_light_route(light_id: str, body: LightPatch) -> dict[str, Any]:
+    L = maps.patch_light(light_id, body.model_dump(exclude_none=True))
+    if not L:
+        raise HTTPException(404, "Light not found")
+    return L
+
+
+@app.delete("/maps/lights/{light_id}")
+def delete_light_route(light_id: str) -> dict[str, bool]:
+    if not maps.delete_light(light_id):
+        raise HTTPException(404, "Light not found")
+    return {"ok": True}
+
+
+@app.post("/maps/{map_id}/fog")
+async def upload_fog(map_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    data = await file.read()
+    try:
+        return maps.save_fog_mask(map_id, data)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.post("/maps/{map_id}/fog/reset")
+def fog_reset(map_id: str) -> dict[str, Any]:
+    m = maps.reset_fog(map_id)
+    if not m:
+        raise HTTPException(404, "Map not found")
+    return m
+
+
+@app.get("/maps/{map_id}/portals")
+def get_portals(map_id: str) -> list[dict[str, Any]]:
+    return maps.list_portals(map_id)
+
+
+@app.post("/maps/{map_id}/portals")
+def post_portal(map_id: str, body: PortalBody) -> dict[str, Any]:
+    try:
+        return maps.add_portal(map_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/maps/portals/{portal_id}")
+def patch_portal_route(portal_id: str, body: PortalPatch) -> dict[str, Any]:
+    p = maps.patch_portal(portal_id, body.model_dump(exclude_none=True))
+    if not p:
+        raise HTTPException(404, "Portal not found")
+    return p
+
+
+@app.delete("/maps/portals/{portal_id}")
+def delete_portal_route(portal_id: str) -> dict[str, bool]:
+    if not maps.delete_portal(portal_id):
+        raise HTTPException(404, "Portal not found")
+    return {"ok": True}
+
+
+@app.post("/maps/portals/{portal_id}/traverse")
+def traverse_portal_route(portal_id: str, body: TraverseBody) -> dict[str, Any]:
+    try:
+        return maps.traverse_portal(portal_id, body.token_ids)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/creature-sizes")
+def creature_sizes() -> dict[str, Any]:
+    from .creature_size import SIZE_TO_SQUARES
+
+    return {"sizes": list(SIZES), "squares": SIZE_TO_SQUARES}
 
 
 @app.post("/voice/start")

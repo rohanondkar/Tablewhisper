@@ -146,17 +146,23 @@ def get_character(char_id: str) -> dict[str, Any] | None:
 
 
 def public_character(data: dict[str, Any]) -> dict[str, Any]:
+    from .creature_size import ensure_character_size
+    from .portraits import with_portrait
     from .xp import ensure_character_progress
 
     out = ensure_character_progress(dict(data))
+    out = ensure_character_size(out)
+    out = with_portrait(out)
     out.pop("raw_fields", None)
     return out
 
 
 def upsert_character(data: dict[str, Any]) -> dict[str, Any]:
+    from .creature_size import ensure_character_size
     from .xp import ensure_character_progress
 
     data = ensure_character_progress(dict(data))
+    data = ensure_character_size(data)
     data["updated_at"] = utcnow()
     with db() as conn:
         conn.execute(
@@ -265,6 +271,14 @@ def delete_session(session_id: str) -> bool:
         was_active = any(r["id"] == session_id and r["active"] for r in rows)
         conn.execute("DELETE FROM events WHERE session_id = ?", (session_id,))
         conn.execute("DELETE FROM encounter_enemies WHERE session_id = ?", (session_id,))
+        try:
+            conn.execute("DELETE FROM scene_npcs WHERE session_id = ?", (session_id,))
+        except sqlite3.OperationalError:
+            pass
+    from . import maps as maps_mod
+
+    maps_mod.delete_session_maps(session_id)
+    with db() as conn:
         conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
         if was_active:
             nxt = conn.execute(

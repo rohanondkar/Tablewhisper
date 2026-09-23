@@ -21,6 +21,8 @@ export interface Character {
   class_level: string;
   level: number;
   species: string;
+  size?: string;
+  size_sq?: number;
   background: string;
   proficiency_bonus: number;
   abilities: Record<AbilityId, { score: number; modifier: number }>;
@@ -39,6 +41,7 @@ export interface Character {
   source_pdf: string | null;
   pdf_hash: string | null;
   updated_at: string;
+  image_url?: string;
   xp?: number;
   milestones?: string[];
   xp_progress?: {
@@ -65,6 +68,14 @@ export interface CharacterPreview {
   changes: CharacterChange[];
 }
 
+export interface CheckParticipant {
+  id?: string | null;
+  label: string;
+  role: string;
+  kind?: string;
+  image_url?: string | null;
+}
+
 export interface CheckResult {
   character: string | null;
   character_id: string | null;
@@ -89,11 +100,17 @@ export interface CheckResult {
     current_hp: number;
     max_hp: number;
     monster_id: string;
+    npc_id?: string | null;
+    kind?: string;
+    image_url?: string | null;
     virtual?: boolean;
   } | null;
+  participants?: CheckParticipant[];
   target_ac?: number | null;
   to_hit_needed?: number | null;
   howto?: string | null;
+  /** False when the action cannot be attempted (missing gear, etc.). */
+  possible?: boolean;
 }
 
 export interface SessionInfo {
@@ -112,6 +129,8 @@ export interface MonsterTemplate {
   hp: number;
   cr?: string;
   xp?: number;
+  size?: string;
+  size_sq?: number;
   type?: string;
   notes?: string;
   aliases?: string[];
@@ -128,6 +147,8 @@ export interface EncounterEnemy {
   current_hp: number;
   cr?: string;
   xp?: number;
+  size?: string;
+  size_sq?: number;
   image_url?: string;
 }
 
@@ -138,6 +159,8 @@ export interface NpcTemplate {
   hp: number;
   cr?: string;
   xp?: number;
+  size?: string;
+  size_sq?: number;
   role?: string;
   attitude?: string;
   aliases?: string[];
@@ -157,6 +180,8 @@ export interface SceneNpc {
   attitude: string;
   cr?: string;
   xp?: number;
+  size?: string;
+  size_sq?: number;
   image_url?: string;
 }
 
@@ -178,6 +203,82 @@ export interface XpAwardResult {
     duplicate?: boolean;
   }>;
   characters: Character[];
+}
+
+export interface BattleMap {
+  id: string;
+  session_id: string;
+  name: string;
+  background_path?: string | null;
+  background_url?: string | null;
+  fog_url?: string | null;
+  width: number;
+  height: number;
+  grid_size_px: number;
+  grid_offset_x: number;
+  grid_offset_y: number;
+  feet_per_square: number;
+  show_grid_overlay: boolean;
+  active: boolean;
+  created_at: string;
+}
+
+export interface MapToken {
+  id: string;
+  map_id: string;
+  kind: string;
+  ref_id: string | null;
+  label: string;
+  x: number;
+  y: number;
+  rotation: number;
+  size: string;
+  size_sq: number;
+  vision_ft: number;
+  light_bright_ft: number;
+  light_dim_ft: number;
+  show_vision: boolean;
+  image_url?: string | null;
+  data?: Record<string, unknown>;
+}
+
+export interface MapWall {
+  id: string;
+  map_id: string;
+  points: number[];
+  door: boolean;
+  door_open: boolean;
+  block_movement: boolean;
+  block_sight: boolean;
+}
+
+export interface MapLight {
+  id: string;
+  map_id: string;
+  x: number;
+  y: number;
+  bright_ft: number;
+  dim_ft: number;
+}
+
+export interface MapPortal {
+  id: string;
+  map_id: string;
+  x: number;
+  y: number;
+  radius: number;
+  target_map_id: string;
+  target_x: number;
+  target_y: number;
+  label: string;
+}
+
+export interface MapState {
+  map: BattleMap;
+  tokens: MapToken[];
+  walls: MapWall[];
+  lights: MapLight[];
+  portals: MapPortal[];
 }
 
 export interface SessionEvent {
@@ -433,6 +534,30 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<NpcTemplate>;
   },
+  uploadCharacterImage: async (charId: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/characters/${charId}/image`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<Character>;
+  },
+  uploadMonsterImage: async (monsterId: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/monsters/${monsterId}/image`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<MonsterTemplate>;
+  },
+  uploadNpcImage: async (npcId: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/npcs/${npcId}/image`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<NpcTemplate>;
+  },
   awardXp: (body: {
     kind: "defeat" | "milestone";
     character_ids: string[];
@@ -448,5 +573,116 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+    }),
+
+  listMaps: () => request<BattleMap[]>("/maps"),
+  createMap: (name?: string) =>
+    request<BattleMap>("/maps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name || "Map" }),
+    }),
+  getActiveMapState: () => request<MapState>("/maps/active"),
+  getMapState: (id: string) => request<MapState>(`/maps/${id}`),
+  activateMap: (id: string) =>
+    request<MapState>(`/maps/${id}/activate`, { method: "POST" }),
+  patchMap: (id: string, patch: Partial<BattleMap>) =>
+    request<BattleMap>(`/maps/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMap: (id: string) =>
+    request<{ ok: boolean }>(`/maps/${id}`, { method: "DELETE" }),
+  uploadMapBackground: async (
+    mapId: string,
+    file: File,
+    dims?: { width?: number; height?: number }
+  ) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    if (dims?.width != null) form.append("width", String(dims.width));
+    if (dims?.height != null) form.append("height", String(dims.height));
+    const res = await fetch(`${base}/maps/${mapId}/background`, {
+      method: "POST",
+      body: form,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<BattleMap>;
+  },
+  syncMapTokens: (mapId: string) =>
+    request<MapToken[]>(`/maps/${mapId}/tokens/sync`, { method: "POST" }),
+  addMapToken: (mapId: string, body: Partial<MapToken>) =>
+    request<MapToken>(`/maps/${mapId}/tokens`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapToken: (tokenId: string, patch: Partial<MapToken>) =>
+    request<MapToken>(`/maps/tokens/${tokenId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapToken: (tokenId: string) =>
+    request<{ ok: boolean }>(`/maps/tokens/${tokenId}`, { method: "DELETE" }),
+  addMapWall: (mapId: string, body: Partial<MapWall>) =>
+    request<MapWall>(`/maps/${mapId}/walls`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapWall: (wallId: string, patch: Partial<MapWall>) =>
+    request<MapWall>(`/maps/walls/${wallId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapWall: (wallId: string) =>
+    request<{ ok: boolean }>(`/maps/walls/${wallId}`, { method: "DELETE" }),
+  addMapLight: (mapId: string, body: Partial<MapLight>) =>
+    request<MapLight>(`/maps/${mapId}/lights`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapLight: (lightId: string, patch: Partial<MapLight>) =>
+    request<MapLight>(`/maps/lights/${lightId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapLight: (lightId: string) =>
+    request<{ ok: boolean }>(`/maps/lights/${lightId}`, { method: "DELETE" }),
+  uploadFog: async (mapId: string, blob: Blob) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", blob, "fog.png");
+    const res = await fetch(`${base}/maps/${mapId}/fog`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<BattleMap>;
+  },
+  resetFog: (mapId: string) =>
+    request<BattleMap>(`/maps/${mapId}/fog/reset`, { method: "POST" }),
+  addMapPortal: (mapId: string, body: Partial<MapPortal> & { target_map_id: string }) =>
+    request<MapPortal>(`/maps/${mapId}/portals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapPortal: (portalId: string, patch: Partial<MapPortal>) =>
+    request<MapPortal>(`/maps/portals/${portalId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapPortal: (portalId: string) =>
+    request<{ ok: boolean }>(`/maps/portals/${portalId}`, { method: "DELETE" }),
+  traversePortal: (portalId: string, tokenIds: string[]) =>
+    request<{ map: BattleMap; tokens: MapToken[] }>(`/maps/portals/${portalId}/traverse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_ids: tokenIds }),
     }),
 };
