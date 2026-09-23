@@ -16,6 +16,7 @@ import {
   type SessionInfo,
   type StatusInfo,
 } from "./api";
+import InventoryModal from "./InventoryModal";
 import MapPanel from "./map/MapPanel";
 import MapErrorBoundary from "./map/MapErrorBoundary";
 import PicturesPanel from "./map/PicturesPanel";
@@ -55,6 +56,50 @@ function InvolvedFace({
       alt={label}
       onError={() => setBroken(true)}
     />
+  );
+}
+
+function PartyAvatar({
+  name,
+  imageUrl,
+  apiBase,
+  onFile,
+}: {
+  name: string;
+  imageUrl?: string | null;
+  apiBase: string;
+  onFile: (file: File) => void;
+}) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [imageUrl]);
+  const initials = initialsFor(name);
+  return (
+    <label
+      className="avatar-upload"
+      title="Upload portrait. The map token uses this picture."
+      onClick={(e) => e.stopPropagation()}
+    >
+      {imageUrl && !broken ? (
+        <img
+          className="avatar"
+          src={mediaUrlSync(imageUrl, apiBase)}
+          alt=""
+          onError={() => setBroken(true)}
+        />
+      ) : (
+        <div className="avatar initials">{initials}</div>
+      )}
+      <input
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+          e.target.value = "";
+        }}
+      />
+    </label>
   );
 }
 
@@ -147,6 +192,7 @@ export default function App() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bagFor, setBagFor] = useState<string | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [rulesets, setRulesets] = useState<RulesetSummary[]>([]);
@@ -841,12 +887,6 @@ export default function App() {
               <p className="muted">Upload D&D Beyond character PDFs to build the party.</p>
             )}
             {characters.map((c) => {
-              const initials = c.name
-                .split(/\s+/)
-                .map((p) => p[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
               return (
               <div
                 key={c.id}
@@ -854,7 +894,24 @@ export default function App() {
                 onClick={() => setSelectedId(c.id)}
               >
                 <div className="party-hero">
-                  <div className="avatar initials">{initials || "?"}</div>
+                  <PartyAvatar
+                    name={c.name}
+                    imageUrl={c.image_url}
+                    apiBase={apiBase}
+                    onFile={(file) => {
+                      void (async () => {
+                        setBusy(true);
+                        try {
+                          await api.uploadCharacterImage(c.id, file);
+                          setCharacters(await api.listCharacters());
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : String(err));
+                        } finally {
+                          setBusy(false);
+                        }
+                      })();
+                    }}
+                  />
                   <div style={{ minWidth: 0 }}>
                     <strong>{c.name}</strong>
                     <small>
@@ -879,42 +936,51 @@ export default function App() {
                     <span className="level-ready-pill">Level up ready</span>
                   )}
                 </div>
-              </div>
-            );})}
-          </div>
-
-          {selected && (
-            <div>
-              <div className="row">
-                <button
-                  className="btn"
-                  onClick={() => {
-                    setEditing((v) => !v);
-                    setEditDraft({
-                      name: selected.name,
-                      level: selected.level,
-                      max_hp: selected.max_hp,
-                      current_hp: selected.current_hp,
-                      ac: selected.ac,
-                      proficiency_bonus: selected.proficiency_bonus,
-                    });
-                  }}
-                >
-                  {editing ? "Cancel edit" : "Edit sheet"}
-                </button>
-                <button
-                  className="btn ghost"
-                  onClick={async () => {
-                    await api.deleteCharacter(selected.id);
-                    setSelectedId(null);
-                    await refresh();
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-              {editing && (
-                <div className="edit-form">
+                {c.id === selectedId && selected && (
+                  <div className="char-sheet">
+                    <div className="row">
+                      <button
+                        className="btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing((v) => !v);
+                          setEditDraft({
+                            name: selected.name,
+                            level: selected.level,
+                            max_hp: selected.max_hp,
+                            current_hp: selected.current_hp,
+                            ac: selected.ac,
+                            proficiency_bonus: selected.proficiency_bonus,
+                          });
+                        }}
+                      >
+                        {editing ? "Cancel edit" : "Edit sheet"}
+                      </button>
+                      <button
+                        className="btn ghost"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await api.deleteCharacter(selected.id);
+                          setSelectedId(null);
+                          await refresh();
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    <div className="gear-list" onClick={(e) => e.stopPropagation()}>
+                      <div className="gear-head">
+                        Gear · AC {selected.ac}
+                        {selected.ac_unarmored != null ? ` · unarmored ${selected.ac_unarmored}` : ""}
+                        {selected.hands_label ? ` · ${selected.hands_label}` : ""}
+                        {selected.carry_label ? ` · ${selected.carry_label}` : ""}
+                      </div>
+                      <button type="button" className="btn tiny" onClick={() => setBagFor(selected.id)}>
+                        Open bag
+                      </button>
+                    </div>
+                    {editing && (
+                      <div className="edit-form" onClick={(e) => e.stopPropagation()}>
                   <label>
                     Name
                     <input
@@ -1021,13 +1087,24 @@ export default function App() {
                       />
                     </label>
                   ))}
-                  <button className="btn primary" onClick={() => void saveEdits()} disabled={busy}>
+                  <button
+                    className="btn primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void saveEdits();
+                    }}
+                    disabled={busy}
+                  >
                     Save changes
                   </button>
                 </div>
-              )}
-            </div>
-          )}
+                    )}
+                  </div>
+                )}
+              </div>
+              );
+            })}
+          </div>
         </aside>
 
         <section className="panel query-box">
@@ -1084,6 +1161,13 @@ export default function App() {
                 <div className="impossible-banner">Not possible</div>
               )}
               <div className="roll-line">{result.roll_line}</div>
+              {result.factors && result.factors.length > 0 && (
+                <ul className="factor-list">
+                  {result.factors.map((line, index) => (
+                    <li key={`${index}-${line}`}>{line}</li>
+                  ))}
+                </ul>
+              )}
               {involved.length > 0 && (
                 <div className="involved-row">
                   {involved.map((person) => (
@@ -1150,6 +1234,7 @@ export default function App() {
                     {result.modifier != null
                       ? ` ${result.modifier >= 0 ? "+" : ""}${result.modifier}`
                       : ""}
+                    {result.extra_dice ? ` ${result.extra_dice}` : ""}
                   </div>
                 </div>
                 {result.check_type === "attack" ? (
@@ -2293,6 +2378,15 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+      {bagFor && characters.find((c) => c.id === bagFor) && (
+        <InventoryModal
+          character={characters.find((c) => c.id === bagFor)!}
+          onClose={() => setBagFor(null)}
+          onUpdated={(next) =>
+            setCharacters((prev) => prev.map((ch) => (ch.id === next.id ? next : ch)))
+          }
+        />
       )}
     </div>
   );

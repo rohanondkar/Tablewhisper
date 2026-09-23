@@ -126,6 +126,7 @@ class CharacterPatch(BaseModel):
     max_hp: int | None = None
     current_hp: int | None = None
     ac: int | None = None
+    equipment: list[dict[str, Any]] | None = None
     proficiency_bonus: int | None = None
     initiative: int | None = None
     abilities: dict[str, Any] | None = None
@@ -263,6 +264,13 @@ def patch_character(char_id: str, body: CharacterPatch) -> dict[str, Any]:
             base.update(sval)
             merged_skills[sid] = base
         current["skills"] = merged_skills
+    if "equipment" in patch:
+        proposed = patch.pop("equipment")
+        previous = list(current.get("equipment") or [])
+        from .equipment import apply_equipment
+
+        apply_equipment(current, proposed, previous)
+        patch.pop("ac", None)
     current.update(patch)
     if "size" in patch:
         current["size"] = normalize_size(patch["size"])
@@ -285,10 +293,19 @@ async def upload_character_image(char_id: str, file: UploadFile = File(...)) -> 
         ext = ".png"
     fname = f"{char_id}{ext}"
     dest = CHAR_IMAGE_DIR / fname
+    for old in CHAR_IMAGE_DIR.glob(f"{char_id}.*"):
+        if old.name != fname and old.is_file():
+            old.unlink()
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
     current["image"] = fname
-    return db.public_character(db.upsert_character(current))
+    updated = db.public_character(db.upsert_character(current))
+    try:
+        for m in maps.list_maps():
+            maps.refresh_token_portraits(m["id"])
+    except Exception:
+        pass
+    return updated
 
 
 def _place_on_active_map(kind: str, entities: list[dict[str, Any]]) -> None:
