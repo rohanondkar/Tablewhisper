@@ -1566,6 +1566,7 @@ button {
   min-height: 0;
   gap: 0.5rem;
   padding: 0 0.75rem 0.75rem;
+  overflow: auto;
 }
 
 .map-topbar {
@@ -1660,7 +1661,8 @@ button {
 
 .map-stage-wrap {
   position: relative;
-  min-height: 420px;
+  min-height: 0;
+  height: 100%;
   border-radius: 12px;
   border: 1px solid var(--line);
   background: #0a0c10;
@@ -1683,6 +1685,160 @@ button {
   pointer-events: auto;
 }
 
+.turn-order {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0.35rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.turn-controls,
+.turn-swap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.turn-round {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e6c15a;
+}
+
+.turn-track {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  flex: 1;
+  align-items: center;
+  padding: 0.15rem 0;
+}
+
+.turn-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  position: relative;
+}
+
+.turn-later {
+  position: absolute;
+  top: -0.15rem;
+  left: 0;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #9aa3b2;
+  white-space: nowrap;
+}
+
+.turn-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 76px;
+  padding: 0.25rem 0.35rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.turn-card.now {
+  transform: translateY(-4px);
+}
+
+.turn-card.later {
+  opacity: 0.55;
+}
+
+.turn-face {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #1a1d24;
+  background: #1d3557;
+}
+
+.turn-card.now .turn-face {
+  width: 44px;
+  height: 44px;
+  border-color: #e6c15a;
+  box-shadow: 0 0 14px rgba(230, 193, 90, 0.75);
+}
+
+.turn-initials {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #fff;
+}
+
+.turn-initials.kind-pc {
+  background: #2d6a4f;
+}
+
+.turn-initials.kind-enemy {
+  background: #9b2226;
+}
+
+.turn-name {
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.turn-total {
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.turn-math,
+.turn-mod {
+  font-size: 0.68rem;
+  color: #9aa3b2;
+}
+
+.turn-mod {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.turn-mod input,
+.turn-swap select {
+  width: 4.2rem;
+  background: #12151c;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1rem 0.25rem;
+}
+
+.map-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0;
+}
+.map-action-list .btn {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+}
 .map-inspector-block {
   display: flex;
   flex-direction: column;
@@ -1718,7 +1874,7 @@ button {
 @media (max-width: 1100px) {
   .map-body {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: minmax(180px, auto) minmax(360px, 1fr) minmax(180px, auto);
   }
   .map-stage-wrap {
     min-height: 360px;

@@ -266,6 +266,8 @@ def assess(
         disadv("The weather imposes disadvantage on this listening check.")
     if storm and check_type == "attack" and ranged:
         disadv("The weather imposes disadvantage on this ranged attack.")
+    if check_type == "attack" and _find(r"\blong range\b", raw):
+        disadv("Long range: disadvantage on the attack.")
 
     if prone and attacker_side(prone) and check_type == "attack" and not ranged:
         disadv("Prone: disadvantage on this melee attack.")

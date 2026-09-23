@@ -6,6 +6,7 @@ import {
   mediaUrlSync,
   type BattleMap,
   type Character,
+  type CheckResult,
   type EncounterEnemy,
   type MapLight,
   type MapPortal,
@@ -17,8 +18,40 @@ import {
 } from "../api";
 import { CREATURE_SIZES, sizeToSquares } from "./sizes";
 import { boundsSegments, feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
+import {
+  AimOverlay,
+  MarkLayer,
+  PortalRing,
+  RulingChip,
+  TravelEffect,
+  actionsFor,
+  aimTiles,
+  attackSentence,
+  effectTiles,
+  footprint,
+  markKind,
+  tileCenter,
+  tileKey,
+  tileOf,
+  type AimTile,
+  type MapAction,
+  type Mark,
+  type Tile,
+  type Travel,
+} from "./effects";
+import TurnOrder, { sortTurns, type TurnSlot } from "./TurnOrder";
 
 const API_BASE = "http://127.0.0.1:8766";
+
+function portraitUrl(kind: string, url?: string | null): string | null {
+  let path = url || "";
+  if (path.endsWith(".svg") && path.includes("/monsters/")) path = path.replace(/\.svg$/i, ".png");
+  if (!path && kind !== "pc") {
+    path = kind === "npc" ? "/media/tokens/token-npc-generic.png" : "/media/tokens/token-humanoid.png";
+  }
+  if (!path) return null;
+  return mediaUrlSync(path, API_BASE);
+}
 const MIN_SQUARES = 2;
 const MAX_SQUARES = 200;
 const MIN_MAP_PX = 16;
@@ -74,7 +107,6 @@ function VisionFan({ area }: { area: VisionArea }) {
 
 type Tool =
   | "select"
-  | "pan"
   | "measure"
   | "fog"
   | "fog-erase"
@@ -123,6 +155,7 @@ export default function MapPanel({
   onError,
   onEncounterChange,
   onSceneChange,
+  onCharactersChange,
 }: Props) {
   const [mapsList, setMapsList] = useState<BattleMap[]>([]);
   const [map, setMap] = useState<BattleMap | null>(null);
@@ -131,7 +164,20 @@ export default function MapPanel({
   const [lights, setLights] = useState<MapLight[]>([]);
   const [portals, setPortals] = useState<MapPortal[]>([]);
   const [tool, setTool] = useState<Tool>("select");
+  const [armed, setArmed] = useState<MapAction | null>(null);
+  const [hoverTile, setHoverTile] = useState<Tile | null>(null);
+  const [travel, setTravel] = useState<Travel | null>(null);
+  const [travelProgress, setTravelProgress] = useState(0);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [downed, setDowned] = useState<string[]>([]);
+  const [tileRuling, setTileRuling] = useState<{ tile: Tile; text: string; action: MapAction; targetId: string | null } | null>(null);
+  const [damageDraft, setDamageDraft] = useState("");
+  const [grabbing, setGrabbing] = useState(false);
+  const [portalSwirl, setPortalSwirl] = useState<{ x: number; y: number } | null>(null);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [turns, setTurns] = useState<TurnSlot[]>([]);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [round, setRound] = useState(1);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedLightId, setSelectedLightId] = useState<string | null>(null);
   const [selectedPortalId, setSelectedPortalId] = useState<string | null>(null);
@@ -158,6 +204,7 @@ export default function MapPanel({
   const lastFogPt = useRef<{ x: number; y: number } | null>(null);
   const panning = useRef(false);
   const panOrigin = useRef({ mx: 0, my: 0, sx: 0, sy: 0 });
+  const selectPan = useRef<{ mx: number; my: number; sx: number; sy: number; moved: boolean } | null>(null);
   const spaceHeld = useRef(false);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
@@ -233,6 +280,10 @@ export default function MapPanel({
         setWalls(state.walls);
         setLights(state.lights);
         setPortals(state.portals);
+        setMarks([]);
+        setArmed(null);
+        setTileRuling(null);
+        setDowned([]);
         await refreshList();
         ensureFogCanvas(m, !m.fog_url);
         setFogVersion((v) => v + 1);
@@ -315,6 +366,214 @@ export default function MapPanel({
 
   const segs = useMemo(() => wallsToSegments(walls), [walls]);
   const selectedToken = tokens.find((t) => t.id === selectedTokenId) || null;
+  const tokenActions = useMemo(() => {
+    if (!selectedToken) return [] as MapAction[];
+    if (selectedToken.kind === "pc") {
+      const character = characters.find((c) => c.id === selectedToken.ref_id);
+      const weapons = (character?.equipment || [])
+        .filter((item) => item.state === "equipped" && (item.effect === "weapon" || item.effect === "unarmed"))
+        .map((item) => item.name);
+      return actionsFor(character?.attacks || [], { text: character?.features, extraWeapons: weapons });
+    }
+    if (selectedToken.kind === "enemy") {
+      const foe = encounter.find((row) => row.id === selectedToken.ref_id);
+      return actionsFor(foe?.template?.attacks || [], { text: foe?.template?.notes });
+    }
+    const npc = scene.find((row) => row.id === selectedToken.ref_id);
+    return actionsFor(npc?.template?.attacks || [], { text: npc?.template?.notes, social: true });
+  }, [selectedToken, characters, encounter, scene]);
+
+  const rosterSig = useMemo(
+    () =>
+      [
+        characters.map((c) => `${c.id}|${c.name}|${c.initiative}|${c.image_url || ""}`).join(","),
+        encounter.map((e) => `${e.id}|${e.label || e.name}|${e.image_url || ""}`).join(","),
+        scene.map((n) => `${n.id}|${n.label || n.name}|${n.image_url || ""}`).join(","),
+      ].join(";"),
+    [characters, encounter, scene]
+  );
+  const rosterRef = useRef({ characters, encounter, scene });
+  rosterRef.current = { characters, encounter, scene };
+
+  useEffect(() => {
+    const { characters: pcs, encounter: foes, scene: people } = rosterRef.current;
+    const built: TurnSlot[] = [
+      ...pcs.map((c) => ({
+        key: `pc:${c.id}`,
+        refId: c.id,
+        kind: "pc" as const,
+        name: c.name,
+        mod: c.initiative,
+        sheetMod: c.initiative,
+        locked: true,
+        image: portraitUrl("pc", c.image_url),
+        roll: null,
+      })),
+      ...foes.map((e) => ({
+        key: `enemy:${e.id}`,
+        refId: e.id,
+        kind: "enemy" as const,
+        name: e.label || e.name,
+        mod: 0,
+        sheetMod: 0,
+        locked: false,
+        image: portraitUrl("enemy", e.image_url),
+        roll: null,
+      })),
+      ...people.map((n) => ({
+        key: `npc:${n.id}`,
+        refId: n.id,
+        kind: "npc" as const,
+        name: n.label || n.name,
+        mod: 0,
+        sheetMod: 0,
+        locked: false,
+        image: portraitUrl("npc", n.image_url),
+        roll: null,
+      })),
+    ];
+    setTurns((prev) => {
+      const byKey = new Map(prev.map((slot) => [slot.key, slot]));
+      return built.map((slot) => {
+        const old = byKey.get(slot.key);
+        if (!old) return slot;
+        return {
+          ...slot,
+          mod: old.roll != null ? old.mod : slot.locked ? slot.sheetMod : old.mod,
+          roll: old.roll,
+        };
+      });
+    });
+    setActiveKey((current) => (current && built.some((slot) => slot.key === current) ? current : null));
+  }, [rosterSig]);
+
+  const orderedTurns = useMemo(() => sortTurns(turns), [turns]);
+  const turnStart = activeKey ? Math.max(0, orderedTurns.findIndex((slot) => slot.key === activeKey)) : 0;
+  const turnQueue = activeKey
+    ? orderedTurns.slice(turnStart).concat(orderedTurns.slice(0, turnStart))
+    : orderedTurns;
+  const laterFrom = activeKey && turnStart > 0 ? orderedTurns.length - turnStart : turnQueue.length;
+  const activeSlot = orderedTurns.find((slot) => slot.key === activeKey) || null;
+  const activeChar = activeSlot?.kind === "pc" ? characters.find((c) => c.id === activeSlot.refId) : undefined;
+  const canSwap = Boolean(
+    activeSlot &&
+      activeSlot.roll != null &&
+      activeChar &&
+      /initiative swap/i.test(activeChar.features || "")
+  );
+  const swapAllies = orderedTurns
+    .filter((slot) => slot.kind === "pc" && slot.key !== activeKey && slot.roll != null)
+    .map((slot) => ({ key: slot.key, name: slot.name }));
+  const activeTokenId =
+    tokens.find((token) => activeSlot && token.kind === activeSlot.kind && token.ref_id === activeSlot.refId)?.id ||
+    null;
+
+  function focusTurn(slot: TurnSlot | undefined) {
+    if (!slot) return;
+    setActiveKey(slot.key);
+    setArmed(null);
+    const token = tokens.find((item) => item.kind === slot.kind && item.ref_id === slot.refId);
+    setSelectedTokenId(token?.id ?? null);
+  }
+
+  function rollInitiative() {
+    const rolled = turns.map((slot) => ({
+      ...slot,
+      mod: slot.locked ? slot.sheetMod : slot.mod,
+      roll: 1 + Math.floor(Math.random() * 20),
+    }));
+    setTurns(rolled);
+    setRound(1);
+    const sorted = sortTurns(rolled);
+    focusTurn(sorted[0]);
+  }
+
+  function nextTurn() {
+    if (!orderedTurns.length) return;
+    if (orderedTurns.some((slot) => slot.roll == null)) {
+      rollInitiative();
+      return;
+    }
+    const index = orderedTurns.findIndex((slot) => slot.key === activeKey);
+    if (index < 0 || index === orderedTurns.length - 1) {
+      setRound((value) => value + 1);
+      focusTurn(orderedTurns[0]);
+      return;
+    }
+    focusTurn(orderedTurns[index + 1]);
+  }
+
+  function swapInitiative(otherKey: string) {
+    setTurns((prev) => {
+      const mine = prev.find((slot) => slot.key === activeKey);
+      const theirs = prev.find((slot) => slot.key === otherKey);
+      if (!mine || !theirs || mine.roll == null || theirs.roll == null) return prev;
+      return prev.map((slot) => {
+        if (slot.key === mine.key) return { ...slot, roll: theirs.roll, mod: theirs.mod };
+        if (slot.key === theirs.key) return { ...slot, roll: mine.roll, mod: mine.mod };
+        return slot;
+      });
+    });
+  }
+  const highlighted = useMemo(() => {
+    if (!armed || !map || !selectedToken) return [] as AimTile[];
+    const from = footprint(selectedToken.x, selectedToken.y, selectedToken.size_sq, map);
+    const others = tokens
+      .filter((item) => item.id !== selectedToken.id)
+      .flatMap((item) => footprint(item.x, item.y, item.size_sq, map));
+    return aimTiles(armed, from, hoverTile, map, segs, others);
+  }, [armed, map, selectedToken, hoverTile, tokens, segs]);
+
+  useEffect(() => {
+    if (!travel) return;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / 520);
+      setTravelProgress(t);
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else setTravel(null);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [travel]);
+
+  async function fireAction(action: MapAction, tile: Tile, target: MapToken | null, far: boolean) {
+    if (!map || !selectedToken) return;
+    const fromTiles = footprint(selectedToken.x, selectedToken.y, selectedToken.size_sq, map);
+    const tiles = effectTiles(action, fromTiles, tile, map, segs);
+    setTravel({
+      id: Date.now(),
+      family: action.family,
+      damageType: action.damageType,
+      from: tileCenter(fromTiles[0], map),
+      to: tileCenter(tile, map),
+      tiles,
+    });
+    setTravelProgress(0);
+    setArmed(null);
+    setHoverTile(null);
+    if (!action.sentence) {
+      setTileRuling({
+        tile,
+        text: action.spellNote || "The DC is not on the sheet.",
+        action,
+        targetId: target?.id || null,
+      });
+      return;
+    }
+    const pcId =
+      selectedToken.kind === "pc" ? selectedToken.ref_id : target?.kind === "pc" ? target.ref_id : null;
+    try {
+      const result = await api.query(
+        attackSentence(selectedToken.label, action, target?.label || "the open ground", far),
+        pcId
+      );
+      setTileRuling({ tile, text: formatRuling(result), action, targetId: target?.id || null });
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async function ensureMap(): Promise<BattleMap> {
     if (map) return map;
@@ -593,10 +852,10 @@ export default function MapPanel({
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
 
-    const wantPan = tool === "pan" || spaceHeld.current || e.evt.button === 1;
+    const wantPan = spaceHeld.current || e.evt.button === 1;
     if (wantPan) {
-      // Move map tool: drag anywhere. Space / middle-mouse also pan.
       panning.current = true;
+      setGrabbing(true);
       panOrigin.current = {
         mx: pointer.x,
         my: pointer.y,
@@ -645,10 +904,13 @@ export default function MapPanel({
     }
 
     if (tool === "select" && isBgTarget(e.target, stage)) {
-      setSelectedTokenId(null);
-      setSelectedWallId(null);
-      setSelectedLightId(null);
-      setSelectedPortalId(null);
+      selectPan.current = {
+        mx: pointer.x,
+        my: pointer.y,
+        sx: stagePos.x,
+        sy: stagePos.y,
+        moved: false,
+      };
     }
   }
 
@@ -657,6 +919,16 @@ export default function MapPanel({
     if (!stage || !map) return;
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
+
+    const pending = selectPan.current;
+    if (pending && !panning.current) {
+      if (Math.hypot(pointer.x - pending.mx, pointer.y - pending.my) > 4) {
+        pending.moved = true;
+        panning.current = true;
+        setGrabbing(true);
+        panOrigin.current = pending;
+      }
+    }
 
     if (panning.current) {
       setStagePos({
@@ -668,6 +940,9 @@ export default function MapPanel({
 
     const p = stagePointer(stage);
     if (!p) return;
+    if (tool === "select" && armed && map) {
+      setHoverTile(tileOf(p.x, p.y, map));
+    }
     if (tool === "measure" && measure) {
       setMeasure([measure[0], measure[1], p.x, p.y]);
     }
@@ -676,10 +951,37 @@ export default function MapPanel({
     }
   }
 
-  async function onStageMouseUp() {
+  async function onStageMouseUp(e?: Konva.KonvaEventObject<MouseEvent>) {
+    const pending = selectPan.current;
+    selectPan.current = null;
     if (panning.current) {
       panning.current = false;
+      setGrabbing(false);
       return;
+    }
+    if (pending && !pending.moved && tool === "select") {
+      const stage = e?.target?.getStage?.();
+      const p = stage && map ? stagePointer(stage) : null;
+      const tile = p && map ? tileOf(p.x, p.y, map) : null;
+      if (armed) {
+        if (tile && highlighted.some((item) => item.c === tile.c && item.r === tile.r)) {
+          const token = tokens.find((item) =>
+            footprint(item.x, item.y, item.size_sq, map!).some((part) => part.c === tile.c && part.r === tile.r)
+          );
+          void fireAction(
+            armed,
+            tile,
+            token || null,
+            highlighted.some((item) => item.c === tile.c && item.r === tile.r && item.far)
+          );
+        }
+        return;
+      }
+      setSelectedTokenId(null);
+      setSelectedWallId(null);
+      setSelectedLightId(null);
+      setSelectedPortalId(null);
+      setArmed(null);
     }
     if ((tool === "fog" || tool === "fog-erase") && paintingFog.current) {
       paintingFog.current = false;
@@ -734,8 +1036,52 @@ export default function MapPanel({
   }
 
   async function sendThroughPortal(portalId: string, tokenId: string, targetMapId: string) {
+    const portal = portals.find((item) => item.id === portalId);
+    if (portal) setPortalSwirl({ x: portal.x, y: portal.y });
+    await new Promise((resolve) => setTimeout(resolve, 420));
     await api.traversePortal(portalId, [tokenId]);
+    setPortalSwirl(null);
     await loadState(targetMapId);
+  }
+
+  async function applyDamage() {
+    if (!tileRuling || !map) return;
+    const amount = Number(damageDraft);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const target = tokens.find((item) => item.id === tileRuling.targetId);
+    const kind = markKind(tileRuling.action.damageType);
+    const spots = tileRuling.action.shape === "burst" || tileRuling.action.shape === "cone" || tileRuling.action.shape === "line" || tileRuling.action.shape === "cube"
+      ? effectTiles(tileRuling.action, selectedToken ? footprint(selectedToken.x, selectedToken.y, selectedToken.size_sq, map) : [tileRuling.tile], tileRuling.tile, map, segs)
+      : [tileRuling.tile];
+    if (kind !== "dust" && kind !== "flash" && kind !== "radiant" && kind !== "necrotic" && kind !== "force" && kind !== "psychic" && kind !== "heal") {
+      setMarks((prev) => [
+        ...prev,
+        ...spots.map((tile, index) => {
+          const at = tileCenter(tile, map);
+          return { id: `${kind}-${Date.now()}-${index}`, kind, x: at.x, y: at.y, tile };
+        }),
+      ]);
+    }
+    if (target?.kind === "enemy" && target.ref_id) {
+      const foe = encounter.find((row) => row.id === target.ref_id);
+      const updated = await api.damageEnemy(target.ref_id, amount);
+      if ((updated.current_hp ?? (foe ? foe.current_hp - amount : 1)) <= 0) setDowned((prev) => [...prev, target.id]);
+      await onEncounterChange();
+    } else if (target?.kind === "npc" && target.ref_id) {
+      const npc = scene.find((row) => row.id === target.ref_id);
+      const next = Math.max(0, (npc?.current_hp ?? amount) - amount);
+      await api.setSceneNpcHp(target.ref_id, next);
+      if (next <= 0) setDowned((prev) => [...prev, target.id]);
+      await onSceneChange();
+    } else if (target?.kind === "pc" && target.ref_id) {
+      const character = characters.find((row) => row.id === target.ref_id);
+      const next = Math.max(0, (character?.current_hp ?? character?.max_hp ?? amount) - amount);
+      await api.updateCharacter(target.ref_id, { current_hp: next });
+      if (next <= 0) setDowned((prev) => [...prev, target.id]);
+      await onCharactersChange?.();
+    }
+    setTileRuling(null);
+    setDamageDraft("");
   }
 
   const gridLines = useMemo(() => {
@@ -801,8 +1147,8 @@ export default function MapPanel({
     (n) => !filterLower || n.name.toLowerCase().includes(filterLower)
   );
 
-  const cursor =
-    tool === "pan" || spaceHeld.current
+    const cursor =
+    grabbing
       ? "grab"
       : tool === "fog" || tool === "fog-erase"
         ? "crosshair"
@@ -864,9 +1210,9 @@ export default function MapPanel({
         </div>
       </div>
 
-      {map && (
+      {calibrating && map && (
         <div className="map-calibrate">
-          <strong>Map area</strong>
+          <strong>Grid</strong>
           <label>
             squares wide
             <input
@@ -896,15 +1242,7 @@ export default function MapPanel({
           <button type="button" className="btn" disabled={busy} onClick={() => void applyMapSquares()}>
             Set size
           </button>
-          <span className="muted small">
-            Each square stays {Math.round(map.grid_size_px)}px. A larger area adds more squares.
-          </span>
-        </div>
-      )}
-
-      {calibrating && map && (
-        <div className="map-calibrate">
-          <strong>Grid calibration</strong>
+          <strong>Calibration</strong>
           <label>
             px / square
             <input
@@ -955,6 +1293,22 @@ export default function MapPanel({
             Save grid
           </button>
         </div>
+      )}
+
+      {(characters.length > 0 || encounter.length > 0 || scene.length > 0) && (
+        <TurnOrder
+          slots={turnQueue}
+          activeKey={activeKey}
+          round={round}
+          laterFrom={laterFrom}
+          canSwap={canSwap}
+          allies={swapAllies}
+          onRoll={rollInitiative}
+          onNext={nextTurn}
+          onPick={(key) => focusTurn(orderedTurns.find((slot) => slot.key === key))}
+          onMod={(key, mod) => setTurns((prev) => prev.map((slot) => (slot.key === key ? { ...slot, mod } : slot)))}
+          onSwap={swapInitiative}
+        />
       )}
 
       <div className="map-body">
@@ -1095,7 +1449,6 @@ export default function MapPanel({
             {(
               [
                 ["select", "Select"],
-                ["pan", "Move map"],
                 ["measure", "Ruler"],
                 ["fog", "Fog"],
                 ["fog-erase", "Reveal"],
@@ -1185,7 +1538,7 @@ export default function MapPanel({
             }}
             onMouseDown={(e) => void onStageMouseDown(e)}
             onMouseMove={(e) => onStageMouseMove(e)}
-            onMouseUp={() => void onStageMouseUp()}
+            onMouseUp={(e) => void onStageMouseUp(e)}
             onMouseLeave={() => void onStageMouseUp()}
           >
             <Layer>
@@ -1332,13 +1685,7 @@ export default function MapPanel({
                     setPortals((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
                   }}
                 >
-                  <Circle
-                    radius={p.radius}
-                    stroke="#9b59ff"
-                    strokeWidth={2}
-                    dash={[4, 4]}
-                    fill="rgba(155,89,255,0.15)"
-                  />
+                  <PortalRing radius={p.radius} />
                   <Text text={p.label} y={-p.radius - 14} fontSize={12} fill="#d7bfff" />
                 </Group>
               ))}
@@ -1365,15 +1712,49 @@ export default function MapPanel({
                     token={t}
                     side={side}
                     selected={selectedTokenId === t.id}
-                    draggable={tool === "select"}
+                    acting={t.id === activeTokenId}
+                    faded={downed.includes(t.id)}
+                    draggable={tool === "select" && !armed}
                     onSelect={() => {
+                      if (armed && map) {
+                        const tile = tileOf(t.x + 1, t.y + 1, map);
+                        const legal = highlighted.some((item) => item.c === tile.c && item.r === tile.r);
+                        if (legal) {
+                          void fireAction(
+                            armed,
+                            tile,
+                            t,
+                            highlighted.some((item) => item.c === tile.c && item.r === tile.r && item.far)
+                          );
+                        }
+                        return;
+                      }
                       setSelectedTokenId(t.id);
                       setSelectedWallId(null);
+                      setArmed(null);
                     }}
                     onDragEnd={(x, y) => void onTokenDragEnd(t, x, y)}
                   />
                 );
               })}
+            </Layer>
+
+            <Layer listening={false}>
+              {map && <AimOverlay tiles={highlighted} grid={map} />}
+              {map && travel && <TravelEffect travel={travel} progress={travelProgress} grid={map} />}
+              <MarkLayer marks={marks} />
+              {map && tileRuling && (
+                <RulingChip
+                  x={tileCenter(tileRuling.tile, map).x}
+                  y={tileCenter(tileRuling.tile, map).y}
+                  text={tileRuling.text.split("\n")[0] || ""}
+                />
+              )}
+              {portalSwirl && (
+                <Group x={portalSwirl.x} y={portalSwirl.y} listening={false}>
+                  <PortalRing radius={map?.grid_size_px ? map.grid_size_px * 0.9 : 36} />
+                </Group>
+              )}
             </Layer>
 
             <Layer listening={false}>
@@ -1410,7 +1791,7 @@ export default function MapPanel({
         <aside className="map-inspector">
           <h3>Inspector</h3>
           <p className="muted small">
-            <strong>Select</strong> moves tokens. <strong>Portal</strong> is one click, then
+            <strong>Select</strong> moves tokens. Drag empty map to slide it. <strong>Portal</strong> is one click, then
             pick the scene in the panel. Double-click a doorway to open that scene. With Vision ON,
             yellow sight uses each token's Vision (ft) and stops at walls and fog.
           </p>
@@ -1437,6 +1818,56 @@ export default function MapPanel({
                   ))}
                 </select>
               </label>
+              <p className="muted small">Drag an empty part of the map to slide it. Drag a token to move it.</p>
+              <div className="map-action-list">
+                {tokenActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    className={`btn ghost ${armed?.id === action.id ? "active-tab" : ""}`}
+                    onClick={() => {
+                      setArmed(action);
+                      setTileRuling(null);
+                      setHoverTile(null);
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+              {armed && <p className="muted small">Click a highlighted square. Amber squares are long range.</p>}
+              {armed && highlighted.length === 0 && armed.shape !== "cone" && armed.shape !== "line" && armed.shape !== "cube" && (
+                <p className="muted small">That action has no square in reach.</p>
+              )}
+              {tileRuling && (
+                <div className="map-inspector-block">
+                  <p className="small" style={{ whiteSpace: "pre-wrap" }}>{tileRuling.text}</p>
+                  <label>
+                    Damage
+                    <input value={damageDraft} onChange={(e) => setDamageDraft(e.target.value)} />
+                  </label>
+                  <button type="button" className="btn" onClick={() => void applyDamage()}>
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => {
+                      if (map) {
+                        const at = tileCenter(tileRuling.tile, map);
+                        setMarks((prev) => [...prev, { id: `dust-${Date.now()}`, kind: "dust", x: at.x, y: at.y, tile: tileRuling.tile }]);
+                      }
+                      setTileRuling(null);
+                      setDamageDraft("");
+                    }}
+                  >
+                    Miss
+                  </button>
+                </div>
+              )}
+              <button type="button" className="btn ghost" onClick={() => setMarks([])}>
+                Clear marks
+              </button>
               <label>
                 Vision (ft)
                 <input
@@ -1571,6 +2002,8 @@ function TokenNode({
   token,
   side,
   selected,
+  acting,
+  faded,
   draggable,
   onSelect,
   onDragEnd,
@@ -1578,6 +2011,8 @@ function TokenNode({
   token: MapToken;
   side: number;
   selected: boolean;
+  acting?: boolean;
+  faded?: boolean;
   draggable: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
@@ -1620,6 +2055,7 @@ function TokenNode({
     <Group
       x={token.x}
       y={token.y}
+      opacity={faded ? 0.4 : 1}
       draggable={draggable}
       onClick={(e) => {
         e.cancelBubble = true;
@@ -1640,6 +2076,18 @@ function TokenNode({
         onDragEnd(e.target.x(), e.target.y());
       }}
     >
+      {acting && (
+        <Rect
+          x={-5}
+          y={-5}
+          width={side + 10}
+          height={side + 10}
+          stroke="#e6c15a"
+          strokeWidth={3}
+          cornerRadius={side * 0.2}
+          listening={false}
+        />
+      )}
       {img ? (
         <KonvaImage
           image={img}
@@ -1683,6 +2131,12 @@ function TokenNode({
       />
     </Group>
   );
+}
+
+function formatRuling(result: CheckResult): string {
+  return [result.roll_line, result.notes, result.damage ? `Damage: ${result.damage}` : "", result.howto]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function defaultTokenImage(kind: string): string {

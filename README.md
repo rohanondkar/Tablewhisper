@@ -207,7 +207,11 @@ Open **Map** in the top bar. This is a DM-only battle map for screen share. Play
 | **Player preview** | Shows fog the way a shared screen should look. |
 | **Vision** | Optional yellow vision and light rings. Off by default. A ring stops at the edge of the map. |
 
-Tools along the map: **Select**, **Move map** (or hold Space / middle-mouse), **Ruler**, **Fog**, **Reveal**, **Wall**, **Door**, **Light**, **Portal**. Drag tokens; they snap to the grid. Footprint follows 5e size (Medium is 1 square, Gargantuan is 4).
+Tools along the map: **Select**, **Ruler**, **Fog**, **Reveal**, **Wall**, **Door**, **Light**, **Portal**. Drag an empty part of the map to slide it. Hold Space or the middle mouse button to slide from anywhere. Drag tokens; they snap to the grid. Footprint follows 5e size (Medium is 1 square, Gargantuan is 4).
+
+Select a token and pick an attack, spell, or action that sheet actually has. A player gets the attack table, weapons in hand, and named features such as Second Wind or Hunter's Mark. A monster gets its stat-block attacks. A scene NPC gets those attacks plus Persuade, Intimidate, and Deceive. Highlighted squares are in reach. Amber squares are long range. The tile shows the same ruling as the console. **Apply** subtracts the number you rolled. **Miss** leaves hit points alone. Blood, scorch, and frost stay on the square until **Clear marks** or you change scenes. Portals swirl in place. A token that drops to 0 HP fades and stays on the map.
+
+**Roll initiative** lines up the party, the encounter, and scene NPCs. The current actor is the large portrait. Everyone still waiting this round sits to the right, and anyone who already acted shows again under Next round. Players use the initiative on the sheet. For a monster or NPC, type the Dexterity modifier from the stat block, then roll. **Next** steps through the round. A character with Initiative Swap can trade results with an ally. Ties go to the higher modifier.
 
 Token art comes from `packages\token-portraits`. A custom upload in **Pictures** wins. A player character with no portrait stays an initials tile on the map and on the ruling card.
 

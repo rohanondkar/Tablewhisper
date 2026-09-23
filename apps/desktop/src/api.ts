@@ -71,6 +71,11 @@ export interface Character {
     hand?: string | null;
     pocket?: number | null;
     rotated?: boolean;
+    reach_ft?: number;
+    range_ft?: number;
+    long_ft?: number;
+    thrown_ft?: number;
+    thrown_long_ft?: number;
   }>;
   ac_equipped?: number;
   ac_unarmored?: number;
@@ -187,6 +192,13 @@ export interface MonsterTemplate {
   image_url?: string;
 }
 
+export interface StatAttack {
+  name: string;
+  attack_bonus: number | string;
+  damage: string;
+  damage_type?: string;
+}
+
 export interface EncounterEnemy {
   id: string;
   label: string;
@@ -200,6 +212,7 @@ export interface EncounterEnemy {
   size?: string;
   size_sq?: number;
   image_url?: string;
+  template?: { attacks?: StatAttack[]; notes?: string };
 }
 
 export interface NpcTemplate {
@@ -233,6 +246,7 @@ export interface SceneNpc {
   size?: string;
   size_sq?: number;
   image_url?: string;
+  template?: { attacks?: StatAttack[]; notes?: string };
 }
 
 export interface XpAwardResult {

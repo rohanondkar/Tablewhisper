@@ -50,6 +50,30 @@ _WEAPONS: list[tuple[str, dict[str, Any]]] = [
     ("net", {"hands": 1, "weight": 3}),
 ]
 
+# Player's Handbook reach and range, in feet. Thrown weapons keep a 5-foot melee option.
+_WEAPON_RANGE: dict[str, dict[str, int]] = {
+    "dagger": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "handaxe": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "javelin": {"thrown_ft": 30, "thrown_long_ft": 120},
+    "light hammer": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "spear": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "dart": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "trident": {"thrown_ft": 20, "thrown_long_ft": 60},
+    "net": {"thrown_ft": 5, "thrown_long_ft": 15},
+    "glaive": {"reach_ft": 10},
+    "halberd": {"reach_ft": 10},
+    "lance": {"reach_ft": 10},
+    "pike": {"reach_ft": 10},
+    "whip": {"reach_ft": 10},
+    "light crossbow": {"range_ft": 80, "long_ft": 320},
+    "shortbow": {"range_ft": 80, "long_ft": 320},
+    "sling": {"range_ft": 30, "long_ft": 120},
+    "blowgun": {"range_ft": 25, "long_ft": 100},
+    "hand crossbow": {"range_ft": 30, "long_ft": 120},
+    "heavy crossbow": {"range_ft": 100, "long_ft": 400},
+    "longbow": {"range_ft": 150, "long_ft": 600},
+}
+
 _ARMOR: list[tuple[str, dict[str, Any]]] = [
     ("padded", {"weight": 8, "category": "light", "metal": False, "stealth": True, "don": "1 minute"}),
     ("leather", {"weight": 10, "category": "light", "metal": False, "stealth": False, "don": "1 minute"}),
@@ -104,6 +128,11 @@ def _spec_weapon(raw: dict[str, Any]) -> dict[str, Any]:
         "versatile": bool(raw.get("versatile")),
         "loading": bool(raw.get("loading")),
         "ammo": raw.get("ammo"),
+        "reach_ft": int(raw.get("reach_ft") or 5),
+        "range_ft": int(raw.get("range_ft") or 0),
+        "long_ft": int(raw.get("long_ft") or 0),
+        "thrown_ft": int(raw.get("thrown_ft") or 0),
+        "thrown_long_ft": int(raw.get("thrown_long_ft") or 0),
         "assumed": False,
     }
     return out
@@ -112,7 +141,9 @@ def _spec_weapon(raw: dict[str, Any]) -> dict[str, Any]:
 def _catalog() -> list[tuple[str, dict[str, Any]]]:
     rows: list[tuple[str, dict[str, Any]]] = []
     for name, raw in _WEAPONS:
-        rows.append((name, _spec_weapon(raw)))
+        merged = dict(raw)
+        merged.update(_WEAPON_RANGE.get(name, {}))
+        rows.append((name, _spec_weapon(merged)))
     for name, raw in _ARMOR:
         rows.append(
             (
@@ -174,6 +205,96 @@ def _match_key(name: str) -> tuple[str, dict[str, Any]] | None:
         if re.search(rf"\b{re.escape(key)}\b", low):
             return key, dict(spec)
     return None
+
+
+_SIMPLE_WEAPONS = {
+    "club",
+    "dagger",
+    "greatclub",
+    "handaxe",
+    "javelin",
+    "light hammer",
+    "mace",
+    "quarterstaff",
+    "sickle",
+    "spear",
+    "light crossbow",
+    "dart",
+    "shortbow",
+    "sling",
+}
+
+
+def _weapon_proficient(character: dict[str, Any], key: str) -> bool:
+    """Class weapon proficiency from the class line on the sheet."""
+    klass = _class_text(character)
+    simple = key in _SIMPLE_WEAPONS
+    if any(name in klass for name in ("barbarian", "fighter", "paladin", "ranger")):
+        return True
+    if "monk" in klass:
+        return simple or key == "shortsword"
+    if "rogue" in klass or "bard" in klass:
+        return simple or key in {"hand crossbow", "longsword", "rapier", "shortsword"}
+    if "druid" in klass:
+        return key in {
+            "club",
+            "dagger",
+            "dart",
+            "javelin",
+            "mace",
+            "quarterstaff",
+            "scimitar",
+            "sickle",
+            "sling",
+            "spear",
+        }
+    if "cleric" in klass or "warlock" in klass:
+        return simple
+    if "sorcerer" in klass or "wizard" in klass:
+        return key in {"dagger", "dart", "sling", "quarterstaff", "light crossbow"}
+    return False
+
+
+def equipped_attack(character: dict[str, Any], text: str) -> dict[str, Any] | None:
+    """Attack row for a weapon in hand when the attack table does not list it.
+
+    The bonus is the ability modifier on the sheet, plus proficiency when the class is proficient.
+    The damage die stays off this row when the attack table never printed one.
+    """
+    low = (text or "").lower()
+    best_name = ""
+    best_key = ""
+    best_spec: dict[str, Any] | None = None
+    for item in character.get("equipment") or []:
+        if not isinstance(item, dict) or not active(item):
+            continue
+        found = _match_key(str(item.get("name") or ""))
+        if not found or found[1].get("effect") != "weapon":
+            continue
+        key, spec = found
+        if not re.search(rf"\b{re.escape(key)}\b", low):
+            continue
+        if len(key) > len(best_key):
+            best_key = key
+            best_spec = spec
+            best_name = re.sub(r"\s*\([^)]*\)\s*$", "", str(item.get("name") or key)).strip() or key
+    if not best_spec or not best_key:
+        return None
+    ranged = bool(best_spec.get("ammo")) or int(best_spec.get("range_ft") or 0) > 0
+    if ranged and "thrown" not in low:
+        ability = ability_mod(character, "dexterity")
+    elif best_spec.get("finesse"):
+        ability = max(ability_mod(character, "strength"), ability_mod(character, "dexterity"))
+    else:
+        ability = ability_mod(character, "strength")
+    prof = int(character.get("proficiency_bonus") or 0) if _weapon_proficient(character, best_key) else 0
+    bonus = ability + prof
+    return {
+        "name": best_name,
+        "attack_bonus": f"+{bonus}" if bonus >= 0 else str(bonus),
+        "damage": "the weapon's damage die",
+        "notes": "Equipped. The attack table does not list this weapon's damage die.",
+    }
 
 
 def lookup(name: str) -> dict[str, Any]:
@@ -241,6 +362,12 @@ def annotate(item: dict[str, Any]) -> dict[str, Any]:
         row["note"] = "Treated as one-handed. The sheet does not name a Player's Handbook weapon."
     row["hands"] = int(spec.get("hands") or 0)
     row["light"] = bool(spec.get("light"))
+    if spec.get("effect") == "weapon":
+        row["reach_ft"] = int(spec.get("reach_ft") or 5)
+        row["range_ft"] = int(spec.get("range_ft") or 0)
+        row["long_ft"] = int(spec.get("long_ft") or 0)
+        row["thrown_ft"] = int(spec.get("thrown_ft") or 0)
+        row["thrown_long_ft"] = int(spec.get("thrown_long_ft") or 0)
     row["person_slot"] = _person_slot(row)
     return row
 

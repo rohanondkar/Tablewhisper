@@ -738,6 +738,9 @@ def _character_gear_blob(character: dict[str, Any]) -> str:
         parts.append(str(atk.get("damage") or ""))
     parts.append(str(character.get("features") or ""))
     parts.append(str(character.get("proficiencies") or ""))
+    for item in character.get("equipment") or []:
+        if isinstance(item, dict):
+            parts.append(str(item.get("name") or ""))
     return " ".join(parts).lower()
 
 
@@ -751,10 +754,13 @@ def _has_ranged_weapon(character: dict[str, Any]) -> bool:
     extra = f"{character.get('features') or ''} {character.get('proficiencies') or ''}".lower()
     if re.search(
         r"\b(longbow|shortbow|hand\s+crossbow|heavy\s+crossbow|light\s+crossbow|"
-        r"crossbow|short\s+bow|long\s+bow)\b",
+        r"crossbow|short\s+bow|long\s+bow|blowgun)\b",
         extra,
     ):
         return True
+    for item in character.get("equipment") or []:
+        if isinstance(item, dict) and _RANGED_WEAPON_RE.search(str(item.get("name") or "")):
+            return True
     return False
 
 
@@ -912,8 +918,6 @@ def _pick_weapon(
     if not character:
         return None
     attacks = character.get("attacks") or []
-    if not attacks:
-        return None
     lowered = text.lower()
     ranged_intent = bool(_RANGED_INTENT_RE.search(text))
     best = None
@@ -945,12 +949,15 @@ def _pick_weapon(
         if score > best_score:
             best_score = score
             best = atk
+    equipped = gear_rules.equipped_attack(character, text)
+    if equipped and best_score == 0:
+        return equipped
     if best:
         return best
     # Ranged intent with no matching ranged attack → do not fall back to melee
     if ranged_intent:
-        return None
-    return attacks[0]
+        return equipped
+    return attacks[0] if attacks else equipped
 
 
 def _modifier_for(
