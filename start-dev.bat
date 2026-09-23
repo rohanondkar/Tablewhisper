@@ -224,31 +224,33 @@ for /f "tokens=5" %%P in ('netstat -ano ^| findstr :%API_PORT% ^| findstr LISTEN
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr :5173 ^| findstr LISTENING') do taskkill /F /PID %%P >nul 2>&1
 timeout /t 2 /nobreak >nul
 
-echo  Starting API on port %API_PORT%...
-start "DM API :%API_PORT%" cmd /c "cd /d "%ROOT%apps\api" && title DM API :%API_PORT% && echo. && echo  API  http://127.0.0.1:%API_PORT%/health && echo  Docs http://127.0.0.1:%API_PORT%/docs && echo. && .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port %API_PORT% --reload & if errorlevel 1 pause"
-
-echo  Starting UI on port 5173...
-start "DM UI :5173" cmd /c "cd /d "%ROOT%apps\desktop" && title DM UI :5173 && echo. && echo  UI http://127.0.0.1:5173 && echo  (Do NOT press o — the launcher opens the browser for you.) && echo. && npm.cmd run dev:ui & if errorlevel 1 pause"
+echo  Starting API and UI in the background...
+if not exist "%ROOT%data\logs" mkdir "%ROOT%data\logs"
+set "DM_LAUNCH_ROOT=%ROOT%"
+set "DM_LAUNCH_PORT=%API_PORT%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\start-hidden.ps1"
 
 echo  Waiting for UI to be ready...
 set "READY=0"
 for /L %%I in (1,1,30) do (
-  curl -sf http://127.0.0.1:5173/ >nul 2>&1
-  if not errorlevel 1 (
-    set "READY=1"
-    goto ui_ready
+  if "!READY!"=="0" (
+    curl -sf http://127.0.0.1:5173/ >nul 2>&1
+    if not errorlevel 1 set "READY=1"
+    if "!READY!"=="0" timeout /t 1 /nobreak >nul
   )
-  timeout /t 1 /nobreak >nul
 )
-:ui_ready
 
-echo  Opening browser once...
-start "" "http://127.0.0.1:5173"
+if "!READY!"=="1" (
+  echo  Opening the console once...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\open-console-once.ps1"
+) else (
+  echo  [!] UI did not answer on port 5173. See data\logs\ui.log
+)
 
 echo.
 echo  [OK] App started.
-echo   - Keep the API and UI console windows open ^(they are not the app^).
-echo   - You do NOT need to press o in the Vite window — that would open a second tab.
+echo   - This launcher is the only window. Logs are in data\logs.
+echo   - Stop with menu option 6.
 echo   - Hard-refresh the browser ^(Ctrl+F5^) if you still see old errors.
 echo.
 pause

@@ -14,6 +14,21 @@ export interface SkillEntry {
   expertise: boolean;
 }
 
+export interface BagSummary {
+  name: string;
+  cols: number;
+  rows: number;
+  cells_used?: number;
+  cells?: number;
+  known_lb?: number;
+  cap_lb?: number;
+  assumed?: boolean;
+  label?: string;
+  extra?: boolean;
+  uncounted_names?: string[];
+  item_name?: string;
+}
+
 export interface Character {
   id: string;
   name: string;
@@ -21,6 +36,7 @@ export interface Character {
   class_level: string;
   level: number;
   species: string;
+  hand_color?: number[] | null;
   size?: string;
   size_sq?: number;
   background: string;
@@ -36,6 +52,42 @@ export interface Character {
   speed: string;
   passive_perception: number;
   attacks: Array<{ name: string; attack_bonus: string; damage: string; notes: string }>;
+  equipment?: Array<{
+    name: string;
+    state: string;
+    effect?: string | null;
+    qty?: number | null;
+    note?: string | null;
+    col?: number | null;
+    row?: number | null;
+    w?: number | null;
+    h?: number | null;
+    placed?: boolean;
+    container?: string | null;
+    hands?: number;
+    light?: boolean;
+    person_slot?: string | null;
+    fit_note?: string | null;
+    hand?: string | null;
+    pocket?: number | null;
+    rotated?: boolean;
+    reach_ft?: number;
+    range_ft?: number;
+    long_ft?: number;
+    thrown_ft?: number;
+    thrown_long_ft?: number;
+  }>;
+  ac_equipped?: number;
+  ac_unarmored?: number;
+  hands_label?: string;
+  carry_label?: string;
+  pockets?: number;
+  gear_notes?: string[];
+  bag?: BagSummary;
+  bags?: BagSummary[];
+  carry?: {
+    uncounted_names?: string[];
+  };
   features: string;
   proficiencies: string;
   source_pdf: string | null;
@@ -109,6 +161,9 @@ export interface CheckResult {
   target_ac?: number | null;
   to_hit_needed?: number | null;
   howto?: string | null;
+  factors?: string[];
+  extra_dice?: string | null;
+  crit_note?: string | null;
   /** False when the action cannot be attempted (missing gear, etc.). */
   possible?: boolean;
 }
@@ -137,6 +192,13 @@ export interface MonsterTemplate {
   image_url?: string;
 }
 
+export interface StatAttack {
+  name: string;
+  attack_bonus: number | string;
+  damage: string;
+  damage_type?: string;
+}
+
 export interface EncounterEnemy {
   id: string;
   label: string;
@@ -150,6 +212,7 @@ export interface EncounterEnemy {
   size?: string;
   size_sq?: number;
   image_url?: string;
+  template?: { attacks?: StatAttack[]; notes?: string };
 }
 
 export interface NpcTemplate {
@@ -183,6 +246,7 @@ export interface SceneNpc {
   size?: string;
   size_sq?: number;
   image_url?: string;
+  template?: { attacks?: StatAttack[]; notes?: string };
 }
 
 export interface XpAwardResult {
@@ -533,6 +597,16 @@ export const api = {
     const res = await fetch(`${base}/npcs/custom`, { method: "POST", body: form });
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<NpcTemplate>;
+  },
+  gearImages: () => request<{ images: Record<string, string> }>("/gear-images"),
+  uploadGearImage: async (name: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("name", name);
+    form.append("file", file);
+    const res = await fetch(`${base}/gear-images`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{ images: Record<string, string> }>;
   },
   uploadCharacterImage: async (charId: string, file: File) => {
     const base = await apiBase();

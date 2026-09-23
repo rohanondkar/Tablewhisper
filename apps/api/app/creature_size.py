@@ -19,21 +19,25 @@ SIZE_TO_SQUARES: dict[str, float] = {
 # Species / race name fragments → default size (first match wins, case-insensitive)
 _SPECIES_SIZE: list[tuple[str, str]] = [
     ("halfling", "Small"),
+    ("autognome", "Small"),
+    ("grung", "Small"),
     ("gnome", "Small"),
     ("goblin", "Small"),
     ("kobold", "Small"),
+    ("fairy", "Small"),
     ("kenku", "Medium"),
     ("tabaxi", "Medium"),
     ("aasimar", "Medium"),
     ("tiefling", "Medium"),
     ("human", "Medium"),
-    ("elf", "Medium"),
-    ("dwarf", "Medium"),
-    ("orc", "Medium"),
-    ("half-orc", "Medium"),
-    ("halforc", "Medium"),
     ("half-elf", "Medium"),
     ("halfelf", "Medium"),
+    ("elf", "Medium"),
+    ("dwarf", "Medium"),
+    ("half-orc", "Medium"),
+    ("halforc", "Medium"),
+    ("half orc", "Medium"),
+    ("orc", "Medium"),
     ("dragonborn", "Medium"),
     ("goliath", "Medium"),
     ("firbolg", "Medium"),
@@ -45,7 +49,6 @@ _SPECIES_SIZE: list[tuple[str, str]] = [
     ("hobgoblin", "Medium"),
     ("centaur", "Medium"),
     ("minotaur", "Medium"),
-    ("fairy", "Small"),
     ("harengon", "Medium"),
     ("owlin", "Medium"),
     ("satyr", "Medium"),
@@ -62,7 +65,29 @@ _SPECIES_SIZE: list[tuple[str, str]] = [
     ("githzerai", "Medium"),
     ("duergar", "Medium"),
     ("drow", "Medium"),
+    ("aarakocra", "Medium"),
+    ("triton", "Medium"),
+    ("giff", "Medium"),
+    ("locathah", "Medium"),
+    ("eladrin", "Medium"),
+    ("hadozee", "Medium"),
+    ("dhampir", "Medium"),
+    ("hexblood", "Medium"),
+    ("reborn", "Medium"),
+    ("plasmoid", "Medium"),
 ]
+
+
+def size_from_species(species: str | None) -> str:
+    text = (species or "").lower().strip()
+    if not text:
+        return "Medium"
+    if any(name in text for name in ("owlin", "plasmoid", "custom lineage")) and "small" in text:
+        return "Small"
+    for needle, size in _SPECIES_SIZE:
+        if needle in text:
+            return size
+    return "Medium"
 
 
 def normalize_size(raw: Any, default: str = "Medium") -> str:
@@ -83,16 +108,6 @@ def normalize_size(raw: Any, default: str = "Medium") -> str:
 
 def size_to_squares(size: Any) -> float:
     return SIZE_TO_SQUARES.get(normalize_size(size), 1.0)
-
-
-def size_from_species(species: str | None) -> str:
-    text = (species or "").lower().strip()
-    if not text:
-        return "Medium"
-    for needle, size in _SPECIES_SIZE:
-        if needle in text:
-            return size
-    return "Medium"
 
 
 def ensure_character_size(data: dict[str, Any]) -> dict[str, Any]:

@@ -22,6 +22,7 @@ from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
 from .npcs import CUSTOM_IMAGE_DIR as NPC_CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR as NPC_SRD_IMAGE_DIR
 from .maps import MAP_IMAGE_DIR, MAP_FOG_DIR
 from .portraits import CHAR_IMAGE_DIR
+from . import gear_images
 from .token_art import TOKEN_DIR
 from .creature_size import SIZES, normalize_size
 
@@ -102,6 +103,17 @@ app.mount(
     StaticFiles(directory=str(CHAR_IMAGE_DIR)),
     name="character_images",
 )
+gear_images.ensure_dirs()
+app.mount(
+    "/media/gear-stock",
+    StaticFiles(directory=str(gear_images.BUNDLED_DIR)),
+    name="gear_stock",
+)
+app.mount(
+    "/media/gear",
+    StaticFiles(directory=str(gear_images.UPLOAD_DIR)),
+    name="gear_uploads",
+)
 
 
 class QueryRequest(BaseModel):
@@ -126,12 +138,14 @@ class CharacterPatch(BaseModel):
     max_hp: int | None = None
     current_hp: int | None = None
     ac: int | None = None
+    equipment: list[dict[str, Any]] | None = None
     proficiency_bonus: int | None = None
     initiative: int | None = None
     abilities: dict[str, Any] | None = None
     skills: dict[str, Any] | None = None
     xp: int | None = None
     milestones: list[str] | None = None
+    hand_color: list[int] | None = None
 
 
 class XpAwardRequest(BaseModel):
@@ -263,6 +277,19 @@ def patch_character(char_id: str, body: CharacterPatch) -> dict[str, Any]:
             base.update(sval)
             merged_skills[sid] = base
         current["skills"] = merged_skills
+    if "hand_color" in patch:
+        color = patch.pop("hand_color")
+        if isinstance(color, list) and len(color) == 3:
+            current["hand_color"] = [max(0, min(255, int(n))) for n in color]
+        else:
+            current["hand_color"] = None
+    if "equipment" in patch:
+        proposed = patch.pop("equipment")
+        previous = list(current.get("equipment") or [])
+        from .equipment import apply_equipment
+
+        apply_equipment(current, proposed, previous)
+        patch.pop("ac", None)
     current.update(patch)
     if "size" in patch:
         current["size"] = normalize_size(patch["size"])
@@ -285,10 +312,35 @@ async def upload_character_image(char_id: str, file: UploadFile = File(...)) -> 
         ext = ".png"
     fname = f"{char_id}{ext}"
     dest = CHAR_IMAGE_DIR / fname
+    for old in CHAR_IMAGE_DIR.glob(f"{char_id}.*"):
+        if old.name != fname and old.is_file():
+            old.unlink()
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
     current["image"] = fname
-    return db.public_character(db.upsert_character(current))
+    updated = db.public_character(db.upsert_character(current))
+    try:
+        for m in maps.list_maps():
+            maps.refresh_token_portraits(m["id"])
+    except Exception:
+        pass
+    return updated
+
+
+@app.get("/gear-images")
+def list_gear_images() -> dict[str, Any]:
+    return {"images": gear_images.catalog()}
+
+
+@app.post("/gear-images")
+async def upload_gear_image(name: str = Form(...), file: UploadFile = File(...)) -> dict[str, Any]:
+    data = await file.read()
+    ext = Path(file.filename or "gear.png").suffix
+    try:
+        images = gear_images.save_upload(name, data, ext)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"images": images}
 
 
 def _place_on_active_map(kind: str, entities: list[dict[str, Any]]) -> None:

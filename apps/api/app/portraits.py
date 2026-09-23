@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from .config import DATA_DIR
 
@@ -21,9 +22,13 @@ def image_url_for(data: dict[str, Any]) -> str | None:
     if not image:
         return None
     path = CHAR_IMAGE_DIR / str(image)
-    if path.exists():
-        return f"{MEDIA_CHARS}/{image}"
-    return None
+    if not path.exists():
+        return None
+    url = f"{MEDIA_CHARS}/{image}"
+    stamp = data.get("updated_at")
+    if stamp:
+        url += f"?v={quote(str(stamp), safe='')}"
+    return url
 
 
 def with_portrait(data: dict[str, Any]) -> dict[str, Any]:

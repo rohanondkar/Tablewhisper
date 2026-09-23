@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from . import db, ollama_client, portraits, rules
+from . import db, equipment as equipment_mod, ollama_client, portraits, rules
+from . import gear_rules
+from . import roll_factors
 from . import monsters as monsters_mod
 from . import npcs as npcs_mod
 
@@ -491,6 +493,20 @@ def _apply_intent_overrides(
     return hint
 
 
+def _dice_instruction(dice: str | None) -> str:
+    if dice == "2d20kh1":
+        return "Roll 2d20 and keep the higher"
+    if dice == "2d20kl1":
+        return "Roll 2d20 and keep the lower"
+    return "Roll 1d20"
+
+
+def _factor_step(lines: list[str] | None) -> str:
+    if not lines:
+        return "No other factor was stated."
+    return " ".join(lines)
+
+
 def _skill_howto(
     *,
     character: dict[str, Any] | None,
@@ -501,6 +517,8 @@ def _skill_howto(
     subject: dict[str, Any] | None,
     ruleset: dict[str, Any],
     notes: str,
+    dice: str | None = None,
+    factor_lines: list[str] | None = None,
 ) -> str:
     who = character["name"] if character else "the character"
     skill_name = "check"
@@ -511,17 +529,16 @@ def _skill_howto(
         )
     ab = (ability or "").title() or "ability"
     bonus = modifier if modifier is not None else 0
-    dc = suggested_dc if suggested_dc is not None else 15
-    subj = ""
-    if subject:
-        subj = f" involving {subject.get('label')}"
+    subj = f" involving {subject.get('label')}" if subject else ""
+    dc_txt = f"DC {suggested_dc}" if suggested_dc is not None else "the stated DC (none was given)"
     return (
         f"New DM steps — {who} attempts {skill_name} ({ab}){subj}:\n"
-        f"1) Roll 1d20 (advantage = 2d20 take higher; disadvantage = take lower, if fiction warrants).\n"
-        f"2) Add {bonus:+d} (skill / ability modifier from the sheet; add proficiency if proficient).\n"
-        f"3) Compare the total to DC {dc}"
+        f"1) {_dice_instruction(dice)}.\n"
+        f"2) Add {bonus:+d} (skill / ability modifier from the sheet).\n"
+        f"3) Compare the total to {dc_txt}"
         f"{' — or resolve as a contest (both roll; higher total wins)' if subject or 'contest' in (notes or '').lower() else ''}.\n"
-        f"4) {notes}\n"
+        f"4) {_factor_step(factor_lines)}\n"
+        f"5) {notes}\n"
         f"Tip: Passive checks use 10 + modifiers (no roll) when the character isn't actively trying."
     )
 
@@ -581,6 +598,7 @@ def _collect_participants(
     primary: dict[str, Any] | None,
     target: dict[str, Any] | None,
     check_type: str,
+    incoming_actor: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Every party member and named creature the roll is about, with a portrait URL."""
     out: list[dict[str, Any]] = []
@@ -590,8 +608,19 @@ def _collect_participants(
         named.insert(0, primary)
     if primary:
         named.sort(key=lambda c: 0 if c.get("id") == primary.get("id") else 1)
-    for c in named:
-        _add_participant(out, seen, c, "rolling", "character")
+    if incoming_actor:
+        actor_kind = (
+            "npc"
+            if incoming_actor.get("kind") == "npc" or incoming_actor.get("npc_id")
+            else "monster"
+        )
+        _add_participant(out, seen, incoming_actor, "rolling", actor_kind)
+        for c in named:
+            role = "target" if primary and c.get("id") == primary.get("id") else "subject"
+            _add_participant(out, seen, c, role, "character")
+    else:
+        for c in named:
+            _add_participant(out, seen, c, "rolling", "character")
 
     subject_role = "target" if check_type == "attack" else "subject"
     if target:
@@ -709,6 +738,9 @@ def _character_gear_blob(character: dict[str, Any]) -> str:
         parts.append(str(atk.get("damage") or ""))
     parts.append(str(character.get("features") or ""))
     parts.append(str(character.get("proficiencies") or ""))
+    for item in character.get("equipment") or []:
+        if isinstance(item, dict):
+            parts.append(str(item.get("name") or ""))
     return " ".join(parts).lower()
 
 
@@ -722,10 +754,13 @@ def _has_ranged_weapon(character: dict[str, Any]) -> bool:
     extra = f"{character.get('features') or ''} {character.get('proficiencies') or ''}".lower()
     if re.search(
         r"\b(longbow|shortbow|hand\s+crossbow|heavy\s+crossbow|light\s+crossbow|"
-        r"crossbow|short\s+bow|long\s+bow)\b",
+        r"crossbow|short\s+bow|long\s+bow|blowgun)\b",
         extra,
     ):
         return True
+    for item in character.get("equipment") or []:
+        if isinstance(item, dict) and _RANGED_WEAPON_RE.search(str(item.get("name") or "")):
+            return True
     return False
 
 
@@ -883,8 +918,6 @@ def _pick_weapon(
     if not character:
         return None
     attacks = character.get("attacks") or []
-    if not attacks:
-        return None
     lowered = text.lower()
     ranged_intent = bool(_RANGED_INTENT_RE.search(text))
     best = None
@@ -916,12 +949,15 @@ def _pick_weapon(
         if score > best_score:
             best_score = score
             best = atk
+    equipped = gear_rules.equipped_attack(character, text)
+    if equipped and best_score == 0:
+        return equipped
     if best:
         return best
     # Ranged intent with no matching ranged attack → do not fall back to melee
     if ranged_intent:
-        return None
-    return attacks[0]
+        return equipped
+    return attacks[0] if attacks else equipped
 
 
 def _modifier_for(
@@ -1022,16 +1058,20 @@ def _attack_howto(
     modifier: int | None,
     target: dict[str, Any] | None,
     to_hit_needed: int | None,
+    dice: str | None = None,
+    factor_lines: list[str] | None = None,
 ) -> str:
     who = character["name"] if character else "the character"
     wname = (weapon or {}).get("name") or "their weapon"
     bonus = modifier if modifier is not None else 0
     dmg = (weapon or {}).get("damage") or "weapon damage"
+    extra = f"\n6) {_factor_step(factor_lines)}"
     if not target:
         return (
-            f"1) Roll 1d20 and add {bonus:+d} (attack bonus). "
+            f"1) {_dice_instruction(dice)} and add {bonus:+d} (attack bonus). "
             f"2) Compare the total to the target's Armor Class (AC). "
             f"3) If you meet or beat AC, roll damage: {dmg}."
+            f"{extra}"
         )
     ac = target["ac"]
     label = target.get("label") or target.get("name")
@@ -1039,12 +1079,13 @@ def _attack_howto(
     need = to_hit_needed if to_hit_needed is not None else max(1, ac - bonus)
     return (
         f"New DM steps — {who} attacks {label} with {wname}:\n"
-        f"1) Roll 1d20.\n"
+        f"1) {_dice_instruction(dice)}.\n"
         f"2) Add {bonus:+d} (from the character sheet attack bonus).\n"
         f"3) {label} has AC {ac}, so you need a total of {ac}+ "
         f"(that's {need}+ showing on the d20 before modifiers, or any natural 20).\n"
         f"4) On a hit, roll damage: {dmg}. Subtract that from {label}'s HP ({hp}).\n"
-        f"5) Natural 1 always misses; natural 20 is a critical hit (roll damage dice twice, then add modifiers once)."
+        f"5) Natural 1 always misses; natural 20 is a critical hit (roll damage dice twice, then add modifiers once).\n"
+        f"6) {_factor_step(factor_lines)}"
     )
 
 def _llm_agrees(hint: dict[str, Any] | None, llm: dict[str, Any] | None) -> bool:
@@ -1110,6 +1151,66 @@ def _compute_confidence(
         base -= 0.04
 
     return round(max(0.22, min(0.94, base)), 2)
+
+
+def _name_before_attack(text: str, label: str | None) -> bool:
+    """True when this name sits before the attack verb, so they are the actor."""
+    if not label or not _ATTACK_VERB_RE.search(text or ""):
+        return False
+    head = text[: _ATTACK_VERB_RE.search(text).start()]
+    if _named_in_text(label, head):
+        return True
+    first = label.split()[0] if label.split() else ""
+    return bool(first) and _named_in_text(first, head)
+
+
+def _incoming_actor(
+    text: str,
+    character: dict[str, Any] | None,
+    npc: dict[str, Any] | None,
+    creature: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Creature-first attack. A player named before the verb stays the attacker."""
+    if not character or not _ATTACK_VERB_RE.search(text or ""):
+        return None
+    if _name_before_attack(text, str(character.get("name") or "")):
+        return None
+    candidates = [c for c in (npc, creature) if c]
+    for actor in candidates:
+        label = str(actor.get("label") or actor.get("name") or "")
+        if _name_before_attack(text, label):
+            return actor
+    return None
+
+
+def _creature_attack_rows(actor: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = actor.get("attacks") or []
+    if rows:
+        return rows
+    template = actor.get("template") or {}
+    return list(template.get("attacks") or [])
+
+
+def _pick_creature_weapon(text: str, actor: dict[str, Any]) -> dict[str, Any] | None:
+    attacks = _creature_attack_rows(actor)
+    if not attacks:
+        return None
+    lowered = text.lower()
+    best = None
+    best_score = 0
+    for atk in attacks:
+        name = str(atk.get("name") or "")
+        score = 0
+        if name and name.lower() in lowered:
+            score += 20 + len(name)
+        else:
+            for token in re.split(r"[\s/,-]+", name.lower()):
+                if len(token) > 2 and token in lowered:
+                    score += len(token)
+        if score > best_score:
+            best_score = score
+            best = atk
+    return best or attacks[0]
 
 
 def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
@@ -1253,6 +1354,14 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         suggested_dc = None
 
     character = _find_character(text, characters, character_id)
+    incoming_actor = _incoming_actor(text, character, npc_peek, creature_peek)
+    if incoming_actor and character and not _named_in_text(str(character.get("name") or ""), text):
+        named_pc = _find_character(text, characters, None)
+        if named_pc:
+            character = named_pc
+            incoming_actor = _incoming_actor(text, character, npc_peek, creature_peek)
+    if character:
+        equipment_mod.ensure(character)
     if llm and llm.get("character") and not character:
         wanted = str(llm.get("character")).lower()
         for c in characters:
@@ -1262,7 +1371,7 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
 
     # Gear / weapon impossibility — deterministic, before building an attack roll
     impossible = _detect_impossibility(text, character, check_type)
-    if impossible and character:
+    if impossible and character and not incoming_actor:
         src = "hybrid" if llm else "rules"
         why = (
             (reasoning + " " if reasoning else "")
@@ -1301,29 +1410,111 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
                 ability = s["ability"]
                 break
 
-    weapon = _pick_weapon(text, character) if check_type == "attack" else None
-    modifier = _modifier_for(character, check_type, ability, skill, weapon)
-
+    gear = equipment_mod.worn_flags(character, text) if character else None
+    if gear and gear.get("blocked") and character and not incoming_actor:
+        return _impossible_check_result(
+            text=text,
+            character=character,
+            info={"short": "not possible", "reason": gear["blocked"]},
+            source="rules" if not llm else "hybrid",
+            reasoning=gear["blocked"],
+        )
+    weapon = None
+    modifier = None
     target = None
     to_hit_needed = None
     howto = None
-    if check_type == "attack":
+    if incoming_actor and check_type == "attack" and character and gear:
+        weapon = _pick_creature_weapon(text, incoming_actor)
+        modifier = _parse_bonus((weapon or {}).get("attack_bonus"))
+        if modifier is None:
+            modifier = 0
+        target = {
+            "id": character.get("id"),
+            "label": character.get("name"),
+            "name": character.get("name"),
+            "ac": gear["ac"],
+            "current_hp": character.get("current_hp"),
+            "max_hp": character.get("max_hp"),
+            "kind": "character",
+            "image_url": character.get("image_url"),
+            "virtual": False,
+        }
+        to_hit_needed = max(1, min(20, int(gear["ac"]) - int(modifier)))
+    elif check_type == "attack":
+        weapon = _pick_weapon(text, character)
+        modifier = _modifier_for(character, check_type, ability, skill, weapon)
         try:
             target = npcs_mod.resolve_or_spawn_npc(text) or monsters_mod.resolve_or_spawn_target(text)
         except Exception:
             target = None
         if target and modifier is not None:
             to_hit_needed = max(1, min(20, int(target["ac"]) - int(modifier)))
+        if character and gear and weapon:
+            gate = gear_rules.attack_limits(character, gear.get("items") or [], weapon, text)
+            if gate.get("blocked"):
+                return _impossible_check_result(
+                    text=text,
+                    character=character,
+                    info={"short": "not possible", "reason": gate["blocked"]},
+                    source="rules" if not llm else "hybrid",
+                    reasoning=gate["blocked"],
+                )
+            if gate.get("attack_bonus"):
+                modifier = int(modifier or 0) + int(gate["attack_bonus"])
+                if target and modifier is not None:
+                    to_hit_needed = max(1, min(20, int(target["ac"]) - int(modifier)))
+            if gate.get("damage_extra") and weapon is not None:
+                weapon = dict(weapon)
+                weapon["damage"] = f"{weapon.get('damage') or 'weapon damage'} {gate['damage_extra']}"
+            gear["_attack_gate"] = gate
     elif check_type in {"skill", "save", "ability"}:
+        modifier = _modifier_for(character, check_type, ability, skill, None)
         # Narrative subject only — do not auto-spawn, do not use AC.
         # Social checks use the named scene NPC, not a leftover foe.
         if skill in {"persuasion", "deception", "intimidation", "performance"} and npc_peek:
             target = npc_peek
         else:
             target = npc_peek or creature_peek
-        if target and target.get("virtual"):
-            # Keep label/stats for UI but no encounter id for damage
-            pass
+    else:
+        modifier = _modifier_for(character, check_type, ability, skill, None)
+
+    factors = roll_factors.assess(
+        text=text,
+        character=character,
+        gear=gear,
+        check_type=check_type,
+        ability=ability,
+        skill=skill,
+        weapon=weapon,
+        incoming=bool(incoming_actor and check_type == "attack"),
+        target=target,
+    )
+    if factors.get("blocked"):
+        return _impossible_check_result(
+            text=text,
+            character=character or {"name": "Party", "id": None},
+            info={"short": "not possible", "reason": factors["blocked"]},
+            source="rules" if not llm else "hybrid",
+            reasoning=factors["blocked"],
+        )
+    if factors.get("ac_bonus") and target and check_type == "attack":
+        target["ac"] = int(target.get("ac") or 0) + int(factors["ac_bonus"])
+        if modifier is not None:
+            to_hit_needed = max(1, min(20, int(target["ac"]) - int(modifier)))
+    if (
+        factors.get("dex_save_bonus")
+        and check_type == "save"
+        and ability == "dexterity"
+        and modifier is not None
+    ):
+        modifier += int(factors["dex_save_bonus"])
+    if factors.get("stated_dc") is not None:
+        suggested_dc = factors["stated_dc"]
+    elif factors.get("dc_missing") and (
+        check_type == "save" or (skill == "stealth" and target)
+    ):
+        suggested_dc = None
 
     dice = ruleset.get("dice_defaults", {}).get(
         "ability_check" if check_type in {"skill", "ability"} else check_type,
@@ -1335,6 +1526,20 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         dice = ruleset.get("dice_defaults", {}).get("attack_roll", "1d20")
     if check_type == "initiative":
         dice = ruleset.get("dice_defaults", {}).get("initiative", "1d20")
+    attack_gate = (gear or {}).get("_attack_gate") or {}
+    for line in attack_gate.get("lines") or []:
+        factors.setdefault("lines", []).append(line)
+    if attack_gate.get("disadvantage"):
+        if factors.get("dice") == "2d20kh1":
+            factors["dice"] = "1d20"
+            factors.setdefault("lines", []).append("Advantage and disadvantage cancel.")
+        elif factors.get("dice") in {None, "1d20"}:
+            factors["dice"] = "2d20kl1"
+    if attack_gate.get("ammo_name") and character and character.get("id"):
+        gear_rules.spend_ammo(character, str(attack_gate["ammo_name"]))
+        db.upsert_character(character)
+    if factors.get("dice"):
+        dice = factors["dice"]
 
     if suggested_dc is not None and check_type not in {"attack", "initiative", "impossible"}:
         adjusted = rules.adjust_dc_from_query(text, int(suggested_dc), ruleset)
@@ -1344,8 +1549,11 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
             )
             suggested_dc = adjusted
 
+    roller = character
+    if incoming_actor and check_type == "attack":
+        roller = {"name": incoming_actor.get("label") or incoming_actor.get("name") or "Creature"}
     roll_line = _roll_line(
-        character,
+        roller,
         check_type,
         ability,
         skill,
@@ -1356,14 +1564,18 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         target,
         to_hit_needed,
     )
+    if factors.get("extra_dice"):
+        roll_line = f"{roll_line} {factors['extra_dice']}"
 
     if check_type == "attack":
         howto = _attack_howto(
-            character=character,
+            character=roller if incoming_actor else character,
             weapon=weapon,
             modifier=modifier,
             target=target,
             to_hit_needed=to_hit_needed,
+            dice=dice,
+            factor_lines=factors.get("lines"),
         )
         if weapon and weapon.get("damage"):
             notes = (
@@ -1375,6 +1587,14 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
                     f"{target.get('label')} — AC {target['ac']}, "
                     f"HP {target['current_hp']}/{target['max_hp']}. {notes}"
                 )
+        if gear and incoming_actor:
+            ac_notes = [
+                line
+                for line in (gear.get("notes") or [])
+                if "AC " in line or "unarmored" in line or "unequipped" in line or "attuned" in line
+            ]
+            if ac_notes:
+                notes = ((notes + " ") if notes else "") + " ".join(ac_notes)
     elif check_type in {"skill", "save", "ability"}:
         howto = _skill_howto(
             character=character,
@@ -1385,6 +1605,8 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
             subject=target,
             ruleset=ruleset,
             notes=notes,
+            dice=dice,
+            factor_lines=factors.get("lines"),
         )
 
     rules_kept = bool(hint) and check_type == (hint.get("check_type") if hint else None)
@@ -1419,6 +1641,7 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         character,
         target,
         check_type,
+        incoming_actor if check_type == "attack" else None,
     )
 
     result = {
@@ -1443,6 +1666,9 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         "target_ac": target["ac"] if target and check_type == "attack" else None,
         "to_hit_needed": to_hit_needed if check_type == "attack" else None,
         "howto": howto,
+        "factors": factors.get("lines") or [],
+        "extra_dice": factors.get("extra_dice"),
+        "crit_note": factors.get("crit_note"),
     }
     db.add_event(text, result)
     return result
