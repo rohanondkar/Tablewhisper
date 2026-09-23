@@ -558,68 +558,83 @@ def legalize(
         if id(item) in held_ids:
             item["state"] = "unequipped"
 
-    primary_free = 2
-    secondary_free = 2 if is_thri_kreen(character) else 0
+    held: dict[str, dict[str, Any] | None] = {"left": None, "right": None}
+    if is_thri_kreen(character):
+        held["light-1"] = None
+        held["light-2"] = None
+
+    def _take(item: dict[str, Any], hand: str) -> None:
+        item["state"] = "equipped"
+        item["hand"] = hand
+        item["pocket"] = None
+        if hand == "both":
+            held["left"] = item
+            held["right"] = item
+        else:
+            held[hand] = item
 
     def place(item: dict[str, Any]) -> None:
-        nonlocal primary_free, secondary_free
         spec = lookup(str(item.get("name") or ""))
         hands = int(spec.get("hands") or 0)
         if spec.get("effect") == "shield":
             hands = 1
         if hands >= 2:
-            already = any(
-                active(other) and lookup(str(other.get("name") or "")).get("effect") in {"weapon", "shield"}
-                for other in items
-            )
-            if already and (keep_others or str(item.get("name") or "").lower() not in prefer):
+            if (held["left"] or held["right"]) and (keep_others or str(item.get("name") or "").lower() not in prefer):
                 item["state"] = "unequipped"
                 notes.append(f"{item.get('name')} needs both hands, so it stays where it was.")
                 return
             if not keep_others:
                 _clear_primary(items, except_item=None)
-            primary_free = 0
-            item["state"] = "equipped"
+                held["left"] = None
+                held["right"] = None
+            _take(item, "both")
             return
-        if primary_free >= 1:
-            primary_free -= 1
-            item["state"] = "equipped"
+        want = item.get("hand") if item.get("hand") in {"left", "right", "light-1", "light-2"} else None
+        if want in {"light-1", "light-2"} and not (spec.get("light") and spec.get("effect") == "weapon" and is_thri_kreen(character)):
+            want = None
+        if want and held.get(want) is None:
+            _take(item, str(want))
             return
-        if spec.get("light") and spec.get("effect") == "weapon" and secondary_free >= 1:
-            secondary_free -= 1
-            item["state"] = "equipped"
+        if want and keep_others:
+            item["state"] = "unequipped"
+            notes.append(f"{item.get('name')} stays where it was. Their hands are full.")
             return
+        for side in ("left", "right"):
+            if held[side] is None:
+                _take(item, side)
+                return
+        if spec.get("light") and spec.get("effect") == "weapon":
+            for side in ("light-1", "light-2"):
+                if side in held and held[side] is None:
+                    _take(item, side)
+                    return
         victim = None if keep_others else _droppable_weapon(items, prefer)
         if victim is not None:
             victim["state"] = "unequipped"
-            primary_free += int(lookup(str(victim.get("name") or "")).get("hands") or 1)
-            if primary_free > 2:
-                primary_free = 2
+            for side, owner in list(held.items()):
+                if owner is victim:
+                    held[side] = None
             place(item)
             return
         shield = next((i for i in items if i.get("effect") == "shield" and active(i)), None)
-        if not keep_others and shield is not None and (hands >= 2 or not _droppable_weapon(items, prefer)):
+        if not keep_others and shield is not None:
             shield["state"] = "unequipped"
-            primary_free += 1
+            for side, owner in list(held.items()):
+                if owner is shield:
+                    held[side] = None
             notes.append(f"{shield.get('name')} comes off to free a hand.")
             place(item)
             return
         item["state"] = "unequipped"
-        both = next(
-            (
-                other.get("name")
-                for other in items
-                if active(other) and int(lookup(str(other.get("name") or "")).get("hands") or 0) >= 2
-            ),
-            None,
-        )
+        both = next((owner for owner in (held["left"], held["right"]) if owner is not None and owner.get("hand") == "both"), None)
         if both:
-            notes.append(f"{item.get('name')} comes off. {both} needs both hands.")
+            notes.append(f"{item.get('name')} comes off. {both.get('name')} needs both hands.")
         else:
             notes.append(f"{item.get('name')} does not fit in their hands.")
 
     for item in queue:
         place(item)
+    assign_hands(items, character)
 
     for item in items:
         held = active(item) or (item.get("effect") == "armor" and on_body(item))
@@ -674,20 +689,113 @@ def bag_kind(name: str) -> dict[str, Any] | None:
     return None
 
 
-def footprint(name: str) -> tuple[int, int]:
+def footprint(name: str, rotated: bool = False) -> tuple[int, int]:
     spec = lookup(name)
     low = (name or "").lower()
     if spec.get("effect") == "armor" or "cloak" in low:
-        return (2, 3)
-    if spec.get("effect") == "shield":
-        return (2, 2)
-    if spec.get("effect") == "weapon":
+        size = (2, 3)
+    elif spec.get("effect") == "shield":
+        size = (2, 2)
+    elif spec.get("effect") == "weapon":
         if int(spec.get("hands") or 0) >= 2 or spec.get("heavy"):
-            return (1, 5)
-        if re.search(r"\b(dagger|knife|dart)\b", low):
-            return (1, 2)
-        return (1, 4)
-    return (1, 1)
+            size = (1, 5)
+        elif re.search(r"\b(dagger|knife|dart)\b", low):
+            size = (1, 2)
+        else:
+            size = (1, 4)
+    else:
+        size = (1, 1)
+    if rotated:
+        return (size[1], size[0])
+    return size
+
+
+def assign_hands(items: list[dict[str, Any]], character: dict[str, Any]) -> None:
+    """Fill left, right, or both when an equipped weapon never recorded a hand."""
+    used = {"left": False, "right": False, "light-1": False, "light-2": False}
+    equipped = [
+        item
+        for item in items
+        if active(item)
+        and item.get("effect") in {"weapon", "shield"}
+        and int(lookup(str(item.get("name") or "")).get("hands") or (1 if item.get("effect") == "shield" else 0)) > 0
+    ]
+    for item in equipped:
+        spec = lookup(str(item.get("name") or ""))
+        hands = 1 if item.get("effect") == "shield" else int(spec.get("hands") or 0)
+        if hands >= 2:
+            item["hand"] = "both"
+            used["left"] = True
+            used["right"] = True
+    for item in equipped:
+        if item.get("hand") == "both":
+            continue
+        hand = item.get("hand")
+        spec = lookup(str(item.get("name") or ""))
+        light_ok = bool(spec.get("light") and spec.get("effect") == "weapon" and is_thri_kreen(character))
+        if hand in {"left", "right"} and not used[str(hand)]:
+            used[str(hand)] = True
+            continue
+        if hand in {"light-1", "light-2"} and light_ok and not used[str(hand)]:
+            used[str(hand)] = True
+            continue
+        item["hand"] = None
+    for item in equipped:
+        if item.get("hand") in {"left", "right", "both", "light-1", "light-2"}:
+            continue
+        spec = lookup(str(item.get("name") or ""))
+        for side in ("left", "right"):
+            if not used[side]:
+                used[side] = True
+                item["hand"] = side
+                break
+        else:
+            if spec.get("light") and is_thri_kreen(character):
+                for side in ("light-1", "light-2"):
+                    if not used[side]:
+                        used[side] = True
+                        item["hand"] = side
+                        break
+    for item in items:
+        held = active(item) and item.get("effect") in {"weapon", "shield"} and item.get("hand")
+        if not held:
+            item.pop("hand", None)
+
+
+def pocket_count(items: list[dict[str, Any]]) -> int:
+    for item in items:
+        if item.get("effect") != "armor" or not on_body(item):
+            continue
+        category = lookup(str(item.get("name") or "")).get("category")
+        return {"light": 4, "medium": 2, "heavy": 1}.get(str(category), 0)
+    return 0
+
+
+def _pocket_fit(item: dict[str, Any]) -> bool:
+    if item.get("effect") in {"weapon", "armor", "shield", "container"}:
+        return False
+    w, h = footprint(str(item.get("name") or ""), bool(item.get("rotated")))
+    return w == 1 and h == 1
+
+
+def pocket_block(items: list[dict[str, Any]]) -> str | None:
+    count = pocket_count(items)
+    seen: dict[int, str] = {}
+    for item in items:
+        if item.get("pocket") is None or normalize_state(item.get("state")) != "worn":
+            continue
+        try:
+            pocket = int(item.get("pocket"))
+        except (TypeError, ValueError):
+            return f"{item.get('name')} does not fit in a pocket."
+        if not _pocket_fit(item):
+            return f"{item.get('name')} does not fit in a pocket."
+        if pocket < 0 or pocket >= count:
+            return f"A pocket still holds {item.get('name')}."
+        if pocket in seen:
+            return f"That pocket already holds {seen[pocket]}."
+        seen[pocket] = str(item.get("name") or "item")
+    return None
 
 
 def list_bags(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -725,7 +833,7 @@ def _person_blocked(items: list[dict[str, Any]], item: dict[str, Any]) -> str | 
     if slot is None or slot == "body":
         return None
     for other in items:
-        if other is item or normalize_state(other.get("state")) not in {"worn", "attuned"}:
+        if other is item or other.get("pocket") is not None or normalize_state(other.get("state")) not in {"worn", "attuned"}:
             continue
         if _person_slot(other) == slot:
             return f"The {slot} is already holding {other.get('name')}."
@@ -807,7 +915,7 @@ def _place_bag(contents: list[dict[str, Any]], bag: dict[str, Any]) -> None:
     rows = int(bag["rows"])
     grid = [[False for _ in range(cols)] for _ in range(rows)]
     for item in contents:
-        w, h = footprint(str(item.get("name") or ""))
+        w, h = footprint(str(item.get("name") or ""), bool(item.get("rotated")))
         item["w"] = w
         item["h"] = h
         col = item.get("col")
@@ -885,7 +993,11 @@ def bag_summaries(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if bag.get("assumed"):
             label += " · backpack assumed"
         if missing:
-            label += " · uncounted " + ", ".join(missing)
+            shown = missing[:3]
+            label += " · uncounted " + ", ".join(shown)
+            extra = len(missing) - len(shown)
+            if extra:
+                label += f" and {extra} more"
         bag.update(
             {
                 "cells_used": used,
@@ -919,17 +1031,31 @@ def apply_patch(
         old = prior.get(name.lower(), "unequipped")
         if state in {"equipped", "attuned"} and old in {"unequipped", "worn"}:
             preferred.append(name)
-        if state == "worn" and old != "worn":
+        if state == "worn" and old != "worn" and item.get("pocket") is None:
             blocked = _person_blocked(proposed, item)
             if blocked:
                 item["state"] = old
                 return [blocked]
+        if state != "worn":
+            item["pocket"] = None
+    aimed: dict[str, tuple[int, int, bool]] = {}
+    for item in proposed:
+        if normalize_state(item.get("state")) != "unequipped":
+            continue
+        col = item.get("col")
+        row = item.get("row")
+        if isinstance(col, int) and isinstance(row, int):
+            aimed[str(item.get("name") or "").lower()] = (col, row, bool(item.get("rotated")))
     notes = legalize(proposed, character, preferred, keep_others=True)
     for name in preferred:
         row = _find_item(proposed, name)
         if row is None or not active(row):
             _restore(proposed, previous)
             return [f"{name} stays where it was. Their hands are full."]
+    packed = pocket_block(proposed)
+    if packed:
+        _restore(proposed, previous)
+        return [packed]
     notes.extend(settle_bags(proposed))
     moved_in = []
     for item in proposed:
@@ -941,6 +1067,27 @@ def apply_patch(
         new_bag = _bag_key(str(item.get("container") or ""))
         if old_state != "unequipped" or (new_bag and old_bag != new_bag):
             moved_in.append(item)
+    for item in proposed:
+        key = str(item.get("name") or "").lower()
+        if key not in aimed or normalize_state(item.get("state")) != "unequipped":
+            continue
+        old_row = prior_rows.get(key) or {}
+        req_col, req_row, req_rot = aimed[key]
+        moved = (
+            prior.get(key, "unequipped") != "unequipped"
+            or old_row.get("col") != req_col
+            or old_row.get("row") != req_row
+            or bool(old_row.get("rotated")) != req_rot
+            or _bag_key(str(old_row.get("container") or "")) != _bag_key(str(item.get("container") or ""))
+        )
+        if not moved:
+            continue
+        if item.get("placed") and item.get("col") == req_col and item.get("row") == req_row:
+            continue
+        _restore(proposed, previous)
+        if bool(old_row.get("rotated")) != req_rot and prior.get(key, "unequipped") == "unequipped":
+            return [f"{item.get('name')} does not fit."]
+        return [f"{item.get('name')} does not fit. The bag is full."]
     for item in moved_in:
         if item.get("placed") is False:
             _restore(proposed, previous)

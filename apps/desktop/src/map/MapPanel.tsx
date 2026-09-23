@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Stage, Layer, Image as KonvaImage, Line, Circle, Rect, Text, Group } from "react-konva";
+import { Stage, Layer, Image as KonvaImage, Line, Circle, Rect, Text, Group, Shape } from "react-konva";
 import type Konva from "konva";
 import {
   api,
@@ -16,13 +16,61 @@ import {
   type SceneNpc,
 } from "../api";
 import { CREATURE_SIZES, sizeToSquares } from "./sizes";
-import { feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
+import { boundsSegments, feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
 
 const API_BASE = "http://127.0.0.1:8766";
 const MIN_SQUARES = 2;
 const MAX_SQUARES = 200;
 const MIN_MAP_PX = 16;
 const MAX_MAP_PX = 40000;
+
+type VisionArea = {
+  key: string;
+  cx: number;
+  cy: number;
+  radius: number;
+  points: number[];
+  dim?: boolean;
+};
+
+function visionFill(dim?: boolean) {
+  return dim ? "rgba(255,220,120,0.16)" : "rgba(255,220,120,0.35)";
+}
+
+function visionStroke(dim?: boolean) {
+  return dim ? "rgba(255,220,120,0.35)" : "rgba(255,210,80,0.85)";
+}
+
+/** Fan of triangles from the token so a folded outline cannot punch a hole. */
+function VisionFan({ area }: { area: VisionArea }) {
+  return (
+    <Shape
+      listening={false}
+      sceneFunc={(ctx) => {
+        const pts = area.points;
+        const n = pts.length;
+        if (n < 6) return;
+        ctx.beginPath();
+        for (let i = 0; i < n; i += 2) {
+          const j = (i + 2) % n;
+          ctx.moveTo(area.cx, area.cy);
+          ctx.lineTo(pts[i], pts[i + 1]);
+          ctx.lineTo(pts[j], pts[j + 1]);
+          ctx.closePath();
+        }
+        ctx.fillStyle = visionFill(area.dim);
+        ctx.fill("nonzero");
+        ctx.beginPath();
+        ctx.moveTo(pts[0], pts[1]);
+        for (let i = 2; i < n; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+        ctx.closePath();
+        ctx.strokeStyle = visionStroke(area.dim);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }}
+    />
+  );
+}
 
 type Tool =
   | "select"
@@ -591,40 +639,8 @@ export default function MapPanel({
 
     if (tool === "portal") {
       const s = snap(p.x, p.y);
-      if (!portalDraft) {
-        setPortalDraft(s);
-        return;
-      }
-      const targets = mapsList.filter((m) => m.id !== map.id);
-      if (targets.length === 0) {
-        onErrorRef.current("Create another scene first to connect maps.");
-        setPortalDraft(null);
-        return;
-      }
-      const pick =
-        targets.length === 1
-          ? targets[0].id
-          : window.prompt(
-              `Target map id:\n${targets.map((t) => `${t.name} (${t.id.slice(0, 8)})`).join("\n")}`,
-              targets[0].id
-            );
-      if (!pick) {
-        setPortalDraft(null);
-        return;
-      }
-      const target = targets.find((t) => t.id === pick || t.id.startsWith(pick)) || targets[0];
-      const portal = await api.addMapPortal(map.id, {
-        x: portalDraft.x,
-        y: portalDraft.y,
-        radius: map.grid_size_px * 0.8,
-        target_map_id: target.id,
-        target_x: s.x,
-        target_y: s.y,
-        label: `To ${target.name}`,
-      });
-      setPortals((prev) => [...prev, portal]);
-      setPortalDraft(null);
-      setTool("select");
+      setPortalDraft(s);
+      setSelectedPortalId(null);
       return;
     }
 
@@ -698,16 +714,28 @@ export default function MapPanel({
     const s = snap(x, y);
     const updated = await api.patchMapToken(token.id, { x: s.x, y: s.y });
     setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    for (const portal of portals) {
-      const d = Math.hypot(s.x - portal.x, s.y - portal.y);
-      if (d <= portal.radius) {
-        if (window.confirm(`Traverse portal "${portal.label}"?`)) {
-          await api.traversePortal(portal.id, [token.id]);
-          await loadState(portal.target_map_id);
-        }
-        break;
-      }
-    }
+  }
+
+  async function createPortalTo(target: { id: string; name: string; width: number; height: number }) {
+    if (!map || !portalDraft) return;
+    const portal = await api.addMapPortal(map.id, {
+      x: portalDraft.x,
+      y: portalDraft.y,
+      radius: map.grid_size_px * 0.8,
+      target_map_id: target.id,
+      target_x: Math.max(0, target.width) / 2,
+      target_y: Math.max(0, target.height) / 2,
+      label: `To ${target.name}`,
+    });
+    setPortals((prev) => [...prev, portal]);
+    setPortalDraft(null);
+    setSelectedPortalId(portal.id);
+    setTool("select");
+  }
+
+  async function sendThroughPortal(portalId: string, tokenId: string, targetMapId: string) {
+    await api.traversePortal(portalId, [tokenId]);
+    await loadState(targetMapId);
   }
 
   const gridLines = useMemo(() => {
@@ -725,30 +753,32 @@ export default function MapPanel({
   }, [map]);
 
   const visionPolys = useMemo(() => {
-    if (!map || !showVision) return [] as { key: string; points: number[]; dim?: boolean }[];
-    const out: { key: string; points: number[]; dim?: boolean }[] = [];
+    if (!map || !showVision) return [] as VisionArea[];
+    const blockers = segs.length ? [...segs, ...boundsSegments(map.width, map.height)] : segs;
+    const out: VisionArea[] = [];
+    const push = (key: string, cx: number, cy: number, radius: number, dim?: boolean) => {
+      if (radius <= 0) return;
+      out.push({
+        key,
+        cx,
+        cy,
+        radius,
+        dim,
+        points: blockers.length ? visibilityPolygon({ x: cx, y: cy }, radius, blockers) : [],
+      });
+    };
     for (const t of tokens) {
-      if (!t.show_vision || t.vision_ft <= 0) continue;
+      if (t.vision_ft <= 0) continue;
       const r = feetToPx(t.vision_ft, map.grid_size_px, map.feet_per_square);
       const cx = t.x + (t.size_sq * map.grid_size_px) / 2;
       const cy = t.y + (t.size_sq * map.grid_size_px) / 2;
-      out.push({
-        key: t.id,
-        points: visibilityPolygon({ x: cx, y: cy }, r, segs),
-      });
+      push(t.id, cx, cy, r);
     }
     for (const L of lights) {
       const bright = feetToPx(L.bright_ft, map.grid_size_px, map.feet_per_square);
       const dim = feetToPx(L.bright_ft + L.dim_ft, map.grid_size_px, map.feet_per_square);
-      out.push({
-        key: `L-${L.id}-d`,
-        points: visibilityPolygon({ x: L.x, y: L.y }, dim, segs),
-        dim: true,
-      });
-      out.push({
-        key: `L-${L.id}-b`,
-        points: visibilityPolygon({ x: L.x, y: L.y }, bright, segs),
-      });
+      push(`L-${L.id}-d`, L.x, L.y, dim, true);
+      push(`L-${L.id}-b`, L.x, L.y, bright);
     }
     return out;
   }, [map, tokens, lights, segs, showVision]);
@@ -1178,16 +1208,40 @@ export default function MapPanel({
             </Layer>
 
             <Layer listening={false}>
-              {visionPolys.map((v) =>
-                v.points.length >= 6 ? (
-                  <Line
-                    key={v.key}
-                    points={v.points}
-                    closed
-                    fill={v.dim ? "rgba(255,220,120,0.08)" : "rgba(255,220,120,0.14)"}
-                    listening={false}
-                  />
-                ) : null
+              {map && (
+                <Group
+                  clipX={0}
+                  clipY={0}
+                  clipWidth={map.width}
+                  clipHeight={map.height}
+                  listening={false}
+                >
+                  {visionPolys.map((v) =>
+                    v.points.length >= 6 ? (
+                      <VisionFan key={v.key} area={v} />
+                    ) : v.radius > 0 ? (
+                      <Circle
+                        key={v.key}
+                        x={v.cx}
+                        y={v.cy}
+                        radius={v.radius}
+                        fill={visionFill(v.dim)}
+                        stroke={visionStroke(v.dim)}
+                        strokeWidth={1}
+                        listening={false}
+                      />
+                    ) : null
+                  )}
+                  {showVision && fogCanvasImage && (
+                    <KonvaImage
+                      image={fogCanvasImage}
+                      width={map.width}
+                      height={map.height}
+                      globalCompositeOperation="destination-out"
+                      listening={false}
+                    />
+                  )}
+                </Group>
               )}
             </Layer>
 
@@ -1257,11 +1311,14 @@ export default function MapPanel({
                   onDragStart={(ev) => {
                     ev.cancelBubble = true;
                   }}
-                  onClick={() => setSelectedPortalId(p.id)}
-                  onDblClick={async () => {
+                  onClick={(ev) => {
+                    ev.cancelBubble = true;
+                    setSelectedPortalId(p.id);
+                  }}
+                  onDblClick={async (ev) => {
+                    ev.cancelBubble = true;
                     if (selectedTokenId) {
-                      await api.traversePortal(p.id, [selectedTokenId]);
-                      await loadState(p.target_map_id);
+                      await sendThroughPortal(p.id, selectedTokenId, p.target_map_id);
                     } else {
                       await switchMap(p.target_map_id);
                     }
@@ -1285,6 +1342,18 @@ export default function MapPanel({
                   <Text text={p.label} y={-p.radius - 14} fontSize={12} fill="#d7bfff" />
                 </Group>
               ))}
+              {portalDraft && map && (
+                <Group x={portalDraft.x} y={portalDraft.y} listening={false}>
+                  <Circle
+                    radius={map.grid_size_px * 0.8}
+                    stroke="#d7bfff"
+                    strokeWidth={2}
+                    dash={[4, 4]}
+                    fill="rgba(155,89,255,0.28)"
+                  />
+                  <Text text="Pick a scene" y={-map.grid_size_px - 8} fontSize={12} fill="#d7bfff" />
+                </Group>
+              )}
             </Layer>
 
             <Layer>
@@ -1341,8 +1410,9 @@ export default function MapPanel({
         <aside className="map-inspector">
           <h3>Inspector</h3>
           <p className="muted small">
-            <strong>Select</strong> moves tokens. <strong>Move map</strong> click-drags the board
-            (or hold Space). Yellow rings = vision/light — use <strong>Vision OFF</strong> to hide.
+            <strong>Select</strong> moves tokens. <strong>Portal</strong> is one click, then
+            pick the scene in the panel. Double-click a doorway to open that scene. With Vision ON,
+            yellow sight uses each token's Vision (ft) and stops at walls and fog.
           </p>
           {selectedToken && (
             <div className="map-inspector-block">
@@ -1425,21 +1495,58 @@ export default function MapPanel({
               </button>
             </div>
           )}
+          {tool === "portal" && portalDraft && map && (
+            <div className="map-inspector-block">
+              <strong>New doorway</strong>
+              <p className="muted small">They arrive in the middle of the scene you pick.</p>
+              {mapsList.filter((m) => m.id !== map.id).length === 0 && (
+                <p className="muted small">Add another scene first, then pick it here.</p>
+              )}
+              {mapsList
+                .filter((m) => m.id !== map.id)
+                .map((scene) => (
+                  <button
+                    key={scene.id}
+                    type="button"
+                    className="btn"
+                    onClick={() => void createPortalTo(scene)}
+                  >
+                    Opens {scene.name}
+                  </button>
+                ))}
+              <button type="button" className="btn ghost" onClick={() => setPortalDraft(null)}>
+                Cancel
+              </button>
+            </div>
+          )}
           {selectedPortalId && (
             <div className="map-inspector-block">
               <strong>Portal</strong>
+              <p className="muted small">
+                {portals.find((p) => p.id === selectedPortalId)?.label || "Doorway"}
+              </p>
+              {selectedToken && (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={async () => {
+                    const p = portals.find((x) => x.id === selectedPortalId);
+                    if (!p) return;
+                    await sendThroughPortal(p.id, selectedToken.id, p.target_map_id);
+                  }}
+                >
+                  Send {selectedToken.label} through
+                </button>
+              )}
               <button
                 type="button"
-                className="btn"
-                disabled={!selectedTokenId}
+                className="btn ghost"
                 onClick={async () => {
-                  if (!selectedTokenId) return;
-                  await api.traversePortal(selectedPortalId, [selectedTokenId]);
                   const p = portals.find((x) => x.id === selectedPortalId);
-                  if (p) await loadState(p.target_map_id);
+                  if (p) await switchMap(p.target_map_id);
                 }}
               >
-                Traverse with selected
+                Open that scene
               </button>
               <button
                 type="button"

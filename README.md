@@ -57,12 +57,12 @@ Menu:
 
 | Option | What |
 |--------|------|
-| **1** | Start API + UI and open the browser once |
+| **1** | Start API + UI in the background and open the browser once. Logs: `data\logs` |
 | **2** | First-time setup (venv + npm) |
 | **3** | Show commands |
 | **4** | Health check |
 | **5** | Discord VC bot (local only; not in this repo) |
-| **6** | Quit — force-closes API/UI terminals and frees ports |
+| **6** | Quit — stops the API and UI and frees ports |
 
 ### Manual — two cmd windows
 
@@ -142,6 +142,41 @@ Or in a browser: http://127.0.0.1:8766/health → `{"status":"ok"}`
    - If the PDF looks like a different character, choose **Upload as new character** instead.
 3. **Edit sheet** / **Remove** for manual tweaks.
 
+### Bag
+
+**Open bag** on a party card opens that character's inventory. Drag an item onto a place and it snaps into the grid. A full hand, worn slot, or bag refuses the drop and the item stays where it was.
+
+| Place | What goes there |
+|-------|-----------------|
+| **Hands** | Left hand and right hand. A two-handed weapon fills both. A thri-kreen also has two light-hand slots. |
+| **On person** | Body (armor), shoulders (cloak), belt (a worn one-handed weapon), back (a worn two-handed weapon or shield). |
+| **Bag** | Everything else, in the worn container's grid. |
+
+Right-click an item in the bag, or press **R** while it is selected, to turn it a quarter turn. Hands and pockets keep their orientation.
+
+The grid follows the container worn on the body. With no pack listed, it is a backpack: 8 by 4 cells, 30 lb.
+
+| Container | Cells | Pound cap | Weight of the container |
+|-----------|-------|-----------|-------------------------|
+| Backpack or sack | 8 × 4 | 30 lb | Backpack 5 lb, sack 0.5 lb |
+| Pouch | 4 × 2 | 6 lb | 1 lb |
+| Handy haversack | 8 × 5 | 120 lb | 5 lb |
+| Bag of holding | 10 × 8 | 500 lb | 15 lb |
+
+Two worn containers get a tab each. Gear inside a bag of holding or haversack counts against that bag's cap. The container itself still counts on the body. A drop that would pass the bag's pound cap is refused.
+
+Footprints: a dagger, knife, or dart is 1 by 2; other weapons are 1 by 4; a two-handed or heavy weapon is 1 by 5; armor or a cloak is 2 by 3; a shield is 2 by 2; anything else is 1 by 1.
+
+Armor on the body adds pockets for small 1 by 1 items (not weapons, armor, shields, or containers): light armor 4, medium 2, heavy 1. With no armor there are no pockets, and a shield adds none. Taking the armor off while a pocket still holds something is refused.
+
+Carry capacity is Strength × 15 lb for a Medium creature. Small is half of that, Tiny is a quarter, Large is double, Huge is four times, and Gargantuan is eight times. Powerful Build, a bear totem, and an attuned giant-strength belt apply when the sheet says so. The card shows carried weight, the cap, and size. Weight over the body cap leaves the sheet's movement as written.
+
+The footer shows filled cells, the bag's pound cap, and body weight.
+
+Pictures come from the bundled set (PHB weapons, armor, and packs). Uploading a picture for an item name replaces the bundled one. An equipped weapon shows a hand holding it. An empty hand uses a sculpt for that species. Skin-tone swatches and the R, G, and B sliders recolor the hand and leave the weapon's colors alone. The tone is saved on the character.
+
+A Beyond PDF fills the bag from an Equipment field. Feature and action text stays on the sheet.
+
 ### Rulings
 
 1. Type a situation in **What needs a roll?** → **Resolve check**.
@@ -170,7 +205,7 @@ Open **Map** in the top bar. This is a DM-only battle map for screen share. Play
 | **+ Scene** | Another map in the same session. |
 | **Sync tokens** | Places party, foe, and scene tokens already in the console. |
 | **Player preview** | Shows fog the way a shared screen should look. |
-| **Vision** | Optional yellow vision and light rings. Off by default. |
+| **Vision** | Optional yellow vision and light rings. Off by default. A ring stops at the edge of the map. |
 
 Tools along the map: **Select**, **Move map** (or hold Space / middle-mouse), **Ruler**, **Fog**, **Reveal**, **Wall**, **Door**, **Light**, **Portal**. Drag tokens; they snap to the grid. Footprint follows 5e size (Medium is 1 square, Gargantuan is 4).
 
@@ -198,15 +233,16 @@ Naming a creature or NPC in the query can also spawn/match them.
 
 ### Quit
 
-- In-app **Quit** calls the API shutdown path and force-closes DM API / DM UI terminals (ports 8766 & 5173).
+- In-app **Quit** calls the API shutdown path and stops the API and UI (ports 8766 and 5173).
 - Or run `scripts\quit-dm.bat` / launcher menu **6**.
+- Option **1** does not open extra consoles. Output is in `data\logs\api.log` and `data\logs\ui.log`.
 
 ---
 
 ## Stop
 
 Prefer in-app **Quit** or `start-dev.bat` → **6**.  
-Otherwise in each terminal: `Ctrl+C`, or close the window.
+The manual two-window commands below still stop with `Ctrl+C`.
 
 ---
 
@@ -215,9 +251,9 @@ Otherwise in each terminal: `Ctrl+C`, or close the window.
 | Problem | Fix |
 |---------|-----|
 | `Unable to copy ... python.exe` into `.venv` | Close terminals using the API, then `rmdir /s /q .venv` and recreate (setup steps above) |
-| Port 8766 / 5173 in use | Run Quit / `scripts\quit-dm.bat`, or close the other API/UI windows |
-| UI can’t reach API | The resolve line says the API did not answer. Start the API (`start-dev.bat` option **1**, or the uvicorn command above), then **Resolve check** again |
-| CSS / Vite overlay error | Hard-refresh (`Ctrl+F5`); ensure UI terminal is still running |
+| Port 8766 / 5173 in use | Run Quit / `scripts\quit-dm.bat` |
+| UI can’t reach API | The resolve line says the API did not answer. Start the API (`start-dev.bat` option **1**, or the uvicorn command above), then **Resolve check** again. Check `data\logs\api.log` |
+| CSS / Vite overlay error | Hard-refresh (`Ctrl+F5`). Check `data\logs\ui.log` |
 | `python` not found | Reinstall Python with PATH, or use `py -3` instead of `python` |
 | Ollama offline | Install Ollama, run `ollama pull llama3.2`, keep Ollama running |
 | Voice buffer empty | Start listening, play Discord audio, then capture |
@@ -238,7 +274,8 @@ py -3 -m venv .venv
 
 | Path | What |
 |------|------|
-| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs, battle maps) |
+| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs, battle maps, bags) |
+| `apps\api\app\gear_art` | Bundled weapon, armor, pack, and hand pictures |
 | `apps\desktop` | React + Electron UI (console and map) |
 | `packages\rules-dnd5e` | 5e SRD rules, DC ladder, and check-verb guidance |
 | `packages\monsters-srd` | All 322 WOTC SRD 5.1 monsters (Open5e; not full DDB) |

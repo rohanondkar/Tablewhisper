@@ -36,6 +36,7 @@ export interface Character {
   class_level: string;
   level: number;
   species: string;
+  hand_color?: number[] | null;
   size?: string;
   size_sq?: number;
   background: string;
@@ -67,11 +68,15 @@ export interface Character {
     light?: boolean;
     person_slot?: string | null;
     fit_note?: string | null;
+    hand?: string | null;
+    pocket?: number | null;
+    rotated?: boolean;
   }>;
   ac_equipped?: number;
   ac_unarmored?: number;
   hands_label?: string;
   carry_label?: string;
+  pockets?: number;
   gear_notes?: string[];
   bag?: BagSummary;
   bags?: BagSummary[];
@@ -578,6 +583,16 @@ export const api = {
     const res = await fetch(`${base}/npcs/custom`, { method: "POST", body: form });
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<NpcTemplate>;
+  },
+  gearImages: () => request<{ images: Record<string, string> }>("/gear-images"),
+  uploadGearImage: async (name: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("name", name);
+    form.append("file", file);
+    const res = await fetch(`${base}/gear-images`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{ images: Record<string, string> }>;
   },
   uploadCharacterImage: async (charId: string, file: File) => {
     const base = await apiBase();

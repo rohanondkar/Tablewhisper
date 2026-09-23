@@ -51,6 +51,24 @@ function rayIntersect(origin: Pt, angle: number, maxR: number, seg: Seg): Pt | n
   return null;
 }
 
+/** Map border, so a sight radius cannot draw past the grid. */
+export function boundsSegments(width: number, height: number): Seg[] {
+  const w = Math.max(0, width);
+  const h = Math.max(0, height);
+  return [
+    { a: { x: 0, y: 0 }, b: { x: w, y: 0 } },
+    { a: { x: w, y: 0 }, b: { x: w, y: h } },
+    { a: { x: w, y: h }, b: { x: 0, y: h } },
+    { a: { x: 0, y: h }, b: { x: 0, y: 0 } },
+  ];
+}
+
+function normAngle(angle: number): number {
+  const turn = Math.PI * 2;
+  const t = angle % turn;
+  return t < 0 ? t + turn : t;
+}
+
 function closestHit(origin: Pt, angle: number, maxR: number, segs: Seg[]): Pt {
   let best: Pt = {
     x: origin.x + Math.cos(angle) * maxR,
@@ -69,7 +87,7 @@ function closestHit(origin: Pt, angle: number, maxR: number, segs: Seg[]): Pt {
   return best;
 }
 
-/** Returns flat [x,y,...] polygon for Konva Line. */
+/** Flat [x,y,...] hit points in angle order, for a sight fan. */
 export function visibilityPolygon(
   origin: Pt,
   radiusPx: number,
@@ -83,8 +101,8 @@ export function visibilityPolygon(
   }
   for (const seg of segs) {
     for (const p of [seg.a, seg.b]) {
-      const base = Math.atan2(p.y - origin.y, p.x - origin.x);
-      angles.push(base - 0.0001, base, base + 0.0001);
+      const base = normAngle(Math.atan2(p.y - origin.y, p.x - origin.x));
+      angles.push(normAngle(base - 0.0001), base, normAngle(base + 0.0001));
     }
   }
   angles.sort((a, b) => a - b);

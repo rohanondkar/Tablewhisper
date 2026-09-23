@@ -147,11 +147,13 @@ def get_character(char_id: str) -> dict[str, Any] | None:
 
 def public_character(data: dict[str, Any]) -> dict[str, Any]:
     from .creature_size import ensure_character_size
+    from .equipment import ensure as ensure_equipment
     from .portraits import with_portrait
     from .xp import ensure_character_progress
 
     out = ensure_character_progress(dict(data))
     out = ensure_character_size(out)
+    out = ensure_equipment(out)
     out = with_portrait(out)
     out.pop("raw_fields", None)
     return out

@@ -9,6 +9,7 @@ from typing import Any
 from pypdf import PdfReader
 from pypdf.generic import IndirectObject
 
+from . import equipment as equipment_mod
 from .creature_size import size_from_species
 
 
@@ -289,6 +290,7 @@ def parse_dndbeyond_pdf(pdf_path: Path, character_id: str | None = None) -> dict
         "pdf_hash": digest,
         "updated_at": "",
     }
+    equipment_mod.seed(character, raw)
     return character
 
 

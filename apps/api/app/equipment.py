@@ -67,6 +67,50 @@ def _state_for_line(line: str, effect: str | None) -> str:
     return "unequipped"
 
 
+_SENTENCE_RE = re.compile(
+    r"\b(if|you|when|your|have|with|damage|action|bonus|advantage|prepared)\b",
+    re.I,
+)
+
+
+def _item_line(line: str, from_equipment: bool) -> bool:
+    """A gear name. A feature sentence that merely mentions a weapon is not gear."""
+    clean = line.strip()
+    if re.search(r"===|PHB-\d|species traits|^\*", clean, re.I):
+        return False
+    found = gear_rules._match_key(clean)
+    if not found:
+        return from_equipment and len(clean) <= 40 and not _SENTENCE_RE.search(clean)
+    key, _spec = found
+    if key == "unarmed":
+        return False
+    if key == "hide" and not from_equipment and re.fullmatch(r"[\W_]*hide[\W_]*", clean, re.I):
+        return False
+    probe = re.sub(r"\([^)]*\)", " ", clean)
+    if not from_equipment and (_SENTENCE_RE.search(probe) or len(clean) > 48):
+        return False
+    rest = re.sub(rf"\b{re.escape(key)}\b", " ", clean, count=1, flags=re.I)
+    rest = re.sub(r"\([^)]*\)", " ", rest)
+    rest = re.sub(r"[^A-Za-z]+", " ", rest).strip()
+    stop = {"a", "an", "the", "of", "and", "x", "armor"}
+    words = [word for word in rest.split() if word.lower() not in stop]
+    return len(words) <= (4 if from_equipment else 2)
+
+
+def _feature_dump(items: list[dict[str, Any]]) -> bool:
+    hits = 0
+    for item in items:
+        name = str(item.get("name") or "")
+        if (
+            name.startswith("===")
+            or name.startswith("* ")
+            or "PHB-" in name
+            or name in {"Standard Actions", "Opportunity Attack", "Two-Weapon Fighting"}
+        ):
+            hits += 1
+    return hits >= 3
+
+
 def _split_inventory(text: str) -> list[str]:
     lines: list[str] = []
     for raw_line in re.split(r"[\n;•,]+", text):
@@ -80,7 +124,7 @@ def _split_inventory(text: str) -> list[str]:
 
 
 def _push(items: list[dict[str, Any]], seen: set[str], name: str, state: str, effect: str | None) -> None:
-    clean = re.sub(r"\s+", " ", name).strip(" -")
+    clean = re.sub(r"\s+", " ", name).strip(" -|*")
     if len(clean) < 2:
         return
     key = clean.lower()
@@ -107,13 +151,13 @@ def seed(character: dict[str, Any], raw_fields: dict[str, Any] | None = None) ->
             _push(items, seen, name, "equipped", effect_for(name))
 
     blobs: list[str] = []
-    from_sheet = raw_fields is not None
+    from_equipment = False
     raw = raw_fields if raw_fields is not None else character.get("raw_fields") or {}
     if isinstance(raw, dict):
         for key, value in raw.items():
             if "equipment" in str(key).lower() and isinstance(value, str) and value.strip():
                 blobs.append(value)
-                from_sheet = True
+                from_equipment = True
     if not blobs:
         features = str(character.get("features") or "")
         if features.strip():
@@ -121,10 +165,9 @@ def seed(character: dict[str, Any], raw_fields: dict[str, Any] | None = None) ->
 
     for blob in blobs:
         for line in _split_inventory(blob):
-            effect = effect_for(line)
-            # Feature paragraphs are not an inventory. Only keep lines that are gear.
-            if not from_sheet and effect is None and "equipment" not in line.lower():
+            if not _item_line(line, from_equipment):
                 continue
+            effect = effect_for(line)
             state = _state_for_line(line, effect)
             _push(items, seen, line, state, effect)
 
@@ -158,8 +201,10 @@ def seed(character: dict[str, Any], raw_fields: dict[str, Any] | None = None) ->
 
 def ensure(character: dict[str, Any]) -> dict[str, Any]:
     """Fill gear on older sheets, then set the live AC from what is equipped."""
-    if not isinstance(character.get("equipment"), list):
-        seed(character)
+    stored = character.get("equipment")
+    if not isinstance(stored, list) or _feature_dump(stored):
+        raw = character.get("raw_fields")
+        seed(character, raw if isinstance(raw, dict) else None)
         return character
     items = [gear_rules.annotate(i) for i in character["equipment"] if isinstance(i, dict)]
     character["equipment"] = items
@@ -202,6 +247,8 @@ def _finish(character: dict[str, Any]) -> None:
         item["hands"] = stamped.get("hands") or 0
         item["light"] = bool(stamped.get("light"))
         item["person_slot"] = stamped.get("person_slot")
+    gear_rules.assign_hands(items, character)
+    character["pockets"] = gear_rules.pocket_count(items)
     character["ac"] = live_ac(character, items)
     character["hands_label"] = gear_rules.hands_label(items, character)
     profile = gear_rules.carry_profile(character, items)

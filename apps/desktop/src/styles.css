@@ -990,11 +990,12 @@ button {
 }
 
 .bag-body {
-  padding: 0.85rem 1rem 1rem;
-  overflow: auto;
+  padding: 0.85rem 1rem 1.1rem;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  align-items: center;
+  gap: 0.85rem;
 }
 
 .bag-tabs,
@@ -1031,6 +1032,311 @@ button {
   outline: 1px solid #fff;
 }
 
+.hand-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 4.5rem;
+  width: 100%;
+  min-height: 12rem;
+}
+
+.light-hands {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-end;
+}
+
+.hand-pad {
+  position: relative;
+  width: 11rem;
+  height: 13rem;
+  color: rgba(230, 184, 77, 0.9);
+  overflow: hidden;
+}
+
+.hand-pad.compact {
+  width: 6.5rem;
+  height: 8rem;
+}
+
+.hand-pad.gripping {
+  cursor: grab;
+}
+
+.hand-pad.on {
+  outline: 1px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 2px;
+}
+
+.held-hand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.held-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+}
+
+.held-photo.mirror {
+  transform: scaleX(-1);
+}
+
+.tone-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.45rem;
+  width: 100%;
+}
+
+.tone-swatch {
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(230, 184, 77, 0.45);
+  cursor: pointer;
+}
+
+.tone-swatch.natural {
+  background:
+    linear-gradient(135deg, transparent 46%, rgba(230, 184, 77, 0.8) 46%, rgba(230, 184, 77, 0.8) 54%, transparent 54%),
+    #1c212b;
+}
+
+.tone-swatch.on {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.tone-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: rgba(230, 184, 77, 0.72);
+}
+
+.tone-slider input {
+  width: 4.2rem;
+  accent-color: #e6b84d;
+}
+
+.hand-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  z-index: 1;
+}
+
+.gear-token {
+  width: 2.4rem;
+  height: 2.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.gear-token img,
+.bag-item img,
+.hand-item img,
+.bag-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.gear-upload {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 1.4rem;
+  cursor: pointer;
+}
+
+.gear-upload input {
+  display: none;
+}
+
+.gear-upload::after {
+  content: "+";
+  margin: auto;
+  color: rgba(230, 184, 77, 0.9);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.hand-pad.compact {
+  width: 4.6rem;
+  height: 4.8rem;
+}
+
+.hand-pad.right svg,
+.hand-pad.light-2 svg {
+  transform: scaleX(-1);
+}
+
+.hand-pad svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hand-label {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  color: #e07070;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.hand-item {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: 34%;
+  height: 78%;
+  transform: translateX(-50%);
+  z-index: 3;
+  border: none;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+
+.hand-pad.right .hand-item {
+  left: 58%;
+}
+
+.hand-pad.left .hand-item {
+  left: 44%;
+}
+
+.hand-pad.held-shield .hand-item {
+  z-index: 3;
+  width: 62%;
+  height: 62%;
+  top: 22%;
+  left: 50%;
+}
+
+.person-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.equip-well {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  width: 4.8rem;
+}
+
+.equip-caption {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(230, 184, 77, 0.72);
+}
+
+.slot-item {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+
+.slot-item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.pocket,
+.bag-slot-box {
+  position: relative;
+  width: 4.8rem;
+  height: 4.8rem;
+  min-width: 4.8rem;
+  max-width: 4.8rem;
+  min-height: 4.8rem;
+  max-height: 4.8rem;
+  box-sizing: border-box;
+  border: 1px solid rgba(230, 184, 77, 0.4);
+  border-radius: 10px;
+  background: #141820;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+
+.bag-ghost {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid rgba(230, 184, 77, 0.8);
+  background: rgba(20, 16, 8, 0.88);
+  color: #f3e6c4;
+  font-size: 0.68rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.15rem;
+}
+
+.bag-snap {
+  background: rgba(230, 184, 77, 0.22);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.bag-snap.bad {
+  background: rgba(160, 40, 40, 0.35);
+}
+
+.bag-item.is-dragging,
+.hand-item.is-dragging,
+.gear-token.is-dragging {
+  opacity: 0.35;
+}
+
 .bag-slot-label {
   font-size: 0.68rem;
   letter-spacing: 0.08em;
@@ -1053,17 +1359,24 @@ button {
 }
 
 .bag-chip.on,
-.bag-item.on {
+.bag-item.on,
+.gear-token.on,
+.hand-item.on {
   outline: 1px solid #fff;
 }
 
 .bag-grid {
   display: grid;
-  gap: 2px;
-  width: fit-content;
-  background: #0c0d10;
-  padding: 4px;
-  border: 1px solid rgba(230, 184, 77, 0.35);
+  gap: 3px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0.35rem auto 0;
+  flex: none;
+  overflow: hidden;
+  background: #10131a;
+  padding: 8px;
+  border: 1px solid rgba(230, 184, 77, 0.28);
+  border-radius: 12px;
 }
 
 .bag-cell {
@@ -1076,9 +1389,33 @@ button {
 }
 
 .bag-item {
+  position: relative;
   min-width: 0;
+  min-height: 0;
+  width: auto;
+  height: auto;
   overflow: hidden;
   z-index: 1;
+  padding: 0;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.bag-item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.bag-snap {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .bag-actions {
@@ -1114,6 +1451,14 @@ button {
 
 .modal-panel.bag-panel {
   width: min(920px, 100%);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bag-panel img {
+  -webkit-user-drag: none;
+  user-select: none;
+  pointer-events: none;
 }
 
 .modal-header {
