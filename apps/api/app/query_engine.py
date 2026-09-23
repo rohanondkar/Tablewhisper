@@ -914,8 +914,7 @@ def _impossible_check_result(
         "howto": howto,
         "possible": False,
     }
-    db.add_event(text, result)
-    return result
+    return db.add_event(text, result)["result"]
 
 
 def _pick_weapon(
@@ -1226,6 +1225,11 @@ def _pick_creature_weapon(text: str, actor: dict[str, Any]) -> dict[str, Any] | 
 def resolve_query(text: str, character_id: str | None = None, origin: str = "console") -> dict[str, Any]:
     previous = db.push_event_origin(origin)
     try:
+        from .spell_cast import cast_or_move
+
+        special = cast_or_move(text, character_id)
+        if special is not None:
+            return special
         return _resolve_query(text, character_id)
     finally:
         db.pop_event_origin(previous)
@@ -1693,5 +1697,4 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         "extra_dice": factors.get("extra_dice"),
         "crit_note": factors.get("crit_note"),
     }
-    db.add_event(text, result)
-    return result
+    return db.add_event(text, result)["result"]

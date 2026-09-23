@@ -1,0 +1,3192 @@
+[
+  {
+    "name": "Acid Arrow",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Acid Splash",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Aid",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Alarm",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Alter Self",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Animal Friendship",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Animal Messenger",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Animal Shapes",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Animate Dead",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Animate Objects",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Antilife Shell",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Antimagic Field",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Antipathy/Sympathy",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Arcane Eye",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Arcane Hand",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Arcane Lock",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Arcane Sword",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Arcanist's Magic Aura",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Astral Projection",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Augury",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Awaken",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Bane",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Banishment",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Barkskin",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Beacon of Hope",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Bestow Curse",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Black Tentacles",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Blade Barrier",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Bless",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Blight",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Blindness/Deafness",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Blink",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Blur",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Branding Smite",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Burning Hands",
+    "range_ft": 0,
+    "radius_ft": 15,
+    "shape": "cone",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Call Lightning",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Calm Emotions",
+    "range_ft": 60,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Chain Lightning",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Charm Person",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Chill Touch",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Circle of Death",
+    "range_ft": 150,
+    "radius_ft": 60,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Clairvoyance",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": true,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Clone",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Cloudkill",
+    "range_ft": 120,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Color Spray",
+    "range_ft": 0,
+    "radius_ft": 15,
+    "shape": "cone",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Command",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Commune",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Commune with Nature",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Comprehend Languages",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Compulsion",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Cone of Cold",
+    "range_ft": 0,
+    "radius_ft": 60,
+    "shape": "cone",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Confusion",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Conjure Animals",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Conjure Celestial",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Conjure Elemental",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Conjure Fey",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Conjure Minor Elementals",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Conjure Woodland Beings",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Contact Other Plane",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Contagion",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Contingency",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Continual Flame",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Control Water",
+    "range_ft": 300,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Control Weather",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Counterspell",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Create Food and Water",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Create or Destroy Water",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Create Undead",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Creation",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Cure Wounds",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Dancing Lights",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Darkness",
+    "range_ft": 60,
+    "radius_ft": 15,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Darkvision",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Daylight",
+    "range_ft": 60,
+    "radius_ft": 60,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Death Ward",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Delayed Blast Fireball",
+    "range_ft": 150,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Demiplane",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Detect Evil and Good",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Detect Magic",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Detect Poison and Disease",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Detect Thoughts",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dimension Door",
+    "range_ft": 500,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Disguise Self",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Disintegrate",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dispel Evil and Good",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Dispel Magic",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Divination",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Divine Favor",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Divine Word",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dominate Beast",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dominate Monster",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dominate Person",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Dream",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Druidcraft",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Earthquake",
+    "range_ft": 500,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Eldritch Blast",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Enhance Ability",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Enlarge/Reduce",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Entangle",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Enthrall",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Etherealness",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Expeditious Retreat",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Eyebite",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Fabricate",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Faerie Fire",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Faithful Hound",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "False Life",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Fear",
+    "range_ft": 0,
+    "radius_ft": 30,
+    "shape": "cone",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Feather Fall",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Feeblemind",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Find Familiar",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Find Steed",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Find the Path",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Find Traps",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Finger of Death",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Fire Bolt",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Fire Shield",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Fire Storm",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Fireball",
+    "range_ft": 150,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Flame Blade",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Flame Strike",
+    "range_ft": 60,
+    "radius_ft": 10,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Flaming Sphere",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Flesh to Stone",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Floating Disk",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Fly",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Fog Cloud",
+    "range_ft": 120,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Forbiddance",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Forcecage",
+    "range_ft": 100,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Foresight",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Freedom of Movement",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Freezing Sphere",
+    "range_ft": 300,
+    "radius_ft": 60,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Gaseous Form",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Gate",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Geas",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Gentle Repose",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Giant Insect",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Glibness",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Globe of Invulnerability",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Glyph of Warding",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Goodberry",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Grease",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Greater Invisibility",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Greater Restoration",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Guardian of Faith",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Guards and Wards",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Guidance",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Guiding Bolt",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Gust of Wind",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hallow",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hallucinatory Terrain",
+    "range_ft": 300,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Harm",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Haste",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Heal",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Healing Word",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Heat Metal",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hellish Rebuke",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Heroes' Feast",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Heroism",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Hideous Laughter",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hold Monster",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hold Person",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Holy Aura",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Hunter's Mark",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Hypnotic Pattern",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Ice Storm",
+    "range_ft": 300,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Identify",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Illusory Script",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Imprisonment",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Incendiary Cloud",
+    "range_ft": 150,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Inflict Wounds",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Insect Plague",
+    "range_ft": 300,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Instant Summons",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Invisibility",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Irresistible Dance",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Jump",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Knock",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Legend Lore",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Lesser Restoration",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Levitate",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Light",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Lightning Bolt",
+    "range_ft": 0,
+    "radius_ft": 100,
+    "shape": "line",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Locate Animals or Plants",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Locate Creature",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Locate Object",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Longstrider",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mage Armor",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mage Hand",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Magic Circle",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Magic Jar",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Magic Missile",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Magic Mouth",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Magic Weapon",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Magnificent Mansion",
+    "range_ft": 300,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Major Image",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mass Cure Wounds",
+    "range_ft": 60,
+    "radius_ft": 30,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Mass Heal",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mass Healing Word",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Mass Suggestion",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Maze",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Meld into Stone",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mending",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Message",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Meteor Swarm",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": true,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Mind Blank",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Minor Illusion",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mirage Arcane",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": true,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mirror Image",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Mislead",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Misty Step",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Modify Memory",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Moonbeam",
+    "range_ft": 120,
+    "radius_ft": 5,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Move Earth",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Nondetection",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Pass without Trace",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Passwall",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Phantasmal Killer",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Phantom Steed",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Planar Ally",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Planar Binding",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Plane Shift",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Plant Growth",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Poison Spray",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Polymorph",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Power Word Kill",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Power Word Stun",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Prayer of Healing",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Prestidigitation",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Prismatic Spray",
+    "range_ft": 0,
+    "radius_ft": 60,
+    "shape": "cone",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Prismatic Wall",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Private Sanctum",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Produce Flame",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Programmed Illusion",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Project Image",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": true,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Protection from Energy",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Protection from Evil and Good",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Protection from Poison",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Purify Food and Drink",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Raise Dead",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Ray of Enfeeblement",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Ray of Frost",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Regenerate",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Reincarnate",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Remove Curse",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Resilient Sphere",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Resistance",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Resurrection",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Reverse Gravity",
+    "range_ft": 100,
+    "radius_ft": 50,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Revivify",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Rope Trick",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Sacred Flame",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Sanctuary",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Scorching Ray",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Scrying",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Secret Chest",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "See Invisibility",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Seeming",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Sending",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": true,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Sequester",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Shapechange",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Shatter",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Shield",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Shield of Faith",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Shillelagh",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Shocking Grasp",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Silence",
+    "range_ft": 120,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Silent Image",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Simulacrum",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Sleep",
+    "range_ft": 90,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Sleet Storm",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Slow",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Spare the Dying",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Speak with Animals",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Speak with Dead",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Speak with Plants",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Spider Climb",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Spike Growth",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Spirit Guardians",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Spiritual Weapon",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Stinking Cloud",
+    "range_ft": 90,
+    "radius_ft": 20,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Stone Shape",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Stoneskin",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Storm of Vengeance",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": true,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Suggestion",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Sunbeam",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Sunburst",
+    "range_ft": 150,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Symbol",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Telekinesis",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Telepathic Bond",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Teleport",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Teleportation Circle",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Thaumaturgy",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Thunderwave",
+    "range_ft": 0,
+    "radius_ft": 15,
+    "shape": "cube",
+    "aim": "shape",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Time Stop",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Tiny Hut",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Tongues",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Transport via Plants",
+    "range_ft": 10,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Tree Stride",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "True Polymorph",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "True Resurrection",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "True Seeing",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "True Strike",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Unseen Servant",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Vampiric Touch",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "attack",
+    "note": "Spell attack. Type the damage if it hits."
+  },
+  {
+    "name": "Vicious Mockery",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Wall of Fire",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Wall of Force",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "point",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Wall of Ice",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Wall of Stone",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Wall of Thorns",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Warding Bond",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Water Breathing",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Water Walk",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Web",
+    "range_ft": 60,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Weird",
+    "range_ft": 120,
+    "radius_ft": 30,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  },
+  {
+    "name": "Wind Walk",
+    "range_ft": 30,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Wind Wall",
+    "range_ft": 120,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card. A successful save deals half."
+  },
+  {
+    "name": "Wish",
+    "range_ft": 0,
+    "radius_ft": 0,
+    "shape": "heal",
+    "aim": "self",
+    "sight": false,
+    "resolution": "heal",
+    "note": "Healing. Hit points go up by the number you enter."
+  },
+  {
+    "name": "Word of Recall",
+    "range_ft": 5,
+    "radius_ft": 0,
+    "shape": "ray",
+    "aim": "creature",
+    "sight": false,
+    "resolution": "none",
+    "note": "No attack roll. Hit points stay."
+  },
+  {
+    "name": "Zone of Truth",
+    "range_ft": 60,
+    "radius_ft": 15,
+    "shape": "burst",
+    "aim": "point",
+    "sight": false,
+    "resolution": "save",
+    "note": "Saving throw. No save DC is printed on this card."
+  }
+]

@@ -608,6 +608,10 @@ export default function MapPanel({
   async function commitResolve(rows: ResolveRow[]) {
     const pending = pendingResolve;
     if (!pending || pending.blocked) return;
+    if (pending.result.check_type === "spell" || pending.result.check_type === "contest") {
+      setPendingResolve(null);
+      return;
+    }
     if (pending.travel) beginTravel(pending.travel);
     let hold = false;
     for (const row of rows) {
@@ -2206,7 +2210,15 @@ export default function MapPanel({
                   </button>
                 ))}
               </div>
-              {armed && <p className="muted small">Click a highlighted square. Amber squares are long range.</p>}
+              {armed && (
+                <p className="muted small">
+                  {armed.aim === "creature"
+                    ? "Click a highlighted creature. Distance uses the map squares, the same feet as the ruler."
+                    : armed.aim === "self"
+                      ? "Click the highlighted creature. This reaches only them."
+                      : "Click a highlighted square. Amber squares are long range."}
+                </p>
+              )}
               {armed && highlighted.length === 0 && armed.shape !== "cone" && armed.shape !== "line" && armed.shape !== "cube" && (
                 <p className="muted small">That action has no square in reach.</p>
               )}

@@ -189,7 +189,8 @@ export default function ResolveModal({
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, [field]: value } : row)));
   }
 
-  const ready = blocked ? false : rows.every((row) => faceOf(row.roll) != null);
+  const quiet = result.check_type === "spell" || result.check_type === "contest";
+  const ready = blocked ? false : quiet || rows.every((row) => faceOf(row.roll) != null);
 
   return (
     <div
@@ -211,12 +212,12 @@ export default function ResolveModal({
         >
           {blocked && <p className="resolve-blocked">{blocked}</p>}
           {notice && <p className="muted small">{notice}</p>}
-          {!blocked &&
+          {!blocked && !quiet &&
             rows.map((row) => (
               <div key={row.key} className="resolve-row">
                 <strong>{row.label}</strong>
                 <label>
-                  {result.check_type === "save" ? "Saving throw" : "Attack roll"}
+                  {heal ? "Healing" : result.check_type === "save" ? "Saving throw" : "Attack roll"}
                   <input
                     type="number"
                     min={1}

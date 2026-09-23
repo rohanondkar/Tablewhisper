@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Arc, Circle, Group, Line, Rect, Text } from "react-konva";
 import type { CheckResult } from "../api";
+import { actionFromSpell, spellByName, spellFromText, spellsNamedIn, type SpellAim, type SpellResolution } from "./spellCatalog";
 import type { Seg } from "./vision";
 
 export type Tile = { c: number; r: number };
@@ -32,6 +33,9 @@ export type MapAction = {
   sentence: boolean;
   spellNote: string | null;
   longRange: boolean;
+  aim?: SpellAim;
+  sight?: boolean;
+  resolution?: SpellResolution;
 };
 
 export type Grid = {
@@ -83,43 +87,6 @@ const THROWN_RANGE: Record<string, [number, number]> = {
   trident: [20, 60],
   net: [5, 15],
 };
-
-export const SPELLS: MapAction[] = [
-  spell("fire-bolt", "Fire bolt", "ray", "fire", "ray", 0, 120, 120, 0, null),
-  spell("fireball", "Fireball", "burst", "fire", "burst", 0, 150, 150, 20, null),
-  spell("burning-hands", "Burning hands", "cone", "fire", "cone", 0, 0, 0, 15, null),
-  spell("lightning-bolt", "Lightning bolt", "line", "lightning", "line", 0, 0, 0, 100, null),
-  spell("thunderwave", "Thunderwave", "cube", "thunder", "cube", 0, 0, 0, 15, null),
-  spell("cure-wounds", "Cure wounds", "heal", "healing", "heal", 5, 5, 5, 0, null),
-];
-
-function spell(
-  id: string,
-  label: string,
-  family: Family,
-  damageType: string,
-  shape: ShapeKind,
-  reachFt: number,
-  rangeFt: number,
-  longFt: number,
-  radiusFt: number,
-  spellNote: string | null
-): MapAction {
-  return {
-    id,
-    label,
-    family,
-    damageType,
-    shape,
-    reachFt,
-    rangeFt,
-    longFt,
-    radiusFt,
-    sentence: false,
-    spellNote,
-    longRange: false,
-  };
-}
 
 export function tileKey(tile: Tile): string {
   return `${tile.c},${tile.r}`;
@@ -299,30 +266,52 @@ function namedOnSheet(text: string): MapAction[] {
       sentence: false,
       spellNote: "Bonus action. Regain 1d10+1 hit points. 2 uses per long rest.",
       longRange: false,
+      aim: "self",
+      resolution: "heal",
     });
   }
-  if (/hunter['’]s mark/i.test(text)) {
-    found.push({
-      id: "hunters-mark",
-      label: "Hunter's Mark",
-      family: "ray",
-      damageType: "force",
-      shape: "ray",
-      reachFt: 0,
-      rangeFt: 90,
-      longFt: 90,
-      radiusFt: 0,
-      sentence: false,
-      spellNote: "Bonus action. Mark one creature you can see within 90 feet. 2 uses per long rest.",
-      longRange: false,
-    });
-  }
-  const low = text.toLowerCase();
-  for (const spell of SPELLS) {
-    const name = spell.label.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`\\b${name}\\b`).test(low)) found.push(spell);
-  }
+  for (const row of spellsNamedIn(text)) found.push(actionFromSpell(row));
   return found;
+}
+
+export function standardMoves(): MapAction[] {
+  const self = ["Dash", "Disengage", "Dodge", "Hide", "Search"].map((label) => ({
+    id: `move-${label.toLowerCase()}`,
+    label,
+    family: "ray" as const,
+    damageType: "",
+    shape: "ray" as const,
+    reachFt: 0,
+    rangeFt: 0,
+    longFt: 0,
+    radiusFt: 0,
+    sentence: false,
+    spellNote: `${label}. No attack roll. Hit points stay.`,
+    longRange: false,
+    aim: "self" as const,
+    resolution: "none" as const,
+  }));
+  const near: MapAction[] = [
+    ["Help", "none", "Help a creature within 5 feet. No attack roll. Hit points stay."],
+    ["Grapple", "contest", "Strength (Athletics) contest. Hit points stay."],
+    ["Shove", "contest", "Strength (Athletics) contest. Hit points stay."],
+  ].map(([label, resolution, note]) => ({
+    id: `move-${label.toLowerCase()}`,
+    label,
+    family: "social",
+    damageType: "",
+    shape: "ray",
+    reachFt: 5,
+    rangeFt: 5,
+    longFt: 5,
+    radiusFt: 0,
+    sentence: false,
+    spellNote: note,
+    longRange: false,
+    aim: "creature",
+    resolution: resolution as SpellResolution,
+  }));
+  return [...self, ...near];
 }
 
 function weaponKey(name: string): string {
@@ -338,6 +327,11 @@ export function actionsFor(
     if (!list.some((item) => item.id === action.id)) list.push(action);
   };
   for (const atk of attacks) {
+    const known = spellByName(atk.name);
+    if (known) {
+      push(actionFromSpell(known));
+      continue;
+    }
     const bonus = Number(String(atk.attack_bonus ?? "0").replace("+", "")) || 0;
     const key = weaponName(atk.name);
     if (THROWN_RANGE[key]) {
@@ -368,17 +362,21 @@ export function actionsFor(
   if (opts?.social) {
     for (const action of socialActions()) push(action);
   }
+  for (const action of standardMoves()) push(action);
   return list;
 }
 
 export function rulingSentence(actor: string, action: MapAction, target: string, far: boolean): string {
+  if (action.aim) {
+    const verb = action.id.startsWith("spell-") ? "casts" : "uses";
+    if (action.aim === "self") return `${actor} ${verb} ${action.label}`;
+    const prep = action.aim === "point" || action.aim === "shape" ? "at" : "on";
+    return `${actor} ${verb} ${action.label} ${prep} ${target}${far ? " at long range" : ""}`;
+  }
   if (action.family === "social") {
     const verb =
       action.label === "Persuade" ? "persuades" : action.label === "Intimidate" ? "intimidates" : "deceives";
     return `${actor} ${verb} ${target}`;
-  }
-  if (action.id === "second-wind" || action.id === "hunters-mark") {
-    return `${actor} uses ${action.label}`;
   }
   if (!action.sentence) {
     return `${actor} casts ${action.label} at ${target}`;
@@ -503,13 +501,14 @@ const EXTRA_WEAPONS = [
 
 export function actionFromQuery(text: string, checkType: string, weaponLabel?: string | null): MapAction | null {
   const low = text.toLowerCase();
-  const spells = [...SPELLS].sort((a, b) => b.label.length - a.label.length);
-  for (const spell of spells) {
-    const name = spell.label.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`\\b${name}\\b`).test(low)) return spell;
-  }
+  const named = spellFromText(text);
+  if (named) return actionFromSpell(named);
+  const used = text.match(/\buses\s+([a-z][a-z' ]*?)(?:\s+on\b|\s+at\b|$)/i);
+  const move = used
+    ? standardMoves().find((action) => action.label.toLowerCase() === used[1].trim().toLowerCase())
+    : undefined;
+  if (move) return move;
   if (/\bsecond wind\b/.test(low)) return namedOnSheet("second wind")[0] || null;
-  if (/hunter['’]?s mark/.test(low)) return namedOnSheet("hunter's mark")[0] || null;
   if (/\b(persuade|persuades|persuasion)\b/.test(low)) return socialActions()[0];
   if (/\b(intimidate|intimidates|intimidation)\b/.test(low)) return socialActions()[1];
   if (/\b(deceive|deceives|deception)\b/.test(low)) return socialActions()[2];
@@ -524,14 +523,14 @@ export function actionFromQuery(text: string, checkType: string, weaponLabel?: s
     (a, b) => b.length - a.length
   );
   const fromResult = (weaponLabel || "").toLowerCase();
-  const named = words.find((word) => low.includes(word) || fromResult.includes(word)) || fromResult || "club";
-  const key = weaponName(named);
+  const weaponWord = words.find((word) => low.includes(word) || fromResult.includes(word)) || fromResult || "club";
+  const key = weaponName(weaponWord);
   const thrown = /\bthrows?\b|\bthrown\b/.test(low);
-  if (thrown && THROWN_RANGE[key]) return actionFromAttack(named, undefined, 0, true);
+  if (thrown && THROWN_RANGE[key]) return actionFromAttack(weaponWord, undefined, 0, true);
   if (RANGED[key] || /\b(shoots?|shooting|bow|crossbow|blowgun)\b/.test(low)) {
-    return actionFromAttack(named, undefined, 0, false);
+    return actionFromAttack(weaponWord, undefined, 0, false);
   }
-  return actionFromAttack(named, undefined, 0, false);
+  return actionFromAttack(weaponWord, undefined, 0, false);
 }
 
 export function socialActions(): MapAction[] {
@@ -561,6 +560,33 @@ export function aimTiles(
 ): AimTile[] {
   const feet = Math.max(1, grid.feet_per_square);
   const self = new Set(from.map(tileKey));
+  const blocked = (tile: Tile, distFt: number) =>
+    distFt > 0 && crossesWall(tileCenter(from[0], grid), tileCenter(tile, grid), segs);
+  if (action.aim === "self") {
+    return from.map((tile) => ({ ...tile, far: false }));
+  }
+  if (action.aim === "creature") {
+    return others
+      .filter((tile) => {
+        if (self.has(tileKey(tile))) return false;
+        const distFt = chebyshev(from, tile) * feet;
+        if (!action.sight && distFt > (action.rangeFt || 0)) return false;
+        return !blocked(tile, distFt);
+      })
+      .map((tile) => ({ ...tile, far: false }));
+  }
+  if (action.aim === "point") {
+    const limit = action.rangeFt || action.longFt || 0;
+    const legal = allTiles(grid).filter((tile) => {
+      const distFt = chebyshev(from, tile) * feet;
+      if (limit > 0 && distFt > limit) return false;
+      return !blocked(tile, distFt);
+    });
+    if (hover && (action.radiusFt || 0) > 0 && legal.some((tile) => tile.c === hover.c && tile.r === hover.r)) {
+      return blast(hover, action.radiusFt, grid).map((tile) => ({ ...tile, far: false }));
+    }
+    return legal.map((tile) => ({ ...tile, far: false }));
+  }
   if (action.shape === "social") {
     return others.filter((tile) => !self.has(tileKey(tile))).map((tile) => ({ ...tile, far: false }));
   }
