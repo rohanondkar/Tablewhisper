@@ -115,7 +115,7 @@ export default function InventoryModal({
       if (FRAME_KEYS.has(known) || known.startsWith("held-")) continue;
       if ((key.startsWith(known) || key.includes(known)) && known.length > best.length) best = known;
     }
-    return best ? art[best] : "";
+    return best ? art[best] : art.item || "";
   }
 
   function heldPicture(name: string): string {

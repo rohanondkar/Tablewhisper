@@ -24,21 +24,27 @@ import {
   PortalRing,
   RulingChip,
   TravelEffect,
+  actionFromQuery,
   actionsFor,
   aimTiles,
-  attackSentence,
   effectTiles,
   footprint,
   markKind,
+  rangeGate,
+  rulingSentence,
   tileCenter,
   tileKey,
   tileOf,
   type AimTile,
   type MapAction,
+  type MapRuling,
   type Mark,
+  type MarkPulse,
+  type RulingCreature,
   type Tile,
   type Travel,
 } from "./effects";
+import ResolveModal, { amountIn, strikeOutcome, type ResolveRow } from "./ResolveModal";
 import TurnOrder, { sortTurns, type TurnSlot } from "./TurnOrder";
 
 const API_BASE = "http://127.0.0.1:8766";
@@ -121,6 +127,16 @@ type Props = {
   scene: SceneNpc[];
   monsters: MonsterTemplate[];
   npcs: NpcTemplate[];
+  active: boolean;
+  selectedCharacterId: string | null;
+  queryPulse: { id: number; text: string; result: CheckResult } | null;
+  markPulse: MarkPulse | null;
+  ruling: MapRuling | null;
+  onRuling: (ruling: MapRuling) => void;
+  onApply: (creature: RulingCreature, amount: number) => void;
+  onMiss: (creature: RulingCreature) => void;
+  damageShown?: Record<string, number>;
+  applyBusy?: boolean;
   onError: (msg: string) => void;
   onEncounterChange: () => Promise<void> | void;
   onSceneChange: () => Promise<void> | void;
@@ -152,6 +168,16 @@ export default function MapPanel({
   scene,
   monsters,
   npcs,
+  active,
+  selectedCharacterId,
+  queryPulse,
+  markPulse,
+  ruling,
+  onRuling,
+  onApply,
+  onMiss,
+  damageShown,
+  applyBusy,
   onError,
   onEncounterChange,
   onSceneChange,
@@ -167,11 +193,21 @@ export default function MapPanel({
   const [armed, setArmed] = useState<MapAction | null>(null);
   const [hoverTile, setHoverTile] = useState<Tile | null>(null);
   const [travel, setTravel] = useState<Travel | null>(null);
+  const [queuedTravel, setQueuedTravel] = useState<Travel | null>(null);
+  const [pendingResolve, setPendingResolve] = useState<{
+    result: CheckResult;
+    blocked: string | null;
+    notice: string | null;
+    heal: boolean;
+    creatures: RulingCreature[];
+    travel: Travel | null;
+  } | null>(null);
+  const [trayW, setTrayW] = useState(() => Number(localStorage.getItem("map-tray-w")) || 240);
+  const [inspectW, setInspectW] = useState(() => Number(localStorage.getItem("map-inspect-w")) || 300);
+  const mapBodyRef = useRef<HTMLDivElement | null>(null);
   const [travelProgress, setTravelProgress] = useState(0);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [downed, setDowned] = useState<string[]>([]);
-  const [tileRuling, setTileRuling] = useState<{ tile: Tile; text: string; action: MapAction; targetId: string | null } | null>(null);
-  const [damageDraft, setDamageDraft] = useState("");
   const [grabbing, setGrabbing] = useState(false);
   const [portalSwirl, setPortalSwirl] = useState<{ x: number; y: number } | null>(null);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -207,6 +243,8 @@ export default function MapPanel({
   const selectPan = useRef<{ mx: number; my: number; sx: number; sy: number; moved: boolean } | null>(null);
   const spaceHeld = useRef(false);
   const onErrorRef = useRef(onError);
+  const seenPulse = useRef(0);
+  const seenMark = useRef(0);
   onErrorRef.current = onError;
 
   const bgUrl = map?.background_url
@@ -282,7 +320,6 @@ export default function MapPanel({
         setPortals(state.portals);
         setMarks([]);
         setArmed(null);
-        setTileRuling(null);
         setDowned([]);
         await refreshList();
         ensureFogCanvas(m, !m.fog_url);
@@ -538,42 +575,391 @@ export default function MapPanel({
     return () => cancelAnimationFrame(frame);
   }, [travel]);
 
+  function startSplitDrag(side: "tray" | "inspect", event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const start = side === "tray" ? trayW : inspectW;
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const next = side === "tray" ? start + dx : start - dx;
+      const room = Math.max(280, (mapBodyRef.current?.clientWidth || 900) - 160);
+      const clamped = Math.max(0, Math.min(room, next));
+      if (side === "tray") setTrayW(clamped);
+      else setInspectW(clamped);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setTrayW((width) => {
+        const snapped = width > 0 && width < 140 ? 140 : width;
+        localStorage.setItem("map-tray-w", String(snapped));
+        return snapped;
+      });
+      setInspectW((width) => {
+        const snapped = width > 0 && width < 160 ? 160 : width;
+        localStorage.setItem("map-inspect-w", String(snapped));
+        return snapped;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  async function commitResolve(rows: ResolveRow[]) {
+    const pending = pendingResolve;
+    if (!pending || pending.blocked) return;
+    if (pending.travel) beginTravel(pending.travel);
+    let hold = false;
+    for (const row of rows) {
+      if (!row.creature) continue;
+      const face = Number(row.roll);
+      const typed = amountIn(row.info);
+      if (pending.heal) {
+        const healing = typed ?? (Number.isInteger(face) ? face : null);
+        if (healing) await Promise.resolve(onApply(row.creature, healing));
+        continue;
+      }
+      const strike = strikeOutcome(pending.result, row.roll, row.info);
+      if (strike.kind === "pending") {
+        hold = true;
+        continue;
+      }
+      if (strike.kind === "damage") await Promise.resolve(onApply(row.creature, strike.amount));
+      else if (strike.kind === "miss") onMiss(row.creature);
+    }
+    if (!hold) setPendingResolve(null);
+  }
+
+  function beginTravel(next: Travel) {
+    if (active) {
+      setTravel(next);
+      setTravelProgress(0);
+      return;
+    }
+    setQueuedTravel(next);
+  }
+
+  useEffect(() => {
+    if (!active || !queuedTravel) return;
+    setTravel(queuedTravel);
+    setTravelProgress(0);
+    setQueuedTravel(null);
+  }, [active, queuedTravel]);
+
+  function tokenCreature(token: MapToken, tile: Tile): RulingCreature {
+    return {
+      key: token.id,
+      tokenId: token.id,
+      refId: token.ref_id,
+      kind: token.kind,
+      label: token.label,
+      tile,
+    };
+  }
+
+  function tokenFaded(token: MapToken): boolean {
+    const hp = tokenVitals(token)?.current;
+    if (hp != null) return hp <= 0;
+    return downed.includes(token.id);
+  }
+
+  function tokenVitals(token: MapToken): { current: number; max: number; temp: number } | null {
+    if (token.kind === "pc") {
+      const row = characters.find((item) => item.id === token.ref_id);
+      if (!row || row.max_hp <= 0) return null;
+      return { current: row.current_hp ?? row.max_hp, max: row.max_hp, temp: row.temp_hp ?? 0 };
+    }
+    if (token.kind === "enemy") {
+      const row = encounter.find((item) => item.id === token.ref_id);
+      if (!row || row.max_hp <= 0) return null;
+      return { current: row.current_hp, max: row.max_hp, temp: 0 };
+    }
+    if (token.kind === "npc") {
+      const row = scene.find((item) => item.id === token.ref_id);
+      if (!row || row.max_hp <= 0) return null;
+      return { current: row.current_hp, max: row.max_hp, temp: 0 };
+    }
+    return null;
+  }
+
+  function creaturesOn(tiles: Tile[]): RulingCreature[] {
+    if (!map) return [];
+    const keys = new Set(tiles.map(tileKey));
+    const found: RulingCreature[] = [];
+    for (const token of tokens) {
+      const foot = footprint(token.x, token.y, token.size_sq, map);
+      const hit = foot.find((tile) => keys.has(tileKey(tile)));
+      if (hit) found.push(tokenCreature(token, hit));
+    }
+    return found;
+  }
+
+  function findTokenByName(name: string | null | undefined): MapToken | null {
+    const low = (name || "").trim().toLowerCase();
+    if (!low) return null;
+    let best: MapToken | null = null;
+    let score = 0;
+    for (const token of tokens) {
+      const pc = token.kind === "pc" ? characters.find((row) => row.id === token.ref_id) : null;
+      const foe = token.kind === "enemy" ? encounter.find((row) => row.id === token.ref_id) : null;
+      const npc = token.kind === "npc" ? scene.find((row) => row.id === token.ref_id) : null;
+      const names = [token.label, pc?.name, foe?.label, foe?.name, npc?.label, npc?.name].filter(
+        (item): item is string => Boolean(item)
+      );
+      for (const item of names) {
+        const value = item.toLowerCase();
+        let next = 0;
+        if (value === low) next = 100 + value.length;
+        else if (low.includes(value) || value.includes(low)) next = value.length;
+        if (next > score) {
+          score = next;
+          best = token;
+        }
+      }
+    }
+    return best;
+  }
+
+  function creatureFromResult(result: CheckResult, token: MapToken | null): RulingCreature | null {
+    if (!result.target && !token) return null;
+    const tile = token && map ? footprint(token.x, token.y, token.size_sq, map)[0] : null;
+    return {
+      key: token?.id || result.target?.id || result.target?.label || "target",
+      tokenId: token?.id || null,
+      refId: token?.ref_id || result.target?.id || null,
+      kind: token?.kind || result.target?.kind || "enemy",
+      label: token?.label || result.target?.label || "Target",
+      tile,
+    };
+  }
+
+  function publishRuling(
+    result: CheckResult,
+    action: MapAction | null,
+    blocked: string | null,
+    tiles: Tile[],
+    anchor: Tile | null,
+    creatures: RulingCreature[]
+  ) {
+    const heal = Boolean(action && (action.family === "heal" || action.damageType === "healing"));
+    const boxes = heal || result.check_type === "attack" || result.check_type === "save";
+    onRuling({
+      id: Date.now(),
+      result,
+      blocked,
+      action,
+      creatures: blocked || !boxes ? [] : creatures,
+      tiles,
+      anchor,
+      heal,
+    });
+  }
+
   async function fireAction(action: MapAction, tile: Tile, target: MapToken | null, far: boolean) {
     if (!map || !selectedToken) return;
     const fromTiles = footprint(selectedToken.x, selectedToken.y, selectedToken.size_sq, map);
-    const tiles = effectTiles(action, fromTiles, tile, map, segs);
-    setTravel({
-      id: Date.now(),
-      family: action.family,
-      damageType: action.damageType,
-      from: tileCenter(fromTiles[0], map),
-      to: tileCenter(tile, map),
-      tiles,
-    });
-    setTravelProgress(0);
+    const sentence = rulingSentence(selectedToken.label, action, target?.label || "the open ground", far);
     setArmed(null);
     setHoverTile(null);
-    if (!action.sentence) {
-      setTileRuling({
-        tile,
-        text: action.spellNote || "The DC is not on the sheet.",
-        action,
-        targetId: target?.id || null,
-      });
-      return;
-    }
-    const pcId =
-      selectedToken.kind === "pc" ? selectedToken.ref_id : target?.kind === "pc" ? target.ref_id : null;
+    const pcId = selectedToken.kind === "pc" ? selectedToken.ref_id : target?.kind === "pc" ? target.ref_id : null;
     try {
-      const result = await api.query(
-        attackSentence(selectedToken.label, action, target?.label || "the open ground", far),
-        pcId
-      );
-      setTileRuling({ tile, text: formatRuling(result), action, targetId: target?.id || null });
+      const result = await api.query(sentence, pcId, "map");
+      const blocked = result.possible === false || result.check_type === "impossible" ? result.notes || "That action is not possible." : null;
+      const tiles = blocked ? [] : effectTiles(action, fromTiles, tile, map, segs);
+      let creatures = blocked ? [] : creaturesOn(tiles);
+      const shaped = action.shape === "burst" || action.shape === "cone" || action.shape === "line" || action.shape === "cube";
+      if (!blocked && target && !shaped && !creatures.some((item) => item.tokenId === target.id)) {
+        creatures = [tokenCreature(target, tile), ...creatures];
+      }
+      const travel = blocked
+        ? null
+        : {
+            id: Date.now(),
+            family: action.family,
+            damageType: action.damageType,
+            from: tileCenter(fromTiles[0], map),
+            to: tileCenter(tile, map),
+            tiles,
+          };
+      publishRuling(result, action, blocked, tiles, tile, creatures);
+      setPendingResolve({
+        result,
+        blocked,
+        notice: null,
+        heal: Boolean(action.family === "heal" || action.damageType === "healing"),
+        creatures: blocked ? [] : creatures,
+        travel,
+      });
     } catch (err) {
       onErrorRef.current(err instanceof Error ? err.message : String(err));
     }
   }
+
+  function attackerLabel(result: CheckResult, text: string): string {
+    const roller = (result.participants || []).find((person) => person.role === "rolling");
+    const targetLabel = (result.target?.label || "").toLowerCase();
+    if (roller?.label && roller.label.toLowerCase() !== targetLabel) return roller.label;
+    const head = text.split(
+      /\b(?:stabs?|stabbing|attacks?|attacking|slaps?|slapping|punches?|punching|kicks?|kicking|shoots?|shooting|throws?|throwing|swings?|swinging)\b/i
+    )[0];
+    const named = head?.replace(/^[^a-z0-9]+/i, "").trim();
+    if (named) return named;
+    return result.character || "";
+  }
+
+  function guessTargetName(text: string): string {
+    const match = text.match(
+      /\b(?:at|on|against|stabs|stabbing|attacks|attacking|slaps|slapping|punches|punching|kicks|kicking|shoots|shooting|throws|throwing)\s+(.+)$/i
+    );
+    return match?.[1]?.replace(/\s+with\b[\s\S]*$/i, "").replace(/[.?!]$/, "").trim() || "";
+  }
+
+  function pcFromResult(result: CheckResult): RulingCreature | null {
+    if (!result.character_id) return null;
+    const token = tokens.find((item) => item.kind === "pc" && item.ref_id === result.character_id) || null;
+    const tile = token && map ? footprint(token.x, token.y, token.size_sq, map)[0] : null;
+    return {
+      key: token?.id || result.character_id,
+      tokenId: token?.id || null,
+      refId: result.character_id,
+      kind: "pc",
+      label: token?.label || result.character || "Character",
+      tile,
+    };
+  }
+
+  function openResolve(
+    result: CheckResult,
+    action: MapAction | null,
+    blocked: string | null,
+    notice: string | null,
+    creatures: RulingCreature[],
+    travel: Travel | null
+  ) {
+    const heal = Boolean(action && (action.family === "heal" || action.damageType === "healing"));
+    if (!(heal || result.check_type === "attack" || result.check_type === "save")) return;
+    setPendingResolve({
+      result,
+      blocked,
+      notice,
+      heal,
+      creatures: blocked ? [] : creatures,
+      travel,
+    });
+  }
+
+  async function absorbConsole(text: string, result: CheckResult) {
+    if (!map) return;
+    const action = actionFromQuery(text, result.check_type, result.weapon);
+    const impossible = result.possible === false || result.check_type === "impossible";
+    if (impossible) {
+      const blocked = result.notes || "That action is not possible.";
+      publishRuling(result, action, blocked, [], null, []);
+      openResolve(result, action, blocked, null, [], null);
+      return;
+    }
+    if (!action) {
+      const lone = creatureFromResult(result, findTokenByName(result.target?.label));
+      publishRuling(result, null, null, [], lone?.tile || null, lone?.refId ? [lone] : []);
+      return;
+    }
+    const actorName = attackerLabel(result, text);
+    const actor = findTokenByName(actorName);
+    if (action.shape === "heal" && (action.rangeFt || 0) <= 0) {
+      const self = actor ? tokenCreature(actor, footprint(actor.x, actor.y, actor.size_sq, map)[0]) : pcFromResult(result);
+      if (self?.tile) {
+        beginTravel({
+          id: Date.now(),
+          family: action.family,
+          damageType: action.damageType,
+          from: tileCenter(self.tile, map),
+          to: tileCenter(self.tile, map),
+          tiles: [self.tile],
+        });
+      }
+      publishRuling(result, action, null, self?.tile ? [self.tile] : [], self?.tile || null, self ? [self] : []);
+      openResolve(result, action, null, null, self ? [self] : [], null);
+      return;
+    }
+    const targetToken = findTokenByName(result.target?.label || guessTargetName(text));
+    if (!actor || !targetToken) {
+      const lone = creatureFromResult(result, targetToken || findTokenByName(result.target?.label));
+      const creatures = lone?.refId ? [lone] : [];
+      const missing = [
+        !actor ? `${actorName || "The attacker"} is not on this map, so there is no swing.` : "",
+        !targetToken ? `${result.target?.label || "The target"} is not on this map.` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      publishRuling(result, action, null, [], lone?.tile || null, creatures);
+      openResolve(result, action, null, missing, creatures, null);
+      return;
+    }
+    const fromTiles = footprint(actor.x, actor.y, actor.size_sq, map);
+    const to = footprint(targetToken.x, targetToken.y, targetToken.size_sq, map)[0];
+    const gate = rangeGate(action, fromTiles, to, map, segs);
+    let next = result;
+    if (gate.far && !/\blong range\b/i.test(text)) {
+      try {
+        next = await api.query(`${text} at long range`, selectedCharacterId, "map");
+      } catch (err) {
+        onErrorRef.current(err instanceof Error ? err.message : String(err));
+      }
+    }
+    if (!gate.play) {
+      publishRuling(next, action, gate.blocked, [], to, []);
+      openResolve(next, action, gate.blocked, null, [], null);
+      return;
+    }
+    const tiles = effectTiles(action, fromTiles, to, map, segs);
+    let creatures = creaturesOn(tiles);
+    const shaped = action.shape === "burst" || action.shape === "cone" || action.shape === "line" || action.shape === "cube";
+    if (!shaped && !creatures.some((item) => item.tokenId === targetToken.id)) {
+      creatures = [tokenCreature(targetToken, to), ...creatures];
+    }
+    beginTravel({
+      id: Date.now(),
+      family: action.family,
+      damageType: action.damageType,
+      from: tileCenter(fromTiles[0], map),
+      to: tileCenter(to, map),
+      tiles,
+    });
+    publishRuling(next, action, null, tiles, to, creatures);
+    openResolve(next, action, null, null, creatures, null);
+  }
+
+  useEffect(() => {
+    if (!queryPulse || !map || queryPulse.id === seenPulse.current) return;
+    seenPulse.current = queryPulse.id;
+    void absorbConsole(queryPulse.text, queryPulse.result);
+  }, [queryPulse, map]);
+
+  useEffect(() => {
+    if (!markPulse || !map || markPulse.id === seenMark.current) return;
+    seenMark.current = markPulse.id;
+    if (markPulse.tile) {
+      const at = tileCenter(markPulse.tile, map);
+      if (markPulse.miss) {
+        setMarks((prev) => [
+          ...prev,
+          { id: `dust-${markPulse.id}`, kind: "dust", x: at.x, y: at.y, tile: markPulse.tile as Tile },
+        ]);
+      } else if (!markPulse.heal) {
+        const kind = markKind(markPulse.damageType);
+        if (!["dust", "flash", "radiant", "necrotic", "force", "psychic", "heal"].includes(kind)) {
+          setMarks((prev) => [
+            ...prev,
+            { id: `${kind}-${markPulse.id}`, kind, x: at.x, y: at.y, tile: markPulse.tile as Tile },
+          ]);
+        }
+      }
+    }
+    if (markPulse.downed && markPulse.tokenId) {
+      const tokenId = markPulse.tokenId;
+      setDowned((prev) => (prev.includes(tokenId) ? prev : [...prev, tokenId]));
+    }
+  }, [markPulse, map]);
 
   async function ensureMap(): Promise<BattleMap> {
     if (map) return map;
@@ -1044,46 +1430,6 @@ export default function MapPanel({
     await loadState(targetMapId);
   }
 
-  async function applyDamage() {
-    if (!tileRuling || !map) return;
-    const amount = Number(damageDraft);
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const target = tokens.find((item) => item.id === tileRuling.targetId);
-    const kind = markKind(tileRuling.action.damageType);
-    const spots = tileRuling.action.shape === "burst" || tileRuling.action.shape === "cone" || tileRuling.action.shape === "line" || tileRuling.action.shape === "cube"
-      ? effectTiles(tileRuling.action, selectedToken ? footprint(selectedToken.x, selectedToken.y, selectedToken.size_sq, map) : [tileRuling.tile], tileRuling.tile, map, segs)
-      : [tileRuling.tile];
-    if (kind !== "dust" && kind !== "flash" && kind !== "radiant" && kind !== "necrotic" && kind !== "force" && kind !== "psychic" && kind !== "heal") {
-      setMarks((prev) => [
-        ...prev,
-        ...spots.map((tile, index) => {
-          const at = tileCenter(tile, map);
-          return { id: `${kind}-${Date.now()}-${index}`, kind, x: at.x, y: at.y, tile };
-        }),
-      ]);
-    }
-    if (target?.kind === "enemy" && target.ref_id) {
-      const foe = encounter.find((row) => row.id === target.ref_id);
-      const updated = await api.damageEnemy(target.ref_id, amount);
-      if ((updated.current_hp ?? (foe ? foe.current_hp - amount : 1)) <= 0) setDowned((prev) => [...prev, target.id]);
-      await onEncounterChange();
-    } else if (target?.kind === "npc" && target.ref_id) {
-      const npc = scene.find((row) => row.id === target.ref_id);
-      const next = Math.max(0, (npc?.current_hp ?? amount) - amount);
-      await api.setSceneNpcHp(target.ref_id, next);
-      if (next <= 0) setDowned((prev) => [...prev, target.id]);
-      await onSceneChange();
-    } else if (target?.kind === "pc" && target.ref_id) {
-      const character = characters.find((row) => row.id === target.ref_id);
-      const next = Math.max(0, (character?.current_hp ?? character?.max_hp ?? amount) - amount);
-      await api.updateCharacter(target.ref_id, { current_hp: next });
-      if (next <= 0) setDowned((prev) => [...prev, target.id]);
-      await onCharactersChange?.();
-    }
-    setTileRuling(null);
-    setDamageDraft("");
-  }
-
   const gridLines = useMemo(() => {
     if (!map || !map.show_grid_overlay) return [] as number[][];
     const lines: number[][] = [];
@@ -1311,8 +1657,12 @@ export default function MapPanel({
         />
       )}
 
-      <div className="map-body">
-        <aside className="map-tray">
+      <div
+        className="map-body"
+        ref={mapBodyRef}
+        style={{ gridTemplateColumns: `${trayW}px 8px minmax(0, 1fr) 8px ${inspectW}px` }}
+      >
+        <aside className={`map-tray${trayW < 48 ? " collapsed" : ""}`}>
           <div className="row" style={{ marginBottom: "0.4rem" }}>
             <button
               type="button"
@@ -1443,6 +1793,16 @@ export default function MapPanel({
             </>
           )}
         </aside>
+
+        <div
+          className="map-split"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the left column"
+          title="Drag to resize. Double-click to collapse."
+          onPointerDown={(event) => startSplitDrag("tray", event)}
+          onDoubleClick={() => setTrayW((width) => (width < 48 ? 240 : 0))}
+        />
 
         <div className="map-stage-wrap" ref={stageWrapRef} style={{ cursor }}>
           <div className="map-tools">
@@ -1713,7 +2073,9 @@ export default function MapPanel({
                     side={side}
                     selected={selectedTokenId === t.id}
                     acting={t.id === activeTokenId}
-                    faded={downed.includes(t.id)}
+                    faded={tokenFaded(t)}
+                    vitals={tokenVitals(t)}
+                    loss={t.ref_id ? damageShown?.[t.ref_id] : undefined}
                     draggable={tool === "select" && !armed}
                     onSelect={() => {
                       if (armed && map) {
@@ -1743,11 +2105,11 @@ export default function MapPanel({
               {map && <AimOverlay tiles={highlighted} grid={map} />}
               {map && travel && <TravelEffect travel={travel} progress={travelProgress} grid={map} />}
               <MarkLayer marks={marks} />
-              {map && tileRuling && (
+              {map && ruling?.anchor && !pendingResolve && (
                 <RulingChip
-                  x={tileCenter(tileRuling.tile, map).x}
-                  y={tileCenter(tileRuling.tile, map).y}
-                  text={tileRuling.text.split("\n")[0] || ""}
+                  x={tileCenter(ruling.anchor, map).x}
+                  y={tileCenter(ruling.anchor, map).y}
+                  text={ruling.blocked || ruling.result.roll_line || ""}
                 />
               )}
               {portalSwirl && (
@@ -1788,7 +2150,17 @@ export default function MapPanel({
           </Stage>
         </div>
 
-        <aside className="map-inspector">
+        <div
+          className="map-split"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the inspector"
+          title="Drag to resize. Double-click to collapse."
+          onPointerDown={(event) => startSplitDrag("inspect", event)}
+          onDoubleClick={() => setInspectW((width) => (width < 48 ? 300 : 0))}
+        />
+
+        <aside className={`map-inspector${inspectW < 48 ? " collapsed" : ""}`}>
           <h3>Inspector</h3>
           <p className="muted small">
             <strong>Select</strong> moves tokens. Drag empty map to slide it. <strong>Portal</strong> is one click, then
@@ -1826,8 +2198,7 @@ export default function MapPanel({
                     type="button"
                     className={`btn ghost ${armed?.id === action.id ? "active-tab" : ""}`}
                     onClick={() => {
-                      setArmed(action);
-                      setTileRuling(null);
+                      setArmed((current) => (current?.id === action.id ? null : action));
                       setHoverTile(null);
                     }}
                   >
@@ -1838,32 +2209,6 @@ export default function MapPanel({
               {armed && <p className="muted small">Click a highlighted square. Amber squares are long range.</p>}
               {armed && highlighted.length === 0 && armed.shape !== "cone" && armed.shape !== "line" && armed.shape !== "cube" && (
                 <p className="muted small">That action has no square in reach.</p>
-              )}
-              {tileRuling && (
-                <div className="map-inspector-block">
-                  <p className="small" style={{ whiteSpace: "pre-wrap" }}>{tileRuling.text}</p>
-                  <label>
-                    Damage
-                    <input value={damageDraft} onChange={(e) => setDamageDraft(e.target.value)} />
-                  </label>
-                  <button type="button" className="btn" onClick={() => void applyDamage()}>
-                    Apply
-                  </button>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => {
-                      if (map) {
-                        const at = tileCenter(tileRuling.tile, map);
-                        setMarks((prev) => [...prev, { id: `dust-${Date.now()}`, kind: "dust", x: at.x, y: at.y, tile: tileRuling.tile }]);
-                      }
-                      setTileRuling(null);
-                      setDamageDraft("");
-                    }}
-                  >
-                    Miss
-                  </button>
-                </div>
               )}
               <button type="button" className="btn ghost" onClick={() => setMarks([])}>
                 Clear marks
@@ -1994,8 +2339,34 @@ export default function MapPanel({
           )}
         </aside>
       </div>
+      {pendingResolve && (
+        <ResolveModal
+          result={pendingResolve.result}
+          blocked={pendingResolve.blocked}
+          notice={pendingResolve.notice}
+          heal={pendingResolve.heal}
+          creatures={pendingResolve.creatures}
+          characters={characters}
+          scene={scene}
+          npcs={npcs}
+          encounter={encounter}
+          monsters={monsters}
+          apiBase={API_BASE}
+          busy={applyBusy || busy}
+          onCancel={() => setPendingResolve(null)}
+          onSubmit={(rows) => void commitResolve(rows)}
+        />
+      )}
     </div>
   );
+}
+
+function hpBarFill(current: number, max: number): string {
+  if (max <= 0) return "#d1242f";
+  const ratio = current / max;
+  if (ratio > 0.5) return "#2ea043";
+  if (ratio > 0.2) return "#e6a317";
+  return "#d1242f";
 }
 
 function TokenNode({
@@ -2004,6 +2375,8 @@ function TokenNode({
   selected,
   acting,
   faded,
+  vitals,
+  loss,
   draggable,
   onSelect,
   onDragEnd,
@@ -2013,6 +2386,8 @@ function TokenNode({
   selected: boolean;
   acting?: boolean;
   faded?: boolean;
+  vitals: { current: number; max: number; temp: number } | null;
+  loss?: number;
   draggable: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
@@ -2051,6 +2426,16 @@ function TokenNode({
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const barH = Math.max(5, Math.min(9, side * 0.1));
+  const hpText = vitals
+    ? vitals.temp
+      ? `${vitals.current}/${vitals.max} +${vitals.temp}`
+      : `${vitals.current}/${vitals.max}`
+    : "";
+  const hpSize = Math.max(9, Math.min(13, side * 0.16));
+  const showLoss = loss != null && loss > 0;
+  const nameY = vitals ? side + barH + hpSize + (showLoss ? hpSize + 2 : 0) + 4 : side + 2;
+  const fillWidth = vitals ? Math.max(0, Math.min(side, (vitals.current / vitals.max) * side)) : 0;
   return (
     <Group
       x={token.x}
@@ -2121,10 +2506,53 @@ function TokenNode({
           )}
         </>
       )}
+      {vitals && (
+        <>
+          <Rect
+            y={side + 2}
+            width={side}
+            height={barH}
+            fill="#12151c"
+            stroke="#2a2f3a"
+            strokeWidth={1}
+            cornerRadius={barH / 2}
+            listening={false}
+          />
+          <Rect
+            y={side + 3}
+            width={fillWidth}
+            height={Math.max(1, barH - 2)}
+            fill={hpBarFill(vitals.current, vitals.max)}
+            cornerRadius={barH / 2}
+            listening={false}
+          />
+          <Text
+            text={hpText}
+            width={side}
+            y={side + barH + 2}
+            fontSize={hpSize}
+            fill={hpBarFill(vitals.current, vitals.max)}
+            align="center"
+            listening={false}
+          />
+          {showLoss && (
+            <Text
+              text={`−${loss}`}
+              width={side}
+              y={side + barH + hpSize + 2}
+              fontSize={hpSize}
+              fill="#ff6a4d"
+              fontStyle="bold"
+              align="center"
+              listening={false}
+            />
+          )}
+        </>
+      )}
       <Text
         text={token.label}
         width={side}
-        y={side + 2}
+        y={nameY}
         fontSize={Math.max(10, side * 0.22)}
         fill="#eee"
         align="center"

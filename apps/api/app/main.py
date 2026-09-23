@@ -119,6 +119,7 @@ app.mount(
 class QueryRequest(BaseModel):
     text: str
     character_id: str | None = None
+    source: str | None = None
 
 
 class SettingsPatch(BaseModel):
@@ -588,7 +589,7 @@ async def upload_character(
 def query(body: QueryRequest) -> dict[str, Any]:
     if not body.text.strip():
         raise HTTPException(400, "Query text required")
-    return query_engine.resolve_query(body.text.strip(), body.character_id)
+    return query_engine.resolve_query(body.text.strip(), body.character_id, body.source or "console")
 
 
 class SessionCreate(BaseModel):
@@ -634,8 +635,79 @@ def remove_session(session_id: str) -> dict[str, bool]:
 
 
 @app.get("/sessions/active/events")
-def session_events() -> list[dict[str, Any]]:
-    return db.list_events()
+def session_events(limit: int = 200) -> list[dict[str, Any]]:
+    return db.list_events(limit=max(1, min(limit, 500)))
+
+
+class StoryNote(BaseModel):
+    text: str
+    outcome: str
+    source: str | None = None
+
+
+@app.post("/sessions/active/notes")
+def story_note(body: StoryNote) -> dict[str, Any]:
+    if not body.text.strip() or not body.outcome.strip():
+        raise HTTPException(400, "A note needs the input and the outcome.")
+    return db.add_event(
+        body.text.strip(),
+        {
+            "check_type": "note",
+            "roll_line": body.outcome.strip(),
+            "notes": "",
+            "confidence": 1,
+            "source": "rules",
+        },
+        body.source or "console",
+    )
+
+
+class SaveName(BaseModel):
+    name: str
+
+
+@app.get("/saves")
+def get_saves() -> list[dict[str, str]]:
+    from .session_save import list_saves
+
+    return list_saves()
+
+
+@app.post("/saves")
+def create_save(body: SaveName) -> dict[str, Any]:
+    from .session_save import write_save
+
+    try:
+        return write_save(body.name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/saves/load")
+def load_named_save(body: SaveName) -> dict[str, Any]:
+    from .session_save import load_save
+
+    try:
+        return load_save(body.name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/sessions/active/export")
+def export_session() -> dict[str, Any]:
+    from .session_save import export_active
+
+    return export_active()
+
+
+@app.post("/sessions/active/restore")
+def restore_session(body: dict[str, Any]) -> dict[str, Any]:
+    from .session_save import restore_active
+
+    try:
+        return restore_active(body)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 class SpawnRequest(BaseModel):

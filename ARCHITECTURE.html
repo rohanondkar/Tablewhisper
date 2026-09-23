@@ -101,7 +101,7 @@
     <div class="pipe">
       <div class="box ui" id="electron"><strong>Electron</strong><span>Starts the API. Ctrl+N captures voice.</span></div>
       <div class="arrow-h">→</div>
-      <div class="box ui hub" id="app"><strong>App.tsx</strong><span>Console and Map. Port 5173.</span></div>
+      <div class="box ui hub" id="app"><strong>App.tsx</strong><span>Console, Map, and the Log book. Port 5173.</span></div>
       <div class="arrow-h">→</div>
       <div class="box ui" id="apits"><strong>api.ts</strong><span>The only client of the API.</span></div>
       <div class="arrow-h">→</div>
@@ -114,13 +114,13 @@
       <h2>Screens</h2>
       <div class="grid g8">
         <div class="box ui"><strong>Party</strong><span>PDF sheets</span></div>
-        <div class="box ui"><strong>Resolve</strong><span>Ruling card</span></div>
+        <div class="box ui"><strong>Resolve</strong><span>DM types the d20. The card rolls printed damage.</span></div>
         <div class="box ui"><strong>Foes</strong><span>Encounter</span></div>
         <div class="box ui"><strong>Scene</strong><span>Social NPCs</span></div>
         <div class="box ui"><strong>Pictures</strong><span>Uploads</span></div>
-        <div class="box ui"><strong>Log</strong><span>Past rulings</span></div>
+        <div class="box ui"><strong>Log</strong><span>Book. Newest page is n/n</span></div>
         <div class="box ui"><strong>XP</strong><span>Awards</span></div>
-        <div class="box ui"><strong>Map</strong><span>Grid and tokens</span></div>
+        <div class="box ui"><strong>Map</strong><span>Grid, tokens, same resolve card</span></div>
       </div>
     </section>
 
@@ -143,6 +143,10 @@
           <div class="box api"><strong>portraits</strong><span>Character images</span></div>
           <div class="box api"><strong>token_art</strong><span>Default token faces</span></div>
         </div>
+        <div class="grid g5">
+          <div class="box api"><strong>session_save</strong><span>Named copies in data/savedata</span></div>
+          <div class="box api"><strong>gear_images</strong><span>Weapons, packs, potions, and other gear</span></div>
+        </div>
       </div>
     </section>
 
@@ -159,9 +163,11 @@
           <div class="box opt"><strong>Ollama</strong><span>Only when the rules are unsure</span></div>
         </div>
         <div class="pair">
-          <div class="box api"><strong>maps, pdf, xp, log</strong><span>Session state</span></div>
+          <div class="box api"><strong>maps, pdf, xp, log, saves</strong><span>Session state. Events remember console or map.</span></div>
           <div class="stem"></div>
           <div class="box data"><strong>SQLite</strong><span>Sheets, events, foes, scene, map tables</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>savedata</strong><span>Named JSON. Maps stay in SQLite.</span></div>
         </div>
         <div class="pair">
           <div class="box api"><strong>monsters</strong><span>Spawn and match foes</span></div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Arc, Circle, Group, Line, Rect, Text } from "react-konva";
+import type { CheckResult } from "../api";
 import type { Seg } from "./vision";
 
 export type Tile = { c: number; r: number };
@@ -85,10 +86,10 @@ const THROWN_RANGE: Record<string, [number, number]> = {
 
 export const SPELLS: MapAction[] = [
   spell("fire-bolt", "Fire bolt", "ray", "fire", "ray", 0, 120, 120, 0, null),
-  spell("fireball", "Fireball", "burst", "fire", "burst", 0, 150, 150, 20, "Dexterity saving throw. DC 15."),
-  spell("burning-hands", "Burning hands", "cone", "fire", "cone", 0, 0, 0, 15, "The DC is not on the sheet."),
-  spell("lightning-bolt", "Lightning bolt", "line", "lightning", "line", 0, 0, 0, 100, "The DC is not on the sheet."),
-  spell("thunderwave", "Thunderwave", "cube", "thunder", "cube", 0, 0, 0, 15, "The DC is not on the sheet."),
+  spell("fireball", "Fireball", "burst", "fire", "burst", 0, 150, 150, 20, null),
+  spell("burning-hands", "Burning hands", "cone", "fire", "cone", 0, 0, 0, 15, null),
+  spell("lightning-bolt", "Lightning bolt", "line", "lightning", "line", 0, 0, 0, 100, null),
+  spell("thunderwave", "Thunderwave", "cube", "thunder", "cube", 0, 0, 0, 15, null),
   spell("cure-wounds", "Cure wounds", "heal", "healing", "heal", 5, 5, 5, 0, null),
 ];
 
@@ -370,14 +371,167 @@ export function actionsFor(
   return list;
 }
 
-export function attackSentence(actor: string, action: MapAction, target: string, far: boolean): string {
+export function rulingSentence(actor: string, action: MapAction, target: string, far: boolean): string {
   if (action.family === "social") {
     const verb =
       action.label === "Persuade" ? "persuades" : action.label === "Intimidate" ? "intimidates" : "deceives";
     return `${actor} ${verb} ${target}`;
   }
+  if (action.id === "second-wind" || action.id === "hunters-mark") {
+    return `${actor} uses ${action.label}`;
+  }
+  if (!action.sentence) {
+    return `${actor} casts ${action.label} at ${target}`;
+  }
   const weapon = action.label.replace(/ \(thrown\)$/i, "");
   return `${actor} attacks ${target} with a ${weapon}${far ? " at long range" : ""}`;
+}
+
+export function attackSentence(actor: string, action: MapAction, target: string, far: boolean): string {
+  return rulingSentence(actor, action, target, far);
+}
+
+export type RulingCreature = {
+  key: string;
+  tokenId: string | null;
+  refId: string | null;
+  kind: string;
+  label: string;
+  tile: Tile | null;
+};
+
+export type MarkPulse = {
+  id: number;
+  miss: boolean;
+  heal: boolean;
+  damageType: string;
+  tile: Tile | null;
+  tokenId: string | null;
+  downed: boolean;
+};
+
+export type MapRuling = {
+  id: number;
+  result: CheckResult;
+  blocked: string | null;
+  action: MapAction | null;
+  creatures: RulingCreature[];
+  tiles: Tile[];
+  anchor: Tile | null;
+  heal: boolean;
+};
+
+export function rangeGate(
+  action: MapAction,
+  from: Tile[],
+  to: Tile,
+  grid: Grid,
+  segs: Seg[]
+): { play: boolean; far: boolean; blocked: string | null } {
+  const feet = Math.max(1, grid.feet_per_square);
+  const distSq = chebyshev(from, to);
+  const distFt = distSq * feet;
+  const origin = tileCenter(from[0], grid);
+  const aim = tileCenter(to, grid);
+  const walled = distSq > 0 && crossesWall(origin, aim, segs);
+  if (action.shape === "social") return { play: true, far: false, blocked: null };
+  if (action.shape === "heal") {
+    if (action.rangeFt <= 0) {
+      const self = from.some((tile) => tile.c === to.c && tile.r === to.r);
+      return self
+        ? { play: true, far: false, blocked: null }
+        : { play: false, far: false, blocked: "That reaches only the creature using it." };
+    }
+    if (walled) return { play: false, far: false, blocked: "A wall is between them." };
+    if (distFt > action.rangeFt) {
+      return { play: false, far: false, blocked: `They are ${distFt} feet apart. This reaches ${action.rangeFt} feet.` };
+    }
+    return { play: true, far: false, blocked: null };
+  }
+  if (action.shape === "melee") {
+    const reachSq = Math.max(1, Math.round((action.reachFt || 5) / feet));
+    if (walled) return { play: false, far: false, blocked: "A wall is between them." };
+    if (distSq > reachSq) {
+      return {
+        play: false,
+        far: false,
+        blocked: `They are ${distFt} feet apart. This weapon reaches ${action.reachFt || 5} feet.`,
+      };
+    }
+    return { play: true, far: false, blocked: null };
+  }
+  if (action.shape === "cone" || action.shape === "line" || action.shape === "cube") {
+    const reach = action.radiusFt || 0;
+    if (reach > 0 && distFt > reach) {
+      return {
+        play: false,
+        far: false,
+        blocked: `That is ${distFt} feet away. This reaches ${reach} feet.`,
+      };
+    }
+    return { play: true, far: false, blocked: null };
+  }
+  const limit = action.longFt || action.rangeFt || action.reachFt;
+  const normal = action.rangeFt || limit;
+  const shot = action.shape === "ranged" || action.shape === "thrown" || action.shape === "ray";
+  if (shot && walled) return { play: false, far: false, blocked: "A wall is between them." };
+  if (limit > 0 && distFt > limit) {
+    return { play: false, far: false, blocked: `That is ${distFt} feet away. This reaches ${limit} feet.` };
+  }
+  const far = shot && normal > 0 && distFt > normal;
+  return { play: true, far, blocked: null };
+}
+
+const EXTRA_WEAPONS = [
+  "morningstar",
+  "quarterstaff",
+  "greatsword",
+  "longsword",
+  "shortsword",
+  "battleaxe",
+  "greataxe",
+  "handaxe",
+  "warhammer",
+  "club",
+  "mace",
+  "rapier",
+  "scimitar",
+  "flail",
+  "maul",
+  "spear",
+];
+
+export function actionFromQuery(text: string, checkType: string, weaponLabel?: string | null): MapAction | null {
+  const low = text.toLowerCase();
+  const spells = [...SPELLS].sort((a, b) => b.label.length - a.label.length);
+  for (const spell of spells) {
+    const name = spell.label.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`\\b${name}\\b`).test(low)) return spell;
+  }
+  if (/\bsecond wind\b/.test(low)) return namedOnSheet("second wind")[0] || null;
+  if (/hunter['’]?s mark/.test(low)) return namedOnSheet("hunter's mark")[0] || null;
+  if (/\b(persuade|persuades|persuasion)\b/.test(low)) return socialActions()[0];
+  if (/\b(intimidate|intimidates|intimidation)\b/.test(low)) return socialActions()[1];
+  if (/\b(deceive|deceives|deception)\b/.test(low)) return socialActions()[2];
+  if (checkType !== "attack") return null;
+  if (/\b(slaps?|slapping|punches?|punching|kicks?|kicking|headbutts?|headbutting|unarmed)\b/.test(low)) {
+    const armed = EXTRA_WEAPONS.concat(Object.keys(RANGED), Object.keys(THROWN_RANGE), [...REACH]).some((word) =>
+      low.includes(word)
+    );
+    if (!armed) return actionFromAttack("Unarmed", "bludgeoning", 0, false);
+  }
+  const words = EXTRA_WEAPONS.concat(Object.keys(RANGED), Object.keys(THROWN_RANGE), [...REACH]).sort(
+    (a, b) => b.length - a.length
+  );
+  const fromResult = (weaponLabel || "").toLowerCase();
+  const named = words.find((word) => low.includes(word) || fromResult.includes(word)) || fromResult || "club";
+  const key = weaponName(named);
+  const thrown = /\bthrows?\b|\bthrown\b/.test(low);
+  if (thrown && THROWN_RANGE[key]) return actionFromAttack(named, undefined, 0, true);
+  if (RANGED[key] || /\b(shoots?|shooting|bow|crossbow|blowgun)\b/.test(low)) {
+    return actionFromAttack(named, undefined, 0, false);
+  }
+  return actionFromAttack(named, undefined, 0, false);
 }
 
 export function socialActions(): MapAction[] {

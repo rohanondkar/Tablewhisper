@@ -82,6 +82,9 @@ def init_db() -> None:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(sessions)").fetchall()}
         if "name" not in cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN name TEXT NOT NULL DEFAULT 'Session'")
+        event_cols = {r[1] for r in conn.execute("PRAGMA table_info(events)").fetchall()}
+        if "source" not in event_cols:
+            conn.execute("ALTER TABLE events ADD COLUMN source TEXT NOT NULL DEFAULT 'console'")
         defaults = {
             "active_ruleset": DEFAULT_RULESET,
             "ollama_model": DEFAULT_OLLAMA_MODEL,
@@ -291,19 +294,36 @@ def delete_session(session_id: str) -> bool:
         return True
 
 
-def add_event(query: str, result: dict[str, Any]) -> dict[str, Any]:
+_event_origin: str = "console"
+
+
+def push_event_origin(origin: str) -> str:
+    global _event_origin
+    previous = _event_origin
+    _event_origin = origin if origin in ("console", "map") else "console"
+    return previous
+
+
+def pop_event_origin(previous: str) -> None:
+    global _event_origin
+    _event_origin = previous if previous in ("console", "map") else "console"
+
+
+def add_event(query: str, result: dict[str, Any], origin: str | None = None) -> dict[str, Any]:
     sid = active_session_id()
+    source = origin if origin in ("console", "map") else _event_origin
     event = {
         "id": str(uuid.uuid4()),
         "session_id": sid,
         "created_at": utcnow(),
         "query": query,
         "result": result,
+        "source": source,
     }
     with db() as conn:
         conn.execute(
-            "INSERT INTO events(id, session_id, created_at, query, result_json) VALUES (?, ?, ?, ?, ?)",
-            (event["id"], sid, event["created_at"], query, json.dumps(result)),
+            "INSERT INTO events(id, session_id, created_at, query, result_json, source) VALUES (?, ?, ?, ?, ?, ?)",
+            (event["id"], sid, event["created_at"], query, json.dumps(result), source),
         )
     return event
 
@@ -313,7 +333,7 @@ def list_events(limit: int = 40, session_id: str | None = None) -> list[dict[str
     with db() as conn:
         rows = conn.execute(
             """
-            SELECT id, session_id, created_at, query, result_json
+            SELECT id, session_id, created_at, query, result_json, source
             FROM events WHERE session_id = ?
             ORDER BY created_at ASC
             LIMIT ?
@@ -326,6 +346,7 @@ def list_events(limit: int = 40, session_id: str | None = None) -> list[dict[str
                 "session_id": r["session_id"],
                 "created_at": r["created_at"],
                 "query": r["query"],
+                "source": r["source"] or "console",
                 "result": json.loads(r["result_json"]),
             }
             for r in rows

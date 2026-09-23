@@ -350,7 +350,18 @@ export interface SessionEvent {
   session_id: string;
   created_at: string;
   query: string;
+  source?: "console" | "map" | string;
   result: CheckResult;
+}
+
+export interface SessionSave {
+  kind: "tablewhisper-session";
+  name: string;
+  saved_at: string;
+  characters: Character[];
+  encounter: EncounterEnemy[];
+  scene: SceneNpc[];
+  events: SessionEvent[];
 }
 
 export interface RulesetSummary {
@@ -448,11 +459,11 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<CharacterPreview>;
   },
-  query: (text: string, characterId?: string | null) =>
+  query: (text: string, characterId?: string | null, source?: "console" | "map") =>
     request<CheckResult>("/query", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, character_id: characterId || null }),
+      body: JSON.stringify({ text, character_id: characterId || null, source: source || "console" }),
     }),
   capture: () =>
     request<{ transcript: string; result: CheckResult }>("/voice/capture", {
@@ -461,7 +472,26 @@ export const api = {
   listRulesets: () => request<RulesetSummary[]>("/rulesets"),
   setRuleset: (id: string) =>
     request<{ ok: boolean; active: string }>(`/rulesets/${id}/activate`, { method: "POST" }),
-  sessionEvents: () => request<SessionEvent[]>("/sessions/active/events"),
+  sessionEvents: () => request<SessionEvent[]>("/sessions/active/events?limit=200"),
+  storyNote: (text: string, outcome: string, source: "console" | "map") =>
+    request<SessionEvent>("/sessions/active/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, outcome, source }),
+    }),
+  listSaves: () => request<{ name: string; saved_at: string }[]>("/saves"),
+  saveGame: (name: string) =>
+    request<{ ok: boolean; name: string; saved_at: string }>("/saves", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
+  loadGame: (name: string) =>
+    request<{ ok: boolean; characters: number; encounter: number; scene: number }>("/saves/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
   listSessions: () => request<SessionInfo[]>("/sessions"),
   newSession: (name?: string) =>
     request<SessionInfo>("/sessions", {

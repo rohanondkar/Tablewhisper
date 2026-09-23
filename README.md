@@ -62,7 +62,9 @@ Menu:
 | **3** | Show commands |
 | **4** | Health check |
 | **5** | Discord VC bot (local only; not in this repo) |
-| **6** | Quit — stops the API and UI and frees ports |
+| **6** | Reset the API — stop whatever is on port 8766 and start it again |
+| **7** | Bring the console window forward, or open it |
+| **8** | Quit — stops the API and UI and frees ports |
 
 ### Manual — two cmd windows
 
@@ -173,7 +175,7 @@ Carry capacity is Strength × 15 lb for a Medium creature. Small is half of that
 
 The footer shows filled cells, the bag's pound cap, and body weight.
 
-Pictures come from the bundled set (PHB weapons, armor, and packs). Uploading a picture for an item name replaces the bundled one. An equipped weapon shows a hand holding it. An empty hand uses a sculpt for that species. Skin-tone swatches and the R, G, and B sliders recolor the hand and leave the weapon's colors alone. The tone is saved on the character.
+Pictures come from the bundled set: PHB weapons, armor, and packs, plus potions, elixirs, scrolls, rings, wands, torches, rope, rations, gems, oil, and a generic item when nothing more specific matches. Uploading a picture for an item name replaces the bundled one. An equipped weapon shows a hand holding it. An empty hand uses a sculpt for that species. Skin-tone swatches and the R, G, and B sliders recolor the hand and leave the weapon's colors alone. The tone is saved on the character.
 
 A Beyond PDF fills the bag from an Equipment field. Feature and action text stays on the sheet.
 
@@ -209,11 +211,21 @@ Open **Map** in the top bar. This is a DM-only battle map for screen share. Play
 
 Tools along the map: **Select**, **Ruler**, **Fog**, **Reveal**, **Wall**, **Door**, **Light**, **Portal**. Drag an empty part of the map to slide it. Hold Space or the middle mouse button to slide from anywhere. Drag tokens; they snap to the grid. Footprint follows 5e size (Medium is 1 square, Gargantuan is 4).
 
-Select a token and pick an attack, spell, or action that sheet actually has. A player gets the attack table, weapons in hand, and named features such as Second Wind or Hunter's Mark. A monster gets its stat-block attacks. A scene NPC gets those attacks plus Persuade, Intimidate, and Deceive. Highlighted squares are in reach. Amber squares are long range. The tile shows the same ruling as the console. **Apply** subtracts the number you rolled. **Miss** leaves hit points alone. Blood, scorch, and frost stay on the square until **Clear marks** or you change scenes. Portals swirl in place. A token that drops to 0 HP fades and stays on the map.
+Select a token and pick an attack, spell, or action that sheet actually has. A player gets the attack table, weapons in hand, and named features such as Second Wind or Hunter's Mark. A monster gets its stat-block attacks. A scene NPC gets those attacks plus Persuade, Intimidate, and Deceive. Clicking the same attack again deselects it. Highlighted squares are in reach. Amber squares are long range. The tile opens the same resolve card as the console.
+
+The API does not roll dice and does not decide hit or miss. You type the d20 and press **Submit**. A weapon attack hits on a natural 20, misses on a natural 1, and otherwise hits when the face meets the number needed against AC. A spell is a saving throw: if a player cast it, the NPC rolls; if a monster cast it, the player rolls. On a weapon hit or a failed save, the card rolls the printed damage and shows that number on the creature, on the party or foe card, and on the map token. A number in additional info is used instead of the formula. A successful save leaves hit points alone unless the ruling says half. A miss leaves a dust puff and the same hit points. Blood, scorch, and frost stay on the square until **Clear marks** or you change scenes. Portals swirl in place. A token that drops to 0 HP fades and stays on the map.
 
 **Roll initiative** lines up the party, the encounter, and scene NPCs. The current actor is the large portrait. Everyone still waiting this round sits to the right, and anyone who already acted shows again under Next round. Players use the initiative on the sheet. For a monster or NPC, type the Dexterity modifier from the stat block, then roll. **Next** steps through the round. A character with Initiative Swap can trade results with an ally. Ties go to the higher modifier.
 
 Token art comes from `packages\token-portraits`. A custom upload in **Pictures** wins. A player character with no portrait stays an initials tile on the map and on the ruling card.
+
+### Log
+
+**Log** in the top bar is a book for the story, separate from the short list on the right rail. It opens on a leather cover with the session name. **Open** turns the cover onto one parchment page. Each page is one thing that was typed in the console or on the map, and what came of it. The newest page is **n/n** (40/40 when there are 40 entries). **Older** counts down until the first entry is **1/n**. **Cover** closes the book.
+
+### Save
+
+**Save** asks for a name in the app and writes `data\savedata\<name>.json`. **Load** lists that folder. The same name overwrites. A save keeps party hit points, armor class, experience, temporary hit points, the encounter, the scene, and the log. Maps stay in the database and are not copied into the file. Loading puts those values back on the characters that are already in the party.
 
 ### Pictures
 
@@ -231,21 +243,21 @@ The right column uses tabs so you are not scrolling through everything at once:
 |-----|---------|
 | **Foes** | Active combat enemies. **Add foe** opens a modal (filter 322 SRD monsters → Spawn, or Custom monster). |
 | **Scene** | Friendly / social cast (bartender, innkeeper, …). **Add NPC** opens a modal (filter → Spawn, or Custom NPC). |
-| **Log** | Session memory of past rulings. |
+| **Log** | Short list of past rulings. The top-bar **Log** is the book. |
 
 Naming a creature or NPC in the query can also spawn/match them.
 
 ### Quit
 
 - In-app **Quit** calls the API shutdown path and stops the API and UI (ports 8766 and 5173).
-- Or run `scripts\quit-dm.bat` / launcher menu **6**.
+- Or run `scripts\quit-dm.bat` / launcher menu **8**. Menu **6** only restarts the API. Menu **7** brings the console window forward.
 - Option **1** does not open extra consoles. Output is in `data\logs\api.log` and `data\logs\ui.log`.
 
 ---
 
 ## Stop
 
-Prefer in-app **Quit** or `start-dev.bat` → **6**.  
+Prefer in-app **Quit** or `start-dev.bat` → **8**.  
 The manual two-window commands below still stop with `Ctrl+C`.
 
 ---
@@ -278,8 +290,9 @@ py -3 -m venv .venv
 
 | Path | What |
 |------|------|
-| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs, battle maps, bags) |
-| `apps\api\app\gear_art` | Bundled weapon, armor, pack, and hand pictures |
+| `apps\api` | FastAPI backend (characters, query, voice, monsters, scene NPCs, battle maps, bags, saves) |
+| `apps\api\app\session_save.py` | Named session files in `data\savedata` |
+| `apps\api\app\gear_art` | Bundled weapon, armor, pack, gear, and hand pictures |
 | `apps\desktop` | React + Electron UI (console and map) |
 | `packages\rules-dnd5e` | 5e SRD rules, DC ladder, and check-verb guidance |
 | `packages\monsters-srd` | All 322 WOTC SRD 5.1 monsters (Open5e; not full DDB) |
@@ -288,7 +301,8 @@ py -3 -m venv .venv
 | `scripts\import_open5e_monsters.py` | Re-fetch SRD monster pack |
 | `scripts\quit-dm.bat` / `quit-dm.ps1` | Force-close API/UI terminals + free ports |
 | `packages\rules-custom-blank` | Template for next game |
-| `data\` | SQLite + uploads (runtime; not committed) |
+| `data\` | SQLite, uploads, and `data\savedata` (runtime; not committed) |
+| `scripts\reset-api.ps1` | Stop port 8766 and start the API again (launcher option **6**) |
 | `fixtures\` | Sample Beyond PDF |
 | `start-dev.bat` | One-click launcher |
 | `ARCHITECTURE.html` | Box diagram as code (open in a browser). `ARCHITECTURE.png` is the picture shown above. |

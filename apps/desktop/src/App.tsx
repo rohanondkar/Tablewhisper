@@ -5,7 +5,6 @@ import {
   type Character,
   type CharacterChange,
   type CharacterPreview,
-  type CheckParticipant,
   type CheckResult,
   type EncounterEnemy,
   type MonsterTemplate,
@@ -19,10 +18,158 @@ import {
 import InventoryModal from "./InventoryModal";
 import MapPanel from "./map/MapPanel";
 import MapErrorBoundary from "./map/MapErrorBoundary";
+import { HitEntry } from "./map/ResolveModal";
+import ResolveCard from "./map/ResolveCard";
+import type { MapRuling, MarkPulse, RulingCreature } from "./map/effects";
 import PicturesPanel from "./map/PicturesPanel";
 import { CREATURE_SIZES } from "./map/sizes";
 
 const API_BASE = "http://127.0.0.1:8766";
+
+function logWhen(iso: string): { day: string; time: string } {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return { day: "", time: "" };
+  return {
+    day: date.toLocaleDateString(undefined, { month: "long", day: "numeric" }),
+    time: date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+  };
+}
+
+function LogEntry({ event }: { event: SessionEvent }) {
+  const when = logWhen(event.created_at);
+  return (
+    <>
+      {when.day ? <h3 className="story-day">{when.day}</h3> : null}
+      <article className="story-row">
+        <div className="story-when">
+          <span>{when.time}</span>
+          <span className="story-from">{event.source === "map" ? "Map" : "Console"}</span>
+        </div>
+        <div>
+          <p className="story-in">{event.query}</p>
+          {event.result?.roll_line ? <p className="story-out">{event.result.roll_line}</p> : null}
+        </div>
+      </article>
+    </>
+  );
+}
+
+function LogPage({
+  events,
+  sessionName,
+  entryId,
+  pinned,
+  turn,
+  leaving,
+  onTurn,
+  onLeaveDone,
+}: {
+  events: SessionEvent[];
+  sessionName: string;
+  entryId: string | null;
+  pinned: boolean;
+  turn: "" | "older" | "newer";
+  leaving: SessionEvent | null;
+  onTurn: (direction: "older" | "newer", nextId: string, stayOnNewest: boolean, shown: SessionEvent) => void;
+  onLeaveDone: () => void;
+}) {
+  const [opened, setOpened] = useState(false);
+  const [coverAnim, setCoverAnim] = useState<"" | "opening" | "closing">("");
+  const ordered = useMemo(() => [...events].reverse(), [events]);
+  const found = entryId ? ordered.findIndex((row) => row.id === entryId) : -1;
+  const index = pinned || found < 0 ? 0 : found;
+  const entry = ordered[index];
+  const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function openCover() {
+    if (coverAnim === "opening") return;
+    if (reduceMotion()) {
+      setOpened(true);
+      return;
+    }
+    setCoverAnim("opening");
+  }
+
+  function closeCover() {
+    if (reduceMotion()) {
+      setOpened(false);
+      setCoverAnim("");
+      return;
+    }
+    setOpened(false);
+    setCoverAnim("closing");
+  }
+
+  function go(direction: "older" | "newer") {
+    if (!entry) return;
+    const nextIndex = direction === "older" ? index + 1 : index - 1;
+    const next = ordered[nextIndex];
+    if (!next) return;
+    onTurn(direction, next.id, nextIndex === 0, entry);
+  }
+
+  return (
+    <main className="log-page">
+      <div className={`book${opened ? " is-open" : ""}`}>
+        {!opened && (
+          <button
+            type="button"
+            className={`book-cover${coverAnim ? ` ${coverAnim}` : ""}`}
+            onClick={openCover}
+            onAnimationEnd={() => {
+              if (coverAnim === "opening") setOpened(true);
+              if (coverAnim === "closing") setCoverAnim("");
+            }}
+          >
+            <span className="book-spine" />
+            <span className="book-cover-face">
+              <span className="book-rule" />
+              <span className="book-kicker">A record of the table</span>
+              <h2>Log</h2>
+              <p>{sessionName}</p>
+              <span className="book-rule" />
+              <span className="book-open-label">Open</span>
+            </span>
+          </button>
+        )}
+        {opened && (
+          <div className="book-spread">
+            <div className="log-turn book-pages">
+              {!entry ? (
+                <div className="story-page parchment">
+                  <p className="log-empty">The pages are still blank.</p>
+                </div>
+              ) : (
+                <>
+                  {leaving ? (
+                    <div className={`story-page parchment leaving turn-${turn}`} onAnimationEnd={onLeaveDone}>
+                      <LogEntry event={leaving} />
+                    </div>
+                  ) : null}
+                  <div key={entry.id} className={`story-page parchment${turn ? ` turn-${turn}` : ""}`}>
+                    <LogEntry event={entry} />
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="log-nav">
+              <button type="button" className="btn ghost" onClick={closeCover}>
+                Cover
+              </button>
+              <button type="button" className="btn ghost" disabled={!entry || index >= ordered.length - 1} onClick={() => go("older")}>
+                Older
+              </button>
+              <span>{entry ? `${ordered.length - index}/${ordered.length}` : "Empty"}</span>
+              <button type="button" className="btn ghost" disabled={!entry || index <= 0} onClick={() => go("newer")}>
+                Newer
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
 
 function initialsFor(label: string): string {
   return (
@@ -32,30 +179,6 @@ function initialsFor(label: string): string {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "?"
-  );
-}
-
-function InvolvedFace({
-  label,
-  imageUrl,
-  apiBase,
-}: {
-  label: string;
-  imageUrl?: string | null;
-  apiBase: string;
-}) {
-  const [broken, setBroken] = useState(false);
-  const src = imageUrl && !broken ? mediaUrlSync(imageUrl, apiBase) : "";
-  if (!src) {
-    return <div className="avatar initials involved-face">{initialsFor(label)}</div>;
-  }
-  return (
-    <img
-      className="involved-face"
-      src={src}
-      alt={label}
-      onError={() => setBroken(true)}
-    />
   );
 }
 
@@ -108,37 +231,6 @@ function PartyAvatar({
         }}
       />
     </label>
-  );
-}
-
-function roleLabel(role: string): string {
-  if (role === "rolling") return "Rolling";
-  if (role === "target") return "Target";
-  return "Subject";
-}
-
-function catalogPortrait(
-  person: CheckParticipant & { templateId?: string | null },
-  characters: Character[],
-  scene: SceneNpc[],
-  npcs: NpcTemplate[],
-  encounter: EncounterEnemy[],
-  monsters: MonsterTemplate[]
-): string | null {
-  if (person.image_url) return person.image_url;
-  const name = person.label.toLowerCase();
-  const ids = [person.id, person.templateId].filter((id): id is string => Boolean(id));
-  const hasId = (id: string | null | undefined) => Boolean(id && ids.includes(id));
-  return (
-    characters.find((c) => hasId(c.id) || c.name.toLowerCase() === name)?.image_url ||
-    scene.find(
-      (s) => hasId(s.id) || hasId(s.npc_id) || s.label.toLowerCase() === name || s.name.toLowerCase() === name
-    )?.image_url ||
-    npcs.find((n) => hasId(n.id) || n.name.toLowerCase() === name)?.image_url ||
-    encounter.find((e) => hasId(e.id) || hasId(e.monster_id) || e.label.toLowerCase() === name)
-      ?.image_url ||
-    monsters.find((m) => hasId(m.id) || m.name.toLowerCase() === name)?.image_url ||
-    null
   );
 }
 
@@ -215,6 +307,10 @@ export default function App() {
   const [npcFilter, setNpcFilter] = useState("");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<CheckResult | null>(null);
+  const [mapRuling, setMapRuling] = useState<MapRuling | null>(null);
+  const [queryPulse, setQueryPulse] = useState<{ id: number; text: string; result: CheckResult } | null>(null);
+  const [markPulse, setMarkPulse] = useState<MarkPulse | null>(null);
+  const [damageShown, setDamageShown] = useState<Record<string, number>>({});
   const [transcript, setTranscript] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -241,7 +337,15 @@ export default function App() {
   });
   const [apiBase, setApiBase] = useState(API_BASE);
   const [rightTab, setRightTab] = useState<"foes" | "scene" | "log" | "pictures">("foes");
-  const [viewMode, setViewMode] = useState<"console" | "map">("console");
+  const [viewMode, setViewMode] = useState<"console" | "map" | "log">("console");
+  const [logId, setLogId] = useState<string | null>(null);
+  const [logTurn, setLogTurn] = useState<"" | "older" | "newer">("");
+  const [logLeaving, setLogLeaving] = useState<SessionEvent | null>(null);
+  const logPinned = useRef(true);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [loadOpen, setLoadOpen] = useState(false);
+  const [saves, setSaves] = useState<{ name: string; saved_at: string }[]>([]);
   const [addModal, setAddModal] = useState<null | "monster" | "npc">(null);
   const [showCustomInModal, setShowCustomInModal] = useState(false);
   const [spawnTune, setSpawnTune] = useState({ cr: "0", xp: 10, ac: 10, hp: 10 });
@@ -262,41 +366,6 @@ export default function App() {
     () => characters.find((c) => c.id === selectedId) || null,
     [characters, selectedId]
   );
-  const involved = useMemo(() => {
-    if (!result) return [] as CheckParticipant[];
-    const raw: Array<CheckParticipant & { templateId?: string | null }> =
-      result.participants && result.participants.length > 0
-        ? result.participants
-        : [
-            ...(result.character
-              ? [
-                  {
-                    id: result.character_id,
-                    label: result.character,
-                    role: "rolling",
-                    kind: "character",
-                    image_url: null,
-                  },
-                ]
-              : []),
-            ...(result.target
-              ? [
-                  {
-                    id: result.target.id,
-                    label: result.target.label,
-                    role: result.check_type === "attack" ? "target" : "subject",
-                    kind: result.target.kind,
-                    image_url: result.target.image_url,
-                    templateId: result.target.npc_id || result.target.monster_id,
-                  },
-                ]
-              : []),
-          ];
-    return raw.map((person) => ({
-      ...person,
-      image_url: catalogPortrait(person, characters, scene, npcs, encounter, monsters),
-    }));
-  }, [result, characters, scene, npcs, encounter, monsters]);
   const activeSession = useMemo(
     () => sessions.find((s) => s.active) || sessions[0] || null,
     [sessions]
@@ -515,14 +584,135 @@ export default function App() {
     }
   }
 
+  function acceptRuling(ruling: MapRuling) {
+    setMapRuling(ruling);
+    setResult(ruling.result);
+  }
+
+  function patchOpenTarget(
+    id: string,
+    fields: { current_hp?: number; max_hp?: number; ac?: number },
+    dropKey?: string
+  ) {
+    setResult((prev) =>
+      prev?.target?.id === id && prev.target ? { ...prev, target: { ...prev.target, ...fields } } : prev
+    );
+    setMapRuling((prev) => {
+      if (!prev) return prev;
+      const result =
+        prev.result.target?.id === id && prev.result.target
+          ? { ...prev.result, target: { ...prev.result.target, ...fields } }
+          : prev.result;
+      const creatures = dropKey ? prev.creatures.filter((item) => item.key !== dropKey) : prev.creatures;
+      return { ...prev, result, creatures };
+    });
+  }
+
+  async function applyCreature(creature: RulingCreature, amount: number, heal = mapRuling?.heal ?? false) {
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      let next = 0;
+      let downed = false;
+      const character =
+        creature.refId && (creature.kind === "pc" || creature.kind === "character" || characters.some((row) => row.id === creature.refId))
+          ? characters.find((row) => row.id === creature.refId)
+          : null;
+      if (character && creature.refId) {
+        const current = character?.current_hp ?? character?.max_hp ?? 0;
+        const max = character?.max_hp ?? current;
+        next = heal ? Math.min(max, current + amount) : Math.max(0, current - amount);
+        await api.updateCharacter(creature.refId, { current_hp: next });
+        setCharacters(await api.listCharacters());
+        patchOpenTarget(creature.refId, { current_hp: next, max_hp: max }, creature.key);
+        downed = !heal && next <= 0;
+      } else if (creature.refId) {
+        const foe = encounter.find((row) => row.id === creature.refId);
+        const npc = scene.find((row) => row.id === creature.refId);
+        const current = foe?.current_hp ?? npc?.current_hp ?? 0;
+        const max = foe?.max_hp ?? npc?.max_hp ?? current;
+        next = heal ? Math.min(max, current + amount) : Math.max(0, current - amount);
+        if (npc && creature.kind === "npc") {
+          await api.setSceneNpcHp(creature.refId, next);
+          setScene(await api.listScene());
+          patchOpenTarget(creature.refId, { current_hp: next, max_hp: max }, creature.key);
+          downed = !heal && next <= 0;
+        } else if (foe || creature.kind === "enemy" || creature.kind === "monster") {
+          const updated = heal
+            ? await api.setEnemyHp(creature.refId, next)
+            : await api.damageEnemy(creature.refId, amount);
+          next = updated.current_hp;
+          setEncounter(await api.listEncounter());
+          patchOpenTarget(creature.refId, { current_hp: next, max_hp: updated.max_hp ?? max }, creature.key);
+          downed = !heal && next <= 0;
+          if (downed) openDefeatAward(updated);
+        } else {
+          await api.setSceneNpcHp(creature.refId, next);
+          setScene(await api.listScene());
+          patchOpenTarget(creature.refId, { current_hp: next, max_hp: max }, creature.key);
+          downed = !heal && next <= 0;
+        }
+      }
+      if (!heal && creature.refId) {
+        const dealt = amount;
+        setDamageShown((prev) => ({ ...prev, [creature.refId as string]: dealt }));
+        const from = viewMode === "map" ? "map" : "console";
+        void api
+          .storyNote(result?.roll_line || creature.label, `${creature.label} takes ${dealt}. Now ${next} hit points.`, from)
+          .then(() => api.sessionEvents().then(setEvents))
+          .catch(() => undefined);
+      }
+      if (!creature.refId) {
+        setMapRuling((prev) =>
+          prev ? { ...prev, creatures: prev.creatures.filter((item) => item.key !== creature.key) } : prev
+        );
+      }
+      setMarkPulse({
+        id: Date.now(),
+        miss: false,
+        heal,
+        damageType: mapRuling?.action?.damageType || (heal ? "healing" : "bludgeoning"),
+        tile: creature.tile,
+        tokenId: creature.tokenId,
+        downed,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function missCreature(creature: RulingCreature) {
+    const from = viewMode === "map" ? "map" : "console";
+    void api
+      .storyNote(result?.roll_line || creature.label, `${creature.label} misses. Hit points stay.`, from)
+      .then(() => api.sessionEvents().then(setEvents))
+      .catch(() => undefined);
+    setMapRuling((prev) =>
+      prev ? { ...prev, creatures: prev.creatures.filter((item) => item.key !== creature.key) } : prev
+    );
+    setMarkPulse({
+      id: Date.now(),
+      miss: true,
+      heal: false,
+      damageType: "",
+      tile: creature.tile,
+      tokenId: creature.tokenId,
+      downed: false,
+    });
+  }
+
   async function handleQuery() {
     if (!query.trim()) return;
     setBusy(true);
     setError(null);
     setTranscript(null);
     try {
-      const r = await api.query(query.trim(), selectedId);
+      const r = await api.query(query.trim(), selectedId, "console");
       setResult(r);
+      setQueryPulse({ id: Date.now(), text: query.trim(), result: r });
       setEvents(await api.sessionEvents());
       setEncounter(await api.listEncounter());
       setScene(await api.listScene().catch(() => []));
@@ -553,6 +743,7 @@ export default function App() {
       setTranscript(out.transcript);
       setQuery(out.transcript);
       setResult(out.result);
+      setQueryPulse({ id: Date.now(), text: out.transcript, result: out.result });
       setEvents(await api.sessionEvents());
       setEncounter(await api.listEncounter());
       setScene(await api.listScene().catch(() => []));
@@ -657,12 +848,63 @@ export default function App() {
     }
   }
 
+  async function confirmSave() {
+    const name = saveName.trim();
+    if (!name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.saveGame(name);
+      setSaveOpen(false);
+      setSaveName("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openLoad() {
+    setError(null);
+    setLoadOpen(true);
+    try {
+      setSaves(await api.listSaves());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function confirmLoad(name: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.loadGame(name);
+      setLoadOpen(false);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveEdits() {
     if (!selected) return;
     setBusy(true);
     try {
       const updated = await api.updateCharacter(selected.id, editDraft);
       setCharacters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      patchOpenTarget(updated.id, {
+        current_hp: updated.current_hp ?? updated.max_hp,
+        max_hp: updated.max_hp,
+        ac: updated.ac,
+      });
+      setDamageShown((prev) => {
+        if (!(updated.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[updated.id];
+        return next;
+      });
       setEditing(false);
       setEditDraft({});
     } catch (e) {
@@ -697,6 +939,20 @@ export default function App() {
               onClick={() => setViewMode("map")}
             >
               Map
+            </button>
+            <button
+              type="button"
+              className={`btn ghost ${viewMode === "log" ? "active-tab" : ""}`}
+              onClick={() => {
+                logPinned.current = true;
+                setLogId(null);
+                setLogTurn("");
+                setLogLeaving(null);
+                setViewMode("log");
+                void api.sessionEvents().then(setEvents).catch(() => undefined);
+              }}
+            >
+              Log
             </button>
           </div>
           <span className={`pill ${status?.ollama.available ? "on" : "off"}`}>
@@ -737,6 +993,12 @@ export default function App() {
             }}
           >
             + Session
+          </button>
+          <button className="btn ghost" title="Save into the application's savedata folder." onClick={() => setSaveOpen(true)}>
+            Save
+          </button>
+          <button className="btn ghost" title="Load a save from the application's savedata folder." onClick={() => void openLoad()}>
+            Load
           </button>
           <button
             className="btn quit-btn"
@@ -783,6 +1045,58 @@ export default function App() {
         </div>
       </header>
 
+      {saveOpen && (
+        <div className="modal-backdrop" onClick={() => setSaveOpen(false)}>
+          <form
+            className="modal-panel"
+            onClick={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void confirmSave();
+            }}
+          >
+            <h2>Save session</h2>
+            <label>
+              Name
+              <input value={saveName} autoFocus onChange={(event) => setSaveName(event.target.value)} />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setSaveOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn" disabled={busy || !saveName.trim()}>
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {loadOpen && (
+        <div className="modal-backdrop" onClick={() => setLoadOpen(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <h2>Load session</h2>
+            {saves.length === 0 ? (
+              <p className="muted">No saves yet.</p>
+            ) : (
+              <ul className="save-list">
+                {saves.map((row) => (
+                  <li key={row.name}>
+                    <button type="button" className="btn ghost" disabled={busy} onClick={() => void confirmLoad(row.name)}>
+                      {row.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setLoadOpen(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="session-tabs">
         {sessions.map((s) => (
           <button
@@ -826,7 +1140,7 @@ export default function App() {
         ))}
       </div>
 
-      {viewMode === "map" ? (
+      <div className={viewMode === "map" ? "map-live" : "map-stashed"}>
         <MapErrorBoundary onError={(msg) => setError(msg)}>
           <MapPanel
             characters={characters}
@@ -834,6 +1148,16 @@ export default function App() {
             scene={scene}
             monsters={monsters}
             npcs={npcs}
+            active={viewMode === "map"}
+            selectedCharacterId={selectedId}
+            queryPulse={queryPulse}
+            markPulse={markPulse}
+            ruling={mapRuling}
+            onRuling={acceptRuling}
+            onApply={(creature, amount) => void applyCreature(creature, amount)}
+            onMiss={missCreature}
+            damageShown={damageShown}
+            applyBusy={busy}
             onError={(msg) => setError(msg)}
             onEncounterChange={async () => {
               setEncounter(await api.listEncounter());
@@ -846,7 +1170,26 @@ export default function App() {
             }}
           />
         </MapErrorBoundary>
-      ) : (
+      </div>
+      {viewMode === "log" && (
+        <LogPage
+          events={events}
+          sessionName={activeSession?.name || "This session"}
+          entryId={logId}
+          pinned={logPinned.current}
+          turn={logTurn}
+          leaving={logLeaving}
+          onTurn={(direction, nextId, stayOnNewest, shown) => {
+            const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            setLogLeaving(reduce ? null : shown);
+            logPinned.current = stayOnNewest;
+            setLogTurn(reduce ? "" : direction);
+            setLogId(nextId);
+          }}
+          onLeaveDone={() => setLogLeaving(null)}
+        />
+      )}
+      {viewMode === "console" && (
       <main className="layout">
         <aside className="panel stack">
           <div className="party-head">
@@ -941,6 +1284,7 @@ export default function App() {
                     <span>
                       {hp}/{c.max_hp}
                       {c.temp_hp ? ` +${c.temp_hp}` : ""}
+                      {damageShown[c.id] ? <span className="hp-loss"> −{damageShown[c.id]}</span> : null}
                     </span>
                   </div>
                   <div className="hp-meter-track">
@@ -1208,219 +1552,24 @@ export default function App() {
           {error && <div className="error">{error}</div>}
 
           {result && (
-            <div
-              className={
-                result.check_type === "impossible" || result.possible === false
-                  ? "result-card result-card--impossible"
-                  : "result-card"
-              }
+            <ResolveCard
+              result={result}
+              characters={characters}
+              scene={scene}
+              npcs={npcs}
+              encounter={encounter}
+              monsters={monsters}
+              apiBase={apiBase}
             >
-              <div className="muted">
-                {result.source} · confidence {Math.round(result.confidence * 100)}%
-              </div>
-              {(result.check_type === "impossible" || result.possible === false) && (
-                <div className="impossible-banner">Not possible</div>
-              )}
-              <div className="roll-line">{result.roll_line}</div>
-              {result.factors && result.factors.length > 0 && (
-                <ul className="factor-list">
-                  {result.factors.map((line, index) => (
-                    <li key={`${index}-${line}`}>{line}</li>
-                  ))}
-                </ul>
-              )}
-              {involved.length > 0 && (
-                <div className="involved-row">
-                  {involved.map((person) => (
-                    <div className="involved-card" key={`${person.kind || "p"}-${person.id || person.label}`}>
-                      <InvolvedFace label={person.label} imageUrl={person.image_url} apiBase={apiBase} />
-                      <div>
-                        <strong>
-                          {roleLabel(person.role)}: {person.label}
-                        </strong>
-                        {person.role !== "rolling" && result.target?.label === person.label && (
-                          <div className="muted" style={{ fontSize: "0.9rem" }}>
-                            {result.check_type === "attack" ? (
-                              <>
-                                AC {result.target.ac} · HP {result.target.current_hp}/
-                                {result.target.max_hp}
-                                {result.to_hit_needed != null
-                                  ? ` · need ${result.to_hit_needed}+ on d20`
-                                  : ""}
-                              </>
-                            ) : (
-                              <>
-                                {result.suggested_dc != null
-                                  ? `DC ${result.suggested_dc}${
-                                      result.dc_label ? ` (${result.dc_label})` : ""
-                                    }`
-                                  : "No fixed DC"}
-                                {result.target.current_hp != null
-                                  ? ` · HP ${result.target.current_hp}/${result.target.max_hp}`
-                                  : ""}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="result-grid">
-                <div>
-                  <span>Character</span>
-                  <div>
-                    {involved
-                      .filter((person) => person.role === "rolling")
-                      .map((person) => person.label)
-                      .join(", ") || result.character || "—"}
-                  </div>
-                </div>
-                <div>
-                  <span>Check</span>
-                  <div>{result.check_type}</div>
-                </div>
-                <div>
-                  <span>Ability / Skill</span>
-                  <div>
-                    {result.ability || "—"}
-                    {result.skill ? ` / ${result.skill}` : ""}
-                  </div>
-                </div>
-                <div>
-                  <span>Dice + mod</span>
-                  <div>
-                    {result.dice}
-                    {result.modifier != null
-                      ? ` ${result.modifier >= 0 ? "+" : ""}${result.modifier}`
-                      : ""}
-                    {result.extra_dice ? ` ${result.extra_dice}` : ""}
-                  </div>
-                </div>
-                {result.check_type === "attack" ? (
-                  <>
-                    <div>
-                      <span>Target AC</span>
-                      <div>
-                        {result.target
-                          ? `${result.target.label} AC ${result.target.ac}`
-                          : result.target_ac ?? "Pick/spawn a monster"}
-                      </div>
-                    </div>
-                    <div>
-                      <span>Need on d20</span>
-                      <div>
-                        {result.to_hit_needed != null ? `${result.to_hit_needed}+` : "—"}
-                      </div>
-                    </div>
-                    <div>
-                      <span>Damage if hit</span>
-                      <div>{result.damage || "—"}</div>
-                    </div>
-                    <div>
-                      <span>Target HP</span>
-                      <div>
-                        {result.target
-                          ? `${result.target.current_hp}/${result.target.max_hp}`
-                          : "—"}
-                      </div>
-                    </div>
-                  </>
-                ) : result.check_type === "impossible" || result.possible === false ? (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <span>Ruling</span>
-                    <div>No roll — action cannot be attempted as stated</div>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <span>Suggested DC</span>
-                      <div>
-                        {result.suggested_dc != null
-                          ? `${result.suggested_dc}${result.dc_label ? ` (${result.dc_label})` : ""}`
-                          : "—"}
-                      </div>
-                    </div>
-                    {result.target && (
-                      <div>
-                        <span>Subject</span>
-                        <div>{result.target.label}</div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <p style={{ marginTop: "0.85rem" }}>{result.notes}</p>
-              {result.howto && (
-                <pre
-                  className="howto"
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    marginTop: "0.75rem",
-                    padding: "0.75rem",
-                    borderRadius: "8px",
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid var(--line)",
-                    fontFamily: "var(--font-body)",
-                    fontSize: "0.92rem",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {result.howto}
-                </pre>
-              )}
-              {result.check_type === "attack" && result.target?.id && !result.target.virtual && (
-                <div className="row" style={{ marginTop: "0.65rem" }}>
-                  <button
-                    className="btn"
-                    disabled={busy}
-                    onClick={async () => {
-                      const raw = window.prompt("Damage dealt (number)?", "5");
-                      if (!raw) return;
-                      const dmg = Number(raw);
-                      if (!Number.isFinite(dmg)) return;
-                      const tid = result.target!.id!;
-                      // Prefer encounter damage; fall back to scene NPC patch
-                      try {
-                        await api.damageEnemy(tid, dmg);
-                        const enc = await api.listEncounter();
-                        setEncounter(enc);
-                        const updated = enc.find((e) => e.id === tid);
-                        const newHp = updated
-                          ? updated.current_hp
-                          : Math.max(0, result.target!.current_hp - dmg);
-                        setResult({
-                          ...result,
-                          target: { ...result.target!, current_hp: newHp },
-                        });
-                        if (updated && updated.current_hp <= 0) {
-                          openDefeatAward(updated);
-                        }
-                      } catch {
-                        await api.setSceneNpcHp(
-                          tid,
-                          Math.max(0, result.target!.current_hp - dmg)
-                        );
-                        const sc = await api.listScene();
-                        setScene(sc);
-                        const updated = sc.find((e) => e.id === tid);
-                        const newHp = updated
-                          ? updated.current_hp
-                          : Math.max(0, result.target!.current_hp - dmg);
-                        setResult({
-                          ...result,
-                          target: { ...result.target!, current_hp: newHp },
-                        });
-                        if (updated && updated.current_hp <= 0) {
-                          openDefeatAward(updated);
-                        }
-                      }
-                    }}
-                  >
-                    Apply damage to {result.target.label}
-                  </button>
-                </div>
+              {(result.check_type === "attack" || result.check_type === "save" || mapRuling?.heal) && (
+                <HitEntry
+                  result={result}
+                  creatures={mapRuling?.blocked ? [] : mapRuling?.creatures || []}
+                  heal={Boolean(mapRuling?.heal)}
+                  busy={busy}
+                  onApply={(creature, amount) => void applyCreature(creature, amount)}
+                  onMiss={missCreature}
+                />
               )}
               {(result.check_type === "skill" ||
                 result.check_type === "ability" ||
@@ -1448,7 +1597,7 @@ export default function App() {
               >
                 Copy roll line
               </button>
-            </div>
+            </ResolveCard>
           )}
 
           {!status?.ollama.available && (
@@ -1547,6 +1696,7 @@ export default function App() {
                             <span>AC {e.ac}</span>
                             <span>
                               HP {e.current_hp}/{e.max_hp}
+                              {damageShown[e.id] ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
                             </span>
                             {e.cr != null && <span>CR {e.cr}</span>}
                             {e.xp != null && <span>XP {e.xp}</span>}
@@ -1634,6 +1784,7 @@ export default function App() {
                             <span>AC {e.ac}</span>
                             <span>
                               HP {e.current_hp}/{e.max_hp}
+                              {damageShown[e.id] ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
                             </span>
                             {e.cr != null && <span>CR {e.cr}</span>}
                             {e.xp != null && <span>XP {e.xp}</span>}

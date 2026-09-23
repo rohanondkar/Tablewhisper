@@ -25,17 +25,21 @@ echo   2 ^) First-time setup   (venv + npm install)
 echo   3 ^) Show all commands
 echo   4 ^) Health check
 echo   5 ^) Start Discord bot   (VC listen → API buffer)
-echo   6 ^) Quit
+echo   6 ^) Reset API   (stop port %API_PORT% and start it again)
+echo   7 ^) Show console   (bring the window forward, or open it)
+echo   8 ^) Quit
 echo  ----------------------------------------------------------------
 echo.
-set /p CHOICE=  Pick 1-6: 
+set /p CHOICE=  Pick 1-8: 
 
 if "%CHOICE%"=="1" goto start
 if "%CHOICE%"=="2" goto setup
 if "%CHOICE%"=="3" goto commands
 if "%CHOICE%"=="4" goto health
 if "%CHOICE%"=="5" goto discord_bot
-if "%CHOICE%"=="6" goto quit_all
+if "%CHOICE%"=="6" goto reset_api
+if "%CHOICE%"=="7" goto show_console
+if "%CHOICE%"=="8" goto quit_all
 goto menu
 
 :quit_all
@@ -103,6 +107,13 @@ echo   npm.cmd run dev:ui
 echo.
 echo  --- Ollama ---
 echo   ollama pull llama3.2
+echo.
+echo  --- Reset API only ---
+echo   Menu option 6, or:
+echo   powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\reset-api.ps1"
+echo.
+echo  --- Show the console window ---
+echo   Menu option 7
 echo.
 pause
 goto menu
@@ -205,6 +216,27 @@ echo  ----------------------------------------------------------------
 pause
 goto menu
 
+:show_console
+echo.
+echo  Bringing the DM Console window forward...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\open-console-once.ps1"
+echo.
+echo  If the page is blank, the app is not running. Use menu option 1.
+echo.
+pause
+goto menu
+
+:reset_api
+echo.
+echo  Resetting the API on port %API_PORT%...
+echo  The browser tab stays open. The UI is left running.
+set "DM_LAUNCH_ROOT=%ROOT%"
+set "DM_LAUNCH_PORT=%API_PORT%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%scripts\reset-api.ps1"
+echo.
+pause
+goto menu
+
 :start
 echo.
 if not exist "%ROOT%apps\api\.venv\Scripts\python.exe" (
@@ -250,7 +282,7 @@ if "!READY!"=="1" (
 echo.
 echo  [OK] App started.
 echo   - This launcher is the only window. Logs are in data\logs.
-echo   - Stop with menu option 6.
+echo   - Stop with menu option 8. Show the window with option 7. Reset a stuck API with option 6.
 echo   - Hard-refresh the browser ^(Ctrl+F5^) if you still see old errors.
 echo.
 pause

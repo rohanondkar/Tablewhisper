@@ -19,7 +19,7 @@ _ATTACK_VERB_RE = re.compile(
     r"\b("
     r"attacks?|attacking|swings?|swinging|shoots?|shooting|strikes?|striking|"
     r"fights?|fighting|slashes?|slashing|stabs?|stabbing|bashes?|bashing|smites?|smiting|"
-    r"punches?|punching|kicks?|kicking|bites?|biting|headbutts?|headbutting|"
+    r"punches?|punching|kicks?|kicking|slaps?|slapping|bites?|biting|headbutts?|headbutting|"
     r"chokes?|choking|strangles?|strangling|tackles?|tackling|"
     r"fire\s+at|fires\s+at|shoot\s+at|shoots\s+at|hit\s+them|hits\s+them|"
     r"melee|ranged|"
@@ -32,6 +32,12 @@ _ATTACK_VERB_RE = re.compile(
 )
 
 _NULLISH = {"", "null", "none", "undefined", "n/a", "nil", "nan"}
+
+# A body blow with no weapon named is an unarmed strike, not the weapon in hand.
+_UNARMED_VERB_RE = re.compile(
+    r"\b(slaps?|slapping|punches?|punching|kicks?|kicking|headbutts?|headbutting)\b",
+    re.I,
+)
 
 # (pattern, skill id, ability, notes). First match wins. Animal Handling is separate
 # so it does not fire against a person.
@@ -949,6 +955,10 @@ def _pick_weapon(
         if score > best_score:
             best_score = score
             best = atk
+    if _UNARMED_VERB_RE.search(text) and not _extract_named_gear(text):
+        for atk in attacks:
+            if re.search(r"\bunarmed\b", str(atk.get("name") or ""), re.I):
+                return atk
     equipped = gear_rules.equipped_attack(character, text)
     if equipped and best_score == 0:
         return equipped
@@ -1213,7 +1223,15 @@ def _pick_creature_weapon(text: str, actor: dict[str, Any]) -> dict[str, Any] | 
     return best or attacks[0]
 
 
-def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
+def resolve_query(text: str, character_id: str | None = None, origin: str = "console") -> dict[str, Any]:
+    previous = db.push_event_origin(origin)
+    try:
+        return _resolve_query(text, character_id)
+    finally:
+        db.pop_event_origin(previous)
+
+
+def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
     ruleset = rules.get_active_ruleset()
     characters = db.list_characters()
     events = db.list_events()
@@ -1354,6 +1372,11 @@ def resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]:
         suggested_dc = None
 
     character = _find_character(text, characters, character_id)
+    verb = _ATTACK_VERB_RE.search(text or "")
+    if verb:
+        named_before = _find_character(text[: verb.start()], characters, None)
+        if named_before:
+            character = named_before
     incoming_actor = _incoming_actor(text, character, npc_peek, creature_peek)
     if incoming_actor and character and not _named_in_text(str(character.get("name") or ""), text):
         named_pc = _find_character(text, characters, None)

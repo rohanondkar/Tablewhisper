@@ -285,6 +285,93 @@ def _frame(kind: str) -> Image.Image:
     return image
 
 
+def _vial(liquid: tuple[int, int, int, int], cork: tuple[int, int, int, int] = (196, 154, 64, 255)) -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((50, 18, 78, 36), radius=3, fill=cork)
+    draw.polygon([(46, 40), (82, 40), (96, 108), (32, 108)], fill=(210, 220, 230, 180))
+    draw.polygon([(40, 70), (88, 70), (96, 108), (32, 108)], fill=liquid)
+    draw.line([(46, 40), (32, 108), (96, 108), (82, 40)], fill=(230, 236, 242, 255), width=2)
+    return image
+
+
+def _scroll() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((28, 24, 100, 108), radius=8, fill=(232, 214, 170, 255))
+    draw.ellipse((22, 20, 46, 44), fill=(214, 190, 140, 255))
+    draw.ellipse((82, 88, 108, 112), fill=(214, 190, 140, 255))
+    for y in (48, 60, 72, 84):
+        draw.line((40, y, 88, y), fill=(120, 90, 50, 180), width=2)
+    return image
+
+
+def _ring() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((34, 36, 94, 96), outline=(212, 180, 90, 255), width=8)
+    draw.ellipse((54, 22, 74, 46), fill=(80, 160, 190, 255))
+    return image
+
+
+def _wand() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.line((36, 108, 92, 20), fill=(120, 72, 36, 255), width=6)
+    draw.ellipse((84, 10, 104, 30), fill=(120, 180, 255, 255))
+    return image
+
+
+def _torch() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((58, 48, 72, 112), fill=(110, 70, 36, 255))
+    draw.polygon([(50, 52), (65, 16), (80, 52)], fill=(230, 120, 40, 255))
+    draw.polygon([(58, 48), (65, 24), (72, 48)], fill=(255, 210, 80, 255))
+    return image
+
+
+def _rope() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.ellipse((28, 28, 100, 100), outline=(150, 110, 60, 255), width=8)
+    draw.arc((40, 40, 88, 88), 20, 200, fill=(120, 82, 40, 255), width=4)
+    return image
+
+
+def _rations() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((30, 40, 98, 100), radius=6, fill=(168, 122, 64, 255))
+    draw.rectangle((30, 40, 98, 58), fill=(120, 78, 40, 255))
+    draw.line((40, 70, 88, 70), fill=(90, 56, 28, 255), width=2)
+    return image
+
+
+def _gem() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(64, 18), (100, 48), (64, 110), (28, 48)], fill=(80, 170, 160, 255))
+    draw.polygon([(64, 18), (100, 48), (64, 48)], fill=(180, 240, 230, 255))
+    return image
+
+
+def _oil() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(48, 28), (80, 28), (92, 108), (36, 108)], fill=(90, 70, 40, 255))
+    draw.ellipse((44, 16, 84, 40), fill=(196, 154, 64, 255))
+    return image
+
+
+def _item() -> Image.Image:
+    image = _canvas()
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((28, 36, 100, 104), radius=10, fill=(92, 78, 58, 255), outline=(196, 154, 64, 255), width=3)
+    draw.ellipse((54, 58, 74, 78), outline=(230, 200, 120, 255), width=3)
+    return image
+
+
 def build_all(directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     _save(directory, "left-hand", _hand(False))
@@ -359,3 +446,20 @@ def build_all(directory: Path) -> None:
     _save(directory, "bag-of-holding", _pack("bag of holding"))
     _save(directory, "handy-haversack", _pack("haversack"))
     _save(directory, "haversack", _pack("haversack"))
+    _save(directory, "potion", _vial((196, 48, 48, 230)))
+    _save(directory, "elixir", _vial((80, 140, 220, 230), (230, 210, 140, 255)))
+    _save(directory, "antitoxin", _vial((80, 160, 70, 230)))
+    _save(directory, "holy-water", _vial((220, 220, 240, 200)))
+    _save(directory, "vial", _vial((180, 80, 160, 220)))
+    _save(directory, "flask", _vial((180, 80, 160, 220)))
+    _save(directory, "scroll", _scroll())
+    _save(directory, "spell-scroll", _scroll())
+    _save(directory, "ring", _ring())
+    _save(directory, "wand", _wand())
+    _save(directory, "rod", _wand())
+    _save(directory, "torch", _torch())
+    _save(directory, "rope", _rope())
+    _save(directory, "rations", _rations())
+    _save(directory, "gem", _gem())
+    _save(directory, "oil", _oil())
+    _save(directory, "item", _item())
