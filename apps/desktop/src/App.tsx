@@ -59,6 +59,14 @@ function InvolvedFace({
   );
 }
 
+function hpTone(current: number, max: number): "high" | "mid" | "low" {
+  if (max <= 0) return "low";
+  const ratio = current / max;
+  if (ratio > 0.5) return "high";
+  if (ratio > 0.2) return "mid";
+  return "low";
+}
+
 function PartyAvatar({
   name,
   imageUrl,
@@ -192,6 +200,7 @@ export default function App() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [bagFor, setBagFor] = useState<string | null>(null);
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -840,20 +849,11 @@ export default function App() {
       ) : (
       <main className="layout">
         <aside className="panel stack">
-          <h2>Party</h2>
-          {characters.length > 0 && (
-            <div className="party-levels" aria-label="Party levels">
-              {characters.map((c) => (
-                <span key={c.id} className="party-level-chip">
-                  <strong>{c.name.split(/\s+/)[0]}</strong> L{c.level}
-                  {c.xp_progress && c.xp_progress.level_from_xp !== c.level
-                    ? ` · XP L${c.xp_progress.level_from_xp}`
-                    : ""}
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="row">
+          <div className="party-head">
+            <h2>Party</h2>
+            <span className="muted small">{characters.length}</span>
+          </div>
+          <div className="party-tools">
             <label className="btn file-btn primary">
               Upload PDF
               <input
@@ -887,11 +887,23 @@ export default function App() {
               <p className="muted">Upload D&D Beyond character PDFs to build the party.</p>
             )}
             {characters.map((c) => {
+              const hp = c.current_hp ?? c.max_hp;
+              const hpMax = Math.max(1, c.max_hp || 1);
+              const hpPct = Math.max(0, Math.min(100, (hp / hpMax) * 100));
+              const tone = hpTone(hp, c.max_hp || 1);
+              const xp = c.xp_progress?.xp ?? c.xp ?? 0;
+              const xpNext = c.xp_progress?.xp_next_threshold ?? 0;
+              const xpInto = c.xp_progress?.xp_into_level ?? 0;
+              const xpSpan = xpInto + (c.xp_progress?.xp_to_next ?? 0);
+              const xpPct = xpSpan > 0 ? Math.max(0, Math.min(100, (xpInto / xpSpan) * 100)) : 0;
               return (
               <div
                 key={c.id}
                 className={`char-card ${c.id === selectedId ? "selected" : ""}`}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => {
+                  setSelectedId(c.id);
+                  if (c.id !== confirmRemoveId) setConfirmRemoveId(null);
+                }}
               >
                 <div className="party-hero">
                   <PartyAvatar
@@ -912,72 +924,121 @@ export default function App() {
                       })();
                     }}
                   />
-                  <div style={{ minWidth: 0 }}>
-                    <strong>{c.name}</strong>
+                  <div className="party-id" style={{ minWidth: 0 }}>
+                    <div className="party-name-row">
+                      <strong>{c.name}</strong>
+                      <span className="party-level">L{c.level}</span>
+                    </div>
                     <small>
-                      L{c.level} · {c.class_level} · {c.species}
-                      {c.size ? ` · ${c.size}` : ""}
+                      {c.class_level}
+                      {c.species ? ` · ${c.species}` : ""}
                     </small>
                   </div>
                 </div>
-                <div className="char-meta">
-                  <span>AC {c.ac}</span>
-                  <span>HP {c.current_hp ?? c.max_hp}/{c.max_hp}</span>
-                  <span>Init {c.initiative >= 0 ? `+${c.initiative}` : c.initiative}</span>
+                <div className={`hp-meter tone-${tone}`}>
+                  <div className="hp-meter-top">
+                    <span>HP</span>
+                    <span>
+                      {hp}/{c.max_hp}
+                      {c.temp_hp ? ` +${c.temp_hp}` : ""}
+                    </span>
+                  </div>
+                  <div className="hp-meter-track">
+                    <span style={{ width: `${hpPct}%` }} />
+                  </div>
                 </div>
-                <div className="xp-line">
-                  <span>
-                    XP {c.xp_progress?.xp ?? c.xp ?? 0}
-                    {c.xp_progress && c.xp_progress.xp_to_next > 0
-                      ? ` / ${c.xp_progress.xp_next_threshold}`
-                      : ""}
-                  </span>
-                  {c.xp_progress?.ready_to_level && (
-                    <span className="level-ready-pill">Level up ready</span>
-                  )}
+                <div className="char-meta">
+                  <span className="stat-chip">AC {c.ac}</span>
+                  <span className="stat-chip">Init {c.initiative >= 0 ? `+${c.initiative}` : c.initiative}</span>
+                  {c.xp_progress?.ready_to_level && <span className="level-ready-pill">Level up</span>}
+                </div>
+                <div className="xp-meter" title={`XP ${xp}`}>
+                  <div className="hp-meter-top">
+                    <span>XP</span>
+                    <span>
+                      {xp}
+                      {xpNext > 0 ? ` / ${xpNext}` : ""}
+                    </span>
+                  </div>
+                  <div className="xp-meter-track">
+                    <span style={{ width: `${xpPct}%` }} />
+                  </div>
                 </div>
                 {c.id === selectedId && selected && (
                   <div className="char-sheet">
-                    <div className="row">
-                      <button
-                        className="btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditing((v) => !v);
-                          setEditDraft({
-                            name: selected.name,
-                            level: selected.level,
-                            max_hp: selected.max_hp,
-                            current_hp: selected.current_hp,
-                            ac: selected.ac,
-                            proficiency_bonus: selected.proficiency_bonus,
-                          });
-                        }}
-                      >
-                        {editing ? "Cancel edit" : "Edit sheet"}
-                      </button>
-                      <button
-                        className="btn ghost"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          await api.deleteCharacter(selected.id);
-                          setSelectedId(null);
-                          await refresh();
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <div className="gear-list" onClick={(e) => e.stopPropagation()}>
-                      <div className="gear-head">
-                        Gear · AC {selected.ac}
-                        {selected.ac_unarmored != null ? ` · unarmored ${selected.ac_unarmored}` : ""}
-                        {selected.hands_label ? ` · ${selected.hands_label}` : ""}
-                        {selected.carry_label ? ` · ${selected.carry_label}` : ""}
+                    {confirmRemoveId === c.id ? (
+                      <div className="party-confirm" onClick={(e) => e.stopPropagation()}>
+                        <span>Remove {c.name}?</span>
+                        <button
+                          type="button"
+                          className="btn danger"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              await api.deleteCharacter(c.id);
+                              setConfirmRemoveId(null);
+                              setSelectedId(null);
+                              setEditing(false);
+                              await refresh();
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : String(err));
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Remove
+                        </button>
+                        <button type="button" className="btn ghost" onClick={() => setConfirmRemoveId(null)}>
+                          Keep
+                        </button>
                       </div>
-                      <button type="button" className="btn tiny" onClick={() => setBagFor(selected.id)}>
-                        Open bag
-                      </button>
+                    ) : (
+                      <div className="party-actions">
+                        <button
+                          className="btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditing((v) => !v);
+                            setEditDraft({
+                              name: selected.name,
+                              level: selected.level,
+                              max_hp: selected.max_hp,
+                              current_hp: selected.current_hp,
+                              ac: selected.ac,
+                              proficiency_bonus: selected.proficiency_bonus,
+                            });
+                          }}
+                        >
+                          {editing ? "Cancel" : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBagFor(selected.id);
+                          }}
+                        >
+                          Bag
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmRemoveId(c.id);
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                    <div className="party-facts" onClick={(e) => e.stopPropagation()}>
+                      {selected.ac_unarmored != null && <span>Unarmored {selected.ac_unarmored}</span>}
+                      {selected.hands_label && <span>{selected.hands_label}</span>}
+                      {selected.carry_label && <span>{selected.carry_label}</span>}
+                      {selected.size && <span>{selected.size}</span>}
                     </div>
                     {editing && (
                       <div className="edit-form" onClick={(e) => e.stopPropagation()}>
