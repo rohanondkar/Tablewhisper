@@ -4,231 +4,184 @@
   <meta charset="utf-8" />
   <title>Tablewhisper architecture</title>
   <style>
-    :root {
-      --bg: #12141a;
-      --text: #e8e6e3;
-      --muted: #9aa3b5;
-      --line: #3a4254;
-    }
     * { box-sizing: border-box; }
-    body {
+    html, body {
       margin: 0;
-      background: var(--bg);
-      color: var(--text);
+      width: 1080px;
+      background: #12141a;
+      color: #e8e6e3;
       font-family: "Segoe UI", system-ui, sans-serif;
     }
-    header { padding: 1.25rem 1.5rem 0.25rem; }
-    h1 { margin: 0; font-size: 1.45rem; }
-    p { margin: 0.35rem 0 0; color: var(--muted); max-width: 52rem; }
-    #board {
-      position: relative;
-      margin: 1rem 1.25rem 2rem;
-      padding: 0.5rem;
+    .page { padding: 28px 32px 32px; }
+    h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -0.02em; }
+    .lead { margin: 6px 0 0; color: #9aa3b5; font-size: 13px; }
+
+    .pipe {
+      display: grid;
+      grid-template-columns: 1fr 28px 1fr 28px 1fr 28px 1fr;
+      align-items: center;
+      margin-top: 22px;
     }
-    svg#wires {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      overflow: visible;
+    .arrow-h {
+      text-align: center;
+      color: #c45c5c;
+      font-size: 18px;
+      line-height: 1;
     }
-    .layer { position: relative; z-index: 1; margin-bottom: 2.4rem; }
-    .layer h2 {
-      margin: 0 0 0.55rem;
-      font-size: 0.72rem;
+
+    .vlink {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 8px 0 4px;
+      color: #9aa3b5;
+      font-size: 12px;
+    }
+    .vlink i {
+      width: 2px;
+      height: 16px;
+      background: #c45c5c;
+      display: block;
+    }
+    .vlink b { font-weight: 600; color: #d7d4cf; }
+
+    .panel {
+      border: 1px solid #343b4a;
+      border-radius: 14px;
+      background: #181b22;
+      padding: 12px 14px 14px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 11px;
+      font-weight: 650;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--muted);
+      color: #9aa3b5;
     }
-    .row { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+    .g8 { grid-template-columns: repeat(8, 1fr); }
+    .g5 { grid-template-columns: repeat(5, 1fr); }
+    .stack { display: grid; gap: 10px; }
+
     .box {
-      width: 148px;
-      min-height: 68px;
-      padding: 0.45rem 0.55rem;
+      min-height: 62px;
+      padding: 8px 10px;
       border-radius: 10px;
-      border: 1px solid var(--line);
-      background: #1c2029;
+      border: 1px solid #3a4254;
+      background: #232833;
     }
-    .box strong { display: block; font-size: 0.82rem; }
-    .box span { display: block; margin-top: 0.15rem; color: var(--muted); font-size: 0.7rem; }
+    .box strong { display: block; font-size: 13px; font-weight: 650; }
+    .box span { display: block; margin-top: 3px; color: #9aa3b5; font-size: 11px; line-height: 1.3; }
     .ui { background: #2a3344; }
     .api { background: #243028; }
     .data { background: #2c2838; }
     .opt { background: #2a2a24; border-style: dashed; }
-    .hub { outline: 2px solid #c45c5c; }
-    .key { display: flex; gap: 1rem; margin-top: 0.6rem; font-size: 0.75rem; color: var(--muted); }
-    .swatch { display: inline-block; width: 1.1rem; height: 3px; margin-right: 0.3rem; vertical-align: middle; }
+    .hub { border-color: #c45c5c; }
+
+    .pairs {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .pair { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .pair .box { width: 100%; }
+    .stem { width: 2px; height: 14px; background: #6d5a86; }
   </style>
 </head>
 <body>
-  <header>
+  <div class="page">
     <h1>Tablewhisper — how the pieces connect</h1>
-    <p>Every box has a line. Blue is the screen, green is the API, purple is stored data, gold is optional and local.</p>
-    <div class="key">
-      <span><i class="swatch" style="background:#8eb4ff"></i>UI calls</span>
-      <span><i class="swatch" style="background:#7dcea0"></i>API routes</span>
-      <span><i class="swatch" style="background:#c39bd3"></i>Reads or writes data</span>
-      <span><i class="swatch" style="background:#f0d58c"></i>Optional local tool</span>
-    </div>
-  </header>
-  <div id="board">
-    <svg id="wires"></svg>
+    <p class="lead">One path from the screen to the API, then straight down into the files each module uses.</p>
 
-    <div class="layer">
-      <h2>What is running</h2>
-      <div class="row">
-        <div class="box ui" id="electron"><strong>Electron</strong><span>starts API, Ctrl+N</span></div>
-        <div class="box ui hub" id="app"><strong>App.tsx</strong><span>Console and Map, port 5173</span></div>
-        <div class="box ui" id="apits"><strong>api.ts</strong><span>only client of the API</span></div>
-        <div class="box api hub" id="main"><strong>FastAPI main.py</strong><span>port 8766</span></div>
-      </div>
+    <div class="pipe">
+      <div class="box ui" id="electron"><strong>Electron</strong><span>Starts the API. Ctrl+N captures voice.</span></div>
+      <div class="arrow-h">→</div>
+      <div class="box ui hub" id="app"><strong>App.tsx</strong><span>Console and Map. Port 5173.</span></div>
+      <div class="arrow-h">→</div>
+      <div class="box ui" id="apits"><strong>api.ts</strong><span>The only client of the API.</span></div>
+      <div class="arrow-h">→</div>
+      <div class="box api hub" id="main"><strong>FastAPI</strong><span>main.py. Port 8766.</span></div>
     </div>
 
-    <div class="layer">
+    <div class="vlink"><i></i><b>App renders these screens. Every one of them calls api.ts.</b><i></i></div>
+
+    <section class="panel">
       <h2>Screens</h2>
-      <div class="row">
-        <div class="box ui" id="party"><strong>Party</strong><span>sheets, re-upload</span></div>
-        <div class="box ui" id="resolve"><strong>Resolve check</strong><span>ruling card + portraits</span></div>
-        <div class="box ui" id="foes"><strong>Foes</strong><span>encounter</span></div>
-        <div class="box ui" id="scene"><strong>Scene</strong><span>social NPCs</span></div>
-        <div class="box ui" id="pictures"><strong>Pictures</strong><span>portrait uploads</span></div>
-        <div class="box ui" id="log"><strong>Log</strong><span>past rulings</span></div>
-        <div class="box ui" id="xpui"><strong>XP</strong><span>defeat, milestone</span></div>
-        <div class="box ui" id="map"><strong>Map panel</strong><span>grid, tokens, fog</span></div>
+      <div class="grid g8">
+        <div class="box ui"><strong>Party</strong><span>PDF sheets</span></div>
+        <div class="box ui"><strong>Resolve</strong><span>Ruling card</span></div>
+        <div class="box ui"><strong>Foes</strong><span>Encounter</span></div>
+        <div class="box ui"><strong>Scene</strong><span>Social NPCs</span></div>
+        <div class="box ui"><strong>Pictures</strong><span>Uploads</span></div>
+        <div class="box ui"><strong>Log</strong><span>Past rulings</span></div>
+        <div class="box ui"><strong>XP</strong><span>Awards</span></div>
+        <div class="box ui"><strong>Map</strong><span>Grid and tokens</span></div>
       </div>
-    </div>
+    </section>
 
-    <div class="layer">
+    <div class="vlink"><i></i><b>FastAPI routes each call to one module.</b><i></i></div>
+
+    <section class="panel">
       <h2>API modules</h2>
-      <div class="row">
-        <div class="box api" id="query"><strong>query_engine</strong><span>check, DC, who is in it</span></div>
-        <div class="box api" id="mapsmod"><strong>maps</strong><span>tokens, fog, walls</span></div>
-        <div class="box api" id="monsters"><strong>monsters</strong><span>foes and labels</span></div>
-        <div class="box api" id="npcs"><strong>npcs</strong><span>social DCs</span></div>
-        <div class="box api" id="rulesmod"><strong>rules</strong><span>verb catalog, DC ladder</span></div>
-        <div class="box api" id="pdf"><strong>pdf_import</strong><span>Beyond sheets</span></div>
-        <div class="box api" id="xpmod"><strong>xp</strong><span>awards, level</span></div>
-        <div class="box api" id="voice"><strong>voice</strong><span>audio buffer</span></div>
-        <div class="box api" id="portraits"><strong>portraits</strong><span>character images</span></div>
-        <div class="box api" id="tokenart"><strong>token_art</strong><span>default token faces</span></div>
+      <div class="stack">
+        <div class="grid g5">
+          <div class="box api"><strong>query_engine</strong><span>Check, DC, who is involved</span></div>
+          <div class="box api"><strong>maps</strong><span>Tokens, fog, walls, lights</span></div>
+          <div class="box api"><strong>monsters</strong><span>Foes and name tags</span></div>
+          <div class="box api"><strong>npcs</strong><span>Scene cast, social DCs</span></div>
+          <div class="box api"><strong>rules</strong><span>Verb catalog, DC ladder</span></div>
+        </div>
+        <div class="grid g5">
+          <div class="box api"><strong>pdf_import</strong><span>Beyond character sheets</span></div>
+          <div class="box api"><strong>xp</strong><span>Defeat and milestone</span></div>
+          <div class="box api"><strong>voice</strong><span>Mic or Discord audio</span></div>
+          <div class="box api"><strong>portraits</strong><span>Character images</span></div>
+          <div class="box api"><strong>token_art</strong><span>Default token faces</span></div>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <div class="layer">
-      <h2>Files, packs, and optional tools</h2>
-      <div class="row">
-        <div class="box data" id="sqlite"><strong>SQLite</strong><span>sheets, events, map tables</span></div>
-        <div class="box data" id="media"><strong>/media files</strong><span>uploads, map, fog</span></div>
-        <div class="box data" id="rulespack"><strong>rules-dnd5e</strong><span>read-only pack</span></div>
-        <div class="box data" id="monsterpack"><strong>monsters-srd</strong><span>322 creatures</span></div>
-        <div class="box data" id="npcpack"><strong>npcs-srd</strong><span>tavern cast</span></div>
-        <div class="box data" id="tokenpack"><strong>token-portraits</strong><span>circular art</span></div>
-        <div class="box opt" id="ollama"><strong>Ollama</strong><span>only if rules are unsure</span></div>
-        <div class="box opt" id="whisper"><strong>Whisper</strong><span>local speech to text</span></div>
+    <div class="vlink"><i></i><b>Each column below is what that work reads or writes.</b><i></i></div>
+
+    <section class="panel">
+      <h2>Where it lands</h2>
+      <div class="pairs">
+        <div class="pair">
+          <div class="box api"><strong>query_engine + rules</strong><span>Decisive rules skip the model</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>rules-dnd5e</strong><span>Read-only pack</span></div>
+          <div class="stem"></div>
+          <div class="box opt"><strong>Ollama</strong><span>Only when the rules are unsure</span></div>
+        </div>
+        <div class="pair">
+          <div class="box api"><strong>maps, pdf, xp, log</strong><span>Session state</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>SQLite</strong><span>Sheets, events, foes, scene, map tables</span></div>
+        </div>
+        <div class="pair">
+          <div class="box api"><strong>monsters</strong><span>Spawn and match foes</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>monsters-srd</strong><span>322 creatures</span></div>
+        </div>
+        <div class="pair">
+          <div class="box api"><strong>npcs</strong><span>Social checks</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>npcs-srd</strong><span>Tavern cast</span></div>
+        </div>
+        <div class="pair">
+          <div class="box api"><strong>voice, portraits, token_art</strong><span>Pictures also feed Resolve and Map</span></div>
+          <div class="stem"></div>
+          <div class="box opt"><strong>Whisper</strong><span>Speech to text, then Resolve</span></div>
+          <div class="stem"></div>
+          <div class="box data"><strong>/media + token-portraits</strong><span>Uploads, map, fog, token faces</span></div>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
-  <script>
-    const links = [
-      ["electron", "app", "#8eb4ff"],
-      ["electron", "main", "#7dcea0"],
-      ["electron", "voice", "#f0d58c"],
-      ["app", "party", "#8eb4ff"],
-      ["app", "resolve", "#8eb4ff"],
-      ["app", "foes", "#8eb4ff"],
-      ["app", "scene", "#8eb4ff"],
-      ["app", "pictures", "#8eb4ff"],
-      ["app", "log", "#8eb4ff"],
-      ["app", "xpui", "#8eb4ff"],
-      ["app", "map", "#8eb4ff"],
-      ["party", "apits", "#8eb4ff"],
-      ["resolve", "apits", "#8eb4ff"],
-      ["foes", "apits", "#8eb4ff"],
-      ["scene", "apits", "#8eb4ff"],
-      ["pictures", "apits", "#8eb4ff"],
-      ["log", "apits", "#8eb4ff"],
-      ["xpui", "apits", "#8eb4ff"],
-      ["map", "apits", "#8eb4ff"],
-      ["apits", "main", "#8eb4ff"],
-      ["main", "query", "#7dcea0"],
-      ["main", "mapsmod", "#7dcea0"],
-      ["main", "monsters", "#7dcea0"],
-      ["main", "npcs", "#7dcea0"],
-      ["main", "rulesmod", "#7dcea0"],
-      ["main", "pdf", "#7dcea0"],
-      ["main", "xpmod", "#7dcea0"],
-      ["main", "voice", "#7dcea0"],
-      ["main", "portraits", "#7dcea0"],
-      ["main", "tokenart", "#7dcea0"],
-      ["main", "media", "#c39bd3"],
-      ["query", "rulesmod", "#7dcea0"],
-      ["query", "monsters", "#7dcea0"],
-      ["query", "npcs", "#7dcea0"],
-      ["query", "ollama", "#f0d58c"],
-      ["query", "sqlite", "#c39bd3"],
-      ["query", "resolve", "#8eb4ff"],
-      ["mapsmod", "sqlite", "#c39bd3"],
-      ["mapsmod", "media", "#c39bd3"],
-      ["mapsmod", "map", "#8eb4ff"],
-      ["mapsmod", "foes", "#c39bd3"],
-      ["mapsmod", "scene", "#c39bd3"],
-      ["mapsmod", "party", "#c39bd3"],
-      ["mapsmod", "tokenart", "#7dcea0"],
-      ["monsters", "monsterpack", "#c39bd3"],
-      ["monsters", "sqlite", "#c39bd3"],
-      ["monsters", "foes", "#8eb4ff"],
-      ["npcs", "npcpack", "#c39bd3"],
-      ["npcs", "sqlite", "#c39bd3"],
-      ["npcs", "scene", "#8eb4ff"],
-      ["rulesmod", "rulespack", "#c39bd3"],
-      ["pdf", "sqlite", "#c39bd3"],
-      ["pdf", "party", "#8eb4ff"],
-      ["xpmod", "sqlite", "#c39bd3"],
-      ["xpmod", "xpui", "#8eb4ff"],
-      ["voice", "whisper", "#f0d58c"],
-      ["whisper", "resolve", "#f0d58c"],
-      ["portraits", "media", "#c39bd3"],
-      ["portraits", "party", "#c39bd3"],
-      ["pictures", "portraits", "#c39bd3"],
-      ["pictures", "resolve", "#8eb4ff"],
-      ["pictures", "map", "#8eb4ff"],
-      ["tokenart", "tokenpack", "#c39bd3"],
-      ["tokenart", "media", "#c39bd3"],
-      ["log", "sqlite", "#c39bd3"],
-    ];
-
-    function center(id) {
-      const board = document.getElementById("board").getBoundingClientRect();
-      const r = document.getElementById(id).getBoundingClientRect();
-      return {
-        x: r.left - board.left + r.width / 2,
-        y: r.top - board.top + r.height / 2,
-      };
-    }
-
-    function draw() {
-      const svg = document.getElementById("wires");
-      const board = document.getElementById("board");
-      svg.setAttribute("width", board.offsetWidth);
-      svg.setAttribute("height", board.offsetHeight);
-      svg.innerHTML = "";
-      for (const [a, b, color] of links) {
-        const p = center(a);
-        const q = center(b);
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        const midY = (p.y + q.y) / 2;
-        path.setAttribute("d", `M ${p.x} ${p.y} C ${p.x} ${midY}, ${q.x} ${midY}, ${q.x} ${q.y}`);
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", color);
-        path.setAttribute("stroke-width", "1.4");
-        path.setAttribute("stroke-opacity", "0.85");
-        svg.appendChild(path);
-      }
-    }
-
-    window.addEventListener("load", draw);
-    window.addEventListener("resize", draw);
-  </script>
 </body>
 </html>

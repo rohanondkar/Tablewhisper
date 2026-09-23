@@ -10,7 +10,7 @@ Open cmd: Start → type `cmd` → Enter.
 
 ![Tablewhisper architecture](ARCHITECTURE.png)
 
-Boxes are the running app, the screens, the API modules, and the files they read. Blue lines are UI calls, green lines are API routes, purple lines are saved data, and gold lines are optional local tools (Ollama and Whisper). The same diagram as code is [ARCHITECTURE.html](ARCHITECTURE.html) — open it in a browser.
+Boxes run in one direction: the screen calls the API, FastAPI hands each request to a module, and the columns underneath are the files or tools that module uses. The same diagram as code is [ARCHITECTURE.html](ARCHITECTURE.html) — open it in a browser.
 
 Project folder used below:
 
