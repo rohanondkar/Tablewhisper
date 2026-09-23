@@ -1,0 +1,1584 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Stage, Layer, Image as KonvaImage, Line, Circle, Rect, Text, Group } from "react-konva";
+import type Konva from "konva";
+import {
+  api,
+  mediaUrlSync,
+  type BattleMap,
+  type Character,
+  type EncounterEnemy,
+  type MapLight,
+  type MapPortal,
+  type MapToken,
+  type MapWall,
+  type MonsterTemplate,
+  type NpcTemplate,
+  type SceneNpc,
+} from "../api";
+import { CREATURE_SIZES, sizeToSquares } from "./sizes";
+import { feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
+
+const API_BASE = "http://127.0.0.1:8766";
+const MIN_SQUARES = 2;
+const MAX_SQUARES = 200;
+const MIN_MAP_PX = 16;
+const MAX_MAP_PX = 40000;
+
+type Tool =
+  | "select"
+  | "pan"
+  | "measure"
+  | "fog"
+  | "fog-erase"
+  | "wall"
+  | "door"
+  | "light"
+  | "portal";
+
+type Props = {
+  characters: Character[];
+  encounter: EncounterEnemy[];
+  scene: SceneNpc[];
+  monsters: MonsterTemplate[];
+  npcs: NpcTemplate[];
+  onError: (msg: string) => void;
+  onEncounterChange: () => Promise<void> | void;
+  onSceneChange: () => Promise<void> | void;
+  onCharactersChange?: () => Promise<void> | void;
+};
+
+function useHtmlImage(url: string | null | undefined) {
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!url) {
+      setImg(null);
+      return;
+    }
+    const i = new window.Image();
+    // Same-origin API media must not use anonymous CORS — it breaks SVG→canvas/Konva.
+    if (!url.startsWith(API_BASE) && !url.startsWith("/")) {
+      i.crossOrigin = "anonymous";
+    }
+    i.onload = () => setImg(i);
+    i.onerror = () => setImg(null);
+    i.src = url;
+  }, [url]);
+  return img;
+}
+
+export default function MapPanel({
+  characters,
+  encounter,
+  scene,
+  monsters,
+  npcs,
+  onError,
+  onEncounterChange,
+  onSceneChange,
+}: Props) {
+  const [mapsList, setMapsList] = useState<BattleMap[]>([]);
+  const [map, setMap] = useState<BattleMap | null>(null);
+  const [tokens, setTokens] = useState<MapToken[]>([]);
+  const [walls, setWalls] = useState<MapWall[]>([]);
+  const [lights, setLights] = useState<MapLight[]>([]);
+  const [portals, setPortals] = useState<MapPortal[]>([]);
+  const [tool, setTool] = useState<Tool>("select");
+  const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
+  const [selectedLightId, setSelectedLightId] = useState<string | null>(null);
+  const [selectedPortalId, setSelectedPortalId] = useState<string | null>(null);
+  const [playerPreview, setPlayerPreview] = useState(false);
+  const [showVision, setShowVision] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [stagePos, setStagePos] = useState({ x: 40, y: 40 });
+  const [measure, setMeasure] = useState<number[] | null>(null);
+  const [wallDraft, setWallDraft] = useState<number[]>([]);
+  const [portalDraft, setPortalDraft] = useState<{ x: number; y: number } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [calibrating, setCalibrating] = useState(false);
+  const [sqWide, setSqWide] = useState("24");
+  const [sqTall, setSqTall] = useState("16");
+  const [bgVersion, setBgVersion] = useState(0);
+  const [fogBrush, setFogBrush] = useState(40);
+  const [catalogFilter, setCatalogFilter] = useState("");
+  const [trayMode, setTrayMode] = useState<"field" | "add-foe" | "add-npc">("field");
+  const stageWrapRef = useRef<HTMLDivElement>(null);
+  const [stageSize, setStageSize] = useState({ w: 900, h: 600 });
+  const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [fogVersion, setFogVersion] = useState(0);
+  const paintingFog = useRef(false);
+  const lastFogPt = useRef<{ x: number; y: number } | null>(null);
+  const panning = useRef(false);
+  const panOrigin = useRef({ mx: 0, my: 0, sx: 0, sy: 0 });
+  const spaceHeld = useRef(false);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
+  const bgUrl = map?.background_url
+    ? mediaUrlSync(map.background_url, API_BASE) + `?v=${map.id}-${bgVersion}`
+    : null;
+  const fogUrl = map?.fog_url ? mediaUrlSync(map.fog_url, API_BASE) : null;
+  const bgImg = useHtmlImage(bgUrl);
+  const fogImg = useHtmlImage(fogUrl);
+
+  useEffect(() => {
+    if (!map) return;
+    const gs = Math.max(8, Number(map.grid_size_px) || 50);
+    setSqWide(String(Math.max(1, Math.round(map.width / gs))));
+    setSqTall(String(Math.max(1, Math.round(map.height / gs))));
+  }, [map?.id, map?.width, map?.height, map?.grid_size_px]);
+
+  const refreshList = useCallback(async () => {
+    const list = await api.listMaps();
+    setMapsList(list);
+    return list;
+  }, []);
+
+  function ensureFogCanvas(m: BattleMap, fillBlack: boolean) {
+    let c = fogCanvasRef.current;
+    if (!c) {
+      c = document.createElement("canvas");
+      fogCanvasRef.current = c;
+    }
+    // Cap fog bitmap so huge maps don't freeze/crash the tab on open.
+    const w = Math.max(1, Math.min(2048, Math.round(m.width)));
+    const h = Math.max(1, Math.min(2048, Math.round(m.height)));
+    if (c.width !== w || c.height !== h) {
+      const prev = document.createElement("canvas");
+      if (c.width > 0 && c.height > 0) {
+        prev.width = c.width;
+        prev.height = c.height;
+        prev.getContext("2d")?.drawImage(c, 0, 0);
+      }
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      if (ctx) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, w, h);
+        if (!fillBlack && prev.width > 0) ctx.drawImage(prev, 0, 0, w, h);
+      }
+      return;
+    }
+    if (fillBlack) {
+      const ctx = c.getContext("2d");
+      if (ctx) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, w, h);
+      }
+    }
+  }
+
+  const loadState = useCallback(
+    async (mapId?: string) => {
+      try {
+        const state = mapId ? await api.getMapState(mapId) : await api.getActiveMapState();
+        const m = {
+          ...state.map,
+          width: Math.min(MAX_MAP_PX, Math.max(MIN_MAP_PX, Number(state.map.width) || 1200)),
+          height: Math.min(MAX_MAP_PX, Math.max(MIN_MAP_PX, Number(state.map.height) || 800)),
+        };
+        setMap(m);
+        setTokens(state.tokens);
+        setWalls(state.walls);
+        setLights(state.lights);
+        setPortals(state.portals);
+        await refreshList();
+        ensureFogCanvas(m, !m.fog_url);
+        setFogVersion((v) => v + 1);
+      } catch (e) {
+        setMap(null);
+        setTokens([]);
+        setWalls([]);
+        setLights([]);
+        setPortals([]);
+        onErrorRef.current(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [refreshList]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await refreshList();
+        if (cancelled) return;
+        if (list.length === 0) {
+          const created = await api.createMap("Map 1");
+          await api.activateMap(created.id);
+        }
+        if (cancelled) return;
+        await loadState();
+      } catch (e) {
+        if (!cancelled) onErrorRef.current(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadState, refreshList]);
+
+  useEffect(() => {
+    const el = stageWrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setStageSize({
+        w: Math.max(320, el.clientWidth || 320),
+        h: Math.max(240, el.clientHeight || 240),
+      });
+    });
+    ro.observe(el);
+    setStageSize({
+      w: Math.max(320, el.clientWidth || 320),
+      h: Math.max(240, el.clientHeight || 240),
+    });
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceHeld.current = true;
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceHeld.current = false;
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!fogImg || !fogCanvasRef.current || !map) return;
+    const c = fogCanvasRef.current;
+    ensureFogCanvas(map, false);
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(fogImg, 0, 0, c.width, c.height);
+    setFogVersion((v) => v + 1);
+  }, [fogImg, map?.id]);
+
+  const segs = useMemo(() => wallsToSegments(walls), [walls]);
+  const selectedToken = tokens.find((t) => t.id === selectedTokenId) || null;
+
+  async function ensureMap(): Promise<BattleMap> {
+    if (map) return map;
+    const created = await api.createMap("Map 1");
+    const state = await api.activateMap(created.id);
+    setMap(state.map);
+    return state.map;
+  }
+
+  async function onUploadBackground(file: File) {
+    setBusy(true);
+    try {
+      const m = await ensureMap();
+      const updated = await api.uploadMapBackground(m.id, file);
+      setBgVersion((v) => v + 1);
+      setMap(updated);
+      ensureFogCanvas(updated, true);
+      setFogVersion((v) => v + 1);
+      await refreshList();
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyMapSquares() {
+    if (!map) return;
+    const gs = Math.max(8, Number(map.grid_size_px) || 50);
+    const wide = Math.min(MAX_SQUARES, Math.max(MIN_SQUARES, Math.round(Number(sqWide) || MIN_SQUARES)));
+    const tall = Math.min(MAX_SQUARES, Math.max(MIN_SQUARES, Math.round(Number(sqTall) || MIN_SQUARES)));
+    setSqWide(String(wide));
+    setSqTall(String(tall));
+    setBusy(true);
+    try {
+      const updated = await api.patchMap(map.id, {
+        width: Math.round(wide * gs),
+        height: Math.round(tall * gs),
+      });
+      setMap(updated);
+      ensureFogCanvas(updated, false);
+      setFogVersion((v) => v + 1);
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveGrid() {
+    if (!map) return;
+    setBusy(true);
+    try {
+      const updated = await api.patchMap(map.id, {
+        grid_size_px: map.grid_size_px,
+        grid_offset_x: map.grid_offset_x,
+        grid_offset_y: map.grid_offset_y,
+        feet_per_square: map.feet_per_square,
+        show_grid_overlay: map.show_grid_overlay,
+      });
+      setMap(updated);
+      setCalibrating(false);
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createScene() {
+    const name = window.prompt("Scene name", `Map ${mapsList.length + 1}`);
+    if (!name) return;
+    setBusy(true);
+    try {
+      const created = await api.createMap(name);
+      await api.activateMap(created.id);
+      await loadState(created.id);
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function switchMap(id: string) {
+    setBusy(true);
+    try {
+      await api.activateMap(id);
+      await loadState(id);
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncTokens() {
+    if (!map) return;
+    setBusy(true);
+    try {
+      const list = await api.syncMapTokens(map.id);
+      setTokens(list);
+      await onEncounterChange();
+      await onSceneChange();
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function placeExisting(
+    kind: "pc" | "enemy" | "npc",
+    refId: string,
+    label: string,
+    size: string,
+    imageUrl?: string | null
+  ) {
+    if (!map) return;
+    const existing = tokens.find((t) => t.kind === kind && t.ref_id === refId);
+    if (existing) {
+      setSelectedTokenId(existing.id);
+      return;
+    }
+    const gs = map.grid_size_px;
+    const t = await api.addMapToken(map.id, {
+      kind,
+      ref_id: refId,
+      label,
+      x: map.grid_offset_x + gs * 2,
+      y: map.grid_offset_y + gs * 2,
+      size,
+      size_sq: sizeToSquares(size),
+      vision_ft: 60,
+      show_vision: false,
+      // PCs: only pass a real portrait; omit invents nothing on the API.
+      ...(kind === "pc"
+        ? { image_url: imageUrl || null }
+        : { image_url: imageUrl || defaultTokenImage(kind) }),
+    });
+    setTokens((prev) => [...prev, t]);
+    setSelectedTokenId(t.id);
+  }
+
+  async function spawnFoeFromCatalog(m: MonsterTemplate) {
+    if (!map) return;
+    setBusy(true);
+    try {
+      const before = new Set(encounter.map((e) => e.id));
+      const spawned = await api.spawnEnemy(m.id, 1);
+      await onEncounterChange();
+      const fresh = await api.listEncounter();
+      const neu = fresh.filter((e) => !before.has(e.id));
+      // Tokens may already be placed by API; refresh map tokens
+      const state = await api.getMapState(map.id);
+      setTokens(state.tokens);
+      if (neu[0]) {
+        const tok = state.tokens.find((t) => t.kind === "enemy" && t.ref_id === neu[0].id);
+        if (tok) setSelectedTokenId(tok.id);
+      }
+      setTrayMode("field");
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function spawnNpcFromCatalog(n: NpcTemplate) {
+    if (!map) return;
+    setBusy(true);
+    try {
+      const before = new Set(scene.map((s) => s.id));
+      await api.spawnNpc(n.id, 1);
+      await onSceneChange();
+      const fresh = await api.listScene();
+      const neu = fresh.filter((s) => !before.has(s.id));
+      const state = await api.getMapState(map.id);
+      setTokens(state.tokens);
+      if (neu[0]) {
+        const tok = state.tokens.find((t) => t.kind === "npc" && t.ref_id === neu[0].id);
+        if (tok) setSelectedTokenId(tok.id);
+      }
+      setTrayMode("field");
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function snap(x: number, y: number) {
+    if (!map) return { x, y };
+    const gs = map.grid_size_px;
+    const ox = map.grid_offset_x;
+    const oy = map.grid_offset_y;
+    return {
+      x: ox + Math.round((x - ox) / gs) * gs,
+      y: oy + Math.round((y - oy) / gs) * gs,
+    };
+  }
+
+  function stagePointer(stage: Konva.Stage) {
+    const pos = stage.getPointerPosition();
+    if (!pos) return null;
+    return {
+      x: (pos.x - stagePos.x) / scale,
+      y: (pos.y - stagePos.y) / scale,
+    };
+  }
+
+  function isBgTarget(target: Konva.Node | null, stage: Konva.Stage) {
+    if (!target || target === stage) return true;
+    const name = target.name?.() || "";
+    return name === "bg" || name === "grid" || name === "fog";
+  }
+
+  async function persistFog() {
+    if (!map || !fogCanvasRef.current) return;
+    // Downscale for storage if needed — keep upload small.
+    const src = fogCanvasRef.current;
+    let blob: Blob | null = null;
+    try {
+      blob = await new Promise<Blob | null>((resolve) =>
+        src.toBlob((b) => resolve(b), "image/png")
+      );
+    } catch {
+      blob = null;
+    }
+    if (!blob) return;
+    const updated = await api.uploadFog(map.id, blob);
+    setMap(updated);
+  }
+
+  function mapToFog(x: number, y: number) {
+    const c = fogCanvasRef.current;
+    if (!c || !map || map.width <= 0 || map.height <= 0) return { x, y };
+    return {
+      x: (x / map.width) * c.width,
+      y: (y / map.height) * c.height,
+    };
+  }
+
+  function paintFogStroke(mapX: number, mapY: number, erase: boolean) {
+    const c = fogCanvasRef.current;
+    if (!c || !map) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = mapToFog(mapX, mapY);
+    const scale = c.width / Math.max(1, map.width);
+    const r = Math.max(4, fogBrush * scale);
+    ctx.globalCompositeOperation = erase ? "destination-out" : "source-over";
+    ctx.strokeStyle = "#000";
+    ctx.fillStyle = "#000";
+    ctx.lineWidth = r * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const prev = lastFogPt.current;
+    if (prev) {
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    lastFogPt.current = { x, y };
+    setFogVersion((v) => v + 1);
+  }
+
+  async function onStageMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
+    const stage = e.target.getStage();
+    if (!stage || !map) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    const wantPan = tool === "pan" || spaceHeld.current || e.evt.button === 1;
+    if (wantPan) {
+      // Move map tool: drag anywhere. Space / middle-mouse also pan.
+      panning.current = true;
+      panOrigin.current = {
+        mx: pointer.x,
+        my: pointer.y,
+        sx: stagePos.x,
+        sy: stagePos.y,
+      };
+      e.evt.preventDefault();
+      return;
+    }
+
+    const p = stagePointer(stage);
+    if (!p) return;
+
+    if (tool === "measure") {
+      setMeasure([p.x, p.y, p.x, p.y]);
+      return;
+    }
+
+    if (tool === "fog" || tool === "fog-erase") {
+      paintingFog.current = true;
+      lastFogPt.current = null;
+      paintFogStroke(p.x, p.y, tool === "fog-erase");
+      return;
+    }
+
+    if (tool === "wall" || tool === "door") {
+      const s = snap(p.x, p.y);
+      setWallDraft((d) => [...d, s.x, s.y]);
+      return;
+    }
+
+    if (tool === "light") {
+      const s = snap(p.x, p.y);
+      const L = await api.addMapLight(map.id, { x: s.x, y: s.y, bright_ft: 20, dim_ft: 20 });
+      setLights((prev) => [...prev, L]);
+      setSelectedLightId(L.id);
+      setTool("select");
+      return;
+    }
+
+    if (tool === "portal") {
+      const s = snap(p.x, p.y);
+      if (!portalDraft) {
+        setPortalDraft(s);
+        return;
+      }
+      const targets = mapsList.filter((m) => m.id !== map.id);
+      if (targets.length === 0) {
+        onErrorRef.current("Create another scene first to connect maps.");
+        setPortalDraft(null);
+        return;
+      }
+      const pick =
+        targets.length === 1
+          ? targets[0].id
+          : window.prompt(
+              `Target map id:\n${targets.map((t) => `${t.name} (${t.id.slice(0, 8)})`).join("\n")}`,
+              targets[0].id
+            );
+      if (!pick) {
+        setPortalDraft(null);
+        return;
+      }
+      const target = targets.find((t) => t.id === pick || t.id.startsWith(pick)) || targets[0];
+      const portal = await api.addMapPortal(map.id, {
+        x: portalDraft.x,
+        y: portalDraft.y,
+        radius: map.grid_size_px * 0.8,
+        target_map_id: target.id,
+        target_x: s.x,
+        target_y: s.y,
+        label: `To ${target.name}`,
+      });
+      setPortals((prev) => [...prev, portal]);
+      setPortalDraft(null);
+      setTool("select");
+      return;
+    }
+
+    if (tool === "select" && isBgTarget(e.target, stage)) {
+      setSelectedTokenId(null);
+      setSelectedWallId(null);
+      setSelectedLightId(null);
+      setSelectedPortalId(null);
+    }
+  }
+
+  function onStageMouseMove(e: Konva.KonvaEventObject<MouseEvent>) {
+    const stage = e.target.getStage();
+    if (!stage || !map) return;
+    const pointer = stage.getPointerPosition();
+    if (!pointer) return;
+
+    if (panning.current) {
+      setStagePos({
+        x: panOrigin.current.sx + (pointer.x - panOrigin.current.mx),
+        y: panOrigin.current.sy + (pointer.y - panOrigin.current.my),
+      });
+      return;
+    }
+
+    const p = stagePointer(stage);
+    if (!p) return;
+    if (tool === "measure" && measure) {
+      setMeasure([measure[0], measure[1], p.x, p.y]);
+    }
+    if ((tool === "fog" || tool === "fog-erase") && paintingFog.current) {
+      paintFogStroke(p.x, p.y, tool === "fog-erase");
+    }
+  }
+
+  async function onStageMouseUp() {
+    if (panning.current) {
+      panning.current = false;
+      return;
+    }
+    if ((tool === "fog" || tool === "fog-erase") && paintingFog.current) {
+      paintingFog.current = false;
+      lastFogPt.current = null;
+      try {
+        await persistFog();
+      } catch (err) {
+        onErrorRef.current(err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  async function finishWall() {
+    if (!map || wallDraft.length < 4) {
+      setWallDraft([]);
+      return;
+    }
+    const w = await api.addMapWall(map.id, {
+      points: wallDraft,
+      door: tool === "door",
+      door_open: false,
+      block_movement: true,
+      block_sight: true,
+    });
+    setWalls((prev) => [...prev, w]);
+    setWallDraft([]);
+    setTool("select");
+  }
+
+  async function onTokenDragEnd(token: MapToken, x: number, y: number) {
+    if (!map) return;
+    const s = snap(x, y);
+    const updated = await api.patchMapToken(token.id, { x: s.x, y: s.y });
+    setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    for (const portal of portals) {
+      const d = Math.hypot(s.x - portal.x, s.y - portal.y);
+      if (d <= portal.radius) {
+        if (window.confirm(`Traverse portal "${portal.label}"?`)) {
+          await api.traversePortal(portal.id, [token.id]);
+          await loadState(portal.target_map_id);
+        }
+        break;
+      }
+    }
+  }
+
+  const gridLines = useMemo(() => {
+    if (!map || !map.show_grid_overlay) return [] as number[][];
+    const lines: number[][] = [];
+    const { width, height, grid_offset_x: ox, grid_offset_y: oy } = map;
+    // Guard against 0/NaN grid size (infinite loop) and runaway line counts.
+    const gs = Math.max(8, Number(map.grid_size_px) || 50);
+    const maxLines = 500;
+    for (let x = ox, n = 0; x <= width && n < maxLines; x += gs, n++) lines.push([x, 0, x, height]);
+    for (let y = oy, n = 0; y <= height && n < maxLines; y += gs, n++) lines.push([0, y, width, y]);
+    for (let x = ox - gs, n = 0; x >= 0 && n < maxLines; x -= gs, n++) lines.push([x, 0, x, height]);
+    for (let y = oy - gs, n = 0; y >= 0 && n < maxLines; y -= gs, n++) lines.push([0, y, width, y]);
+    return lines;
+  }, [map]);
+
+  const visionPolys = useMemo(() => {
+    if (!map || !showVision) return [] as { key: string; points: number[]; dim?: boolean }[];
+    const out: { key: string; points: number[]; dim?: boolean }[] = [];
+    for (const t of tokens) {
+      if (!t.show_vision || t.vision_ft <= 0) continue;
+      const r = feetToPx(t.vision_ft, map.grid_size_px, map.feet_per_square);
+      const cx = t.x + (t.size_sq * map.grid_size_px) / 2;
+      const cy = t.y + (t.size_sq * map.grid_size_px) / 2;
+      out.push({
+        key: t.id,
+        points: visibilityPolygon({ x: cx, y: cy }, r, segs),
+      });
+    }
+    for (const L of lights) {
+      const bright = feetToPx(L.bright_ft, map.grid_size_px, map.feet_per_square);
+      const dim = feetToPx(L.bright_ft + L.dim_ft, map.grid_size_px, map.feet_per_square);
+      out.push({
+        key: `L-${L.id}-d`,
+        points: visibilityPolygon({ x: L.x, y: L.y }, dim, segs),
+        dim: true,
+      });
+      out.push({
+        key: `L-${L.id}-b`,
+        points: visibilityPolygon({ x: L.x, y: L.y }, bright, segs),
+      });
+    }
+    return out;
+  }, [map, tokens, lights, segs, showVision]);
+
+  const measureLabel = useMemo(() => {
+    if (!measure || !map) return null;
+    const px = Math.hypot(measure[2] - measure[0], measure[3] - measure[1]);
+    const feet = (px / map.grid_size_px) * map.feet_per_square;
+    return `${feet.toFixed(1)} ft`;
+  }, [measure, map]);
+
+  // Force Konva to refresh when fog bitmap changes (canvas element is reused).
+  const fogCanvasImage = fogVersion >= 0 ? fogCanvasRef.current : null;
+
+  const filterLower = catalogFilter.trim().toLowerCase();
+  const filteredMonsters = monsters.filter(
+    (m) => !filterLower || m.name.toLowerCase().includes(filterLower)
+  );
+  const filteredNpcs = npcs.filter(
+    (n) => !filterLower || n.name.toLowerCase().includes(filterLower)
+  );
+
+  const cursor =
+    tool === "pan" || spaceHeld.current
+      ? "grab"
+      : tool === "fog" || tool === "fog-erase"
+        ? "crosshair"
+        : "default";
+
+  return (
+    <div className="map-workspace">
+      <div className="map-topbar">
+        <div className="map-scenes">
+          {mapsList.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`btn ghost ${map?.id === m.id ? "active-tab" : ""}`}
+              onClick={() => void switchMap(m.id)}
+            >
+              {m.name}
+            </button>
+          ))}
+          <button type="button" className="btn" disabled={busy} onClick={() => void createScene()}>
+            + Scene
+          </button>
+        </div>
+        <div className="row">
+          <label className="btn">
+            Upload map
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onUploadBackground(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <button type="button" className="btn" disabled={busy || !map} onClick={() => void syncTokens()}>
+            Sync tokens
+          </button>
+          <button
+            type="button"
+            className={`btn ${playerPreview ? "" : "ghost"}`}
+            onClick={() => setPlayerPreview((v) => !v)}
+          >
+            {playerPreview ? "Player preview ON" : "Player preview"}
+          </button>
+          <button
+            type="button"
+            className={`btn ${showVision ? "" : "ghost"}`}
+            title="Yellow rings are vision / light range. Off by default."
+            onClick={() => setShowVision((v) => !v)}
+          >
+            {showVision ? "Vision ON" : "Vision OFF"}
+          </button>
+          <button type="button" className="btn ghost" onClick={() => setCalibrating((v) => !v)}>
+            Calibrate grid
+          </button>
+        </div>
+      </div>
+
+      {map && (
+        <div className="map-calibrate">
+          <strong>Map area</strong>
+          <label>
+            squares wide
+            <input
+              type="number"
+              min={MIN_SQUARES}
+              max={MAX_SQUARES}
+              value={sqWide}
+              onChange={(e) => setSqWide(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void applyMapSquares();
+              }}
+            />
+          </label>
+          <label>
+            squares tall
+            <input
+              type="number"
+              min={MIN_SQUARES}
+              max={MAX_SQUARES}
+              value={sqTall}
+              onChange={(e) => setSqTall(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void applyMapSquares();
+              }}
+            />
+          </label>
+          <button type="button" className="btn" disabled={busy} onClick={() => void applyMapSquares()}>
+            Set size
+          </button>
+          <span className="muted small">
+            Each square stays {Math.round(map.grid_size_px)}px. A larger area adds more squares.
+          </span>
+        </div>
+      )}
+
+      {calibrating && map && (
+        <div className="map-calibrate">
+          <strong>Grid calibration</strong>
+          <label>
+            px / square
+            <input
+              type="number"
+              min={8}
+              value={map.grid_size_px}
+              onChange={(e) =>
+                setMap({ ...map, grid_size_px: Math.max(8, Number(e.target.value) || 50) })
+              }
+            />
+          </label>
+          <label>
+            offset X
+            <input
+              type="number"
+              value={map.grid_offset_x}
+              onChange={(e) => setMap({ ...map, grid_offset_x: Number(e.target.value) || 0 })}
+            />
+          </label>
+          <label>
+            offset Y
+            <input
+              type="number"
+              value={map.grid_offset_y}
+              onChange={(e) => setMap({ ...map, grid_offset_y: Number(e.target.value) || 0 })}
+            />
+          </label>
+          <label>
+            feet / square
+            <input
+              type="number"
+              min={1}
+              value={map.feet_per_square}
+              onChange={(e) =>
+                setMap({ ...map, feet_per_square: Math.max(1, Number(e.target.value) || 5) })
+              }
+            />
+          </label>
+          <label className="row">
+            <input
+              type="checkbox"
+              checked={map.show_grid_overlay}
+              onChange={(e) => setMap({ ...map, show_grid_overlay: e.target.checked })}
+            />
+            Show grid overlay
+          </label>
+          <button type="button" className="btn" onClick={() => void saveGrid()}>
+            Save grid
+          </button>
+        </div>
+      )}
+
+      <div className="map-body">
+        <aside className="map-tray">
+          <div className="row" style={{ marginBottom: "0.4rem" }}>
+            <button
+              type="button"
+              className={`btn ghost ${trayMode === "field" ? "active-tab" : ""}`}
+              onClick={() => setTrayMode("field")}
+            >
+              On field
+            </button>
+            <button
+              type="button"
+              className={`btn ghost ${trayMode === "add-foe" ? "active-tab" : ""}`}
+              onClick={() => setTrayMode("add-foe")}
+            >
+              + Foe
+            </button>
+            <button
+              type="button"
+              className={`btn ghost ${trayMode === "add-npc" ? "active-tab" : ""}`}
+              onClick={() => setTrayMode("add-npc")}
+            >
+              + NPC
+            </button>
+          </div>
+
+          {trayMode === "field" && (
+            <>
+              <h3>Party</h3>
+              {characters.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className="map-tray-item"
+                  onClick={() =>
+                    void placeExisting("pc", c.id, c.name, c.size || "Medium", c.image_url)
+                  }
+                >
+                  {c.name}
+                  <span className="muted small">{c.size || "Medium"}</span>
+                </button>
+              ))}
+              <h3>Foes (encounter)</h3>
+              {encounter.length === 0 && <p className="muted small">None yet — use + Foe</p>}
+              {encounter.map((e) => (
+                <button
+                  key={e.id}
+                  type="button"
+                  className="map-tray-item"
+                  onClick={() =>
+                    void placeExisting(
+                      "enemy",
+                      e.id,
+                      e.label,
+                      e.size || "Medium",
+                      e.image_url
+                    )
+                  }
+                >
+                  {e.label}
+                  <span className="muted small">{e.size || ""}</span>
+                </button>
+              ))}
+              <h3>Scene NPCs</h3>
+              {scene.length === 0 && <p className="muted small">None yet — use + NPC</p>}
+              {scene.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  className="map-tray-item"
+                  onClick={() =>
+                    void placeExisting("npc", n.id, n.label, n.size || "Medium", n.image_url)
+                  }
+                >
+                  {n.label}
+                </button>
+              ))}
+            </>
+          )}
+
+          {trayMode === "add-foe" && (
+            <>
+              <input
+                className="spawn-filter"
+                placeholder="Search monsters…"
+                value={catalogFilter}
+                onChange={(e) => setCatalogFilter(e.target.value)}
+              />
+              <p className="muted small">Adds to Encounter and places a token.</p>
+              <div className="map-tray-scroll">
+                {filteredMonsters.slice(0, 80).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="map-tray-item"
+                    disabled={busy}
+                    onClick={() => void spawnFoeFromCatalog(m)}
+                  >
+                    {m.name}
+                    <span className="muted small">{m.size || ""}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {trayMode === "add-npc" && (
+            <>
+              <input
+                className="spawn-filter"
+                placeholder="Search NPCs…"
+                value={catalogFilter}
+                onChange={(e) => setCatalogFilter(e.target.value)}
+              />
+              <p className="muted small">Adds to Scene and places a token.</p>
+              <div className="map-tray-scroll">
+                {filteredNpcs.map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className="map-tray-item"
+                    disabled={busy}
+                    onClick={() => void spawnNpcFromCatalog(n)}
+                  >
+                    {n.name}
+                    <span className="muted small">{n.size || ""}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </aside>
+
+        <div className="map-stage-wrap" ref={stageWrapRef} style={{ cursor }}>
+          <div className="map-tools">
+            {(
+              [
+                ["select", "Select"],
+                ["pan", "Move map"],
+                ["measure", "Ruler"],
+                ["fog", "Fog"],
+                ["fog-erase", "Reveal"],
+                ["wall", "Wall"],
+                ["door", "Door"],
+                ["light", "Light"],
+                ["portal", "Portal"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                className={`btn ghost ${tool === id ? "active-tab" : ""}`}
+                onClick={() => {
+                  setTool(id);
+                  if (id !== "measure") setMeasure(null);
+                  if (id !== "wall" && id !== "door") setWallDraft([]);
+                  if (id !== "portal") setPortalDraft(null);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            {(tool === "fog" || tool === "fog-erase") && (
+              <label className="fog-brush-label">
+                Brush
+                <input
+                  type="range"
+                  min={10}
+                  max={120}
+                  value={fogBrush}
+                  onChange={(e) => setFogBrush(Number(e.target.value))}
+                />
+              </label>
+            )}
+            {(tool === "wall" || tool === "door") && (
+              <button type="button" className="btn" onClick={() => void finishWall()}>
+                Finish {tool}
+              </button>
+            )}
+            {map && (
+              <>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={async () => {
+                    ensureFogCanvas(map, true);
+                    await api.resetFog(map.id);
+                    setFogVersion((v) => v + 1);
+                    const updated = await api.getMapState(map.id);
+                    setMap(updated.map);
+                  }}
+                >
+                  Reset fog
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    const c = fogCanvasRef.current;
+                    if (!c) return;
+                    const ctx = c.getContext("2d");
+                    if (!ctx) return;
+                    ctx.clearRect(0, 0, c.width, c.height);
+                    setFogVersion((v) => v + 1);
+                    void persistFog();
+                  }}
+                >
+                  Reveal all
+                </button>
+              </>
+            )}
+          </div>
+
+          <Stage
+            width={stageSize.w}
+            height={stageSize.h}
+            scaleX={scale}
+            scaleY={scale}
+            x={stagePos.x}
+            y={stagePos.y}
+            draggable={false}
+            onWheel={(e) => {
+              e.evt.preventDefault();
+              const factor = e.evt.deltaY > 0 ? 0.9 : 1.1;
+              setScale((s) => Math.min(4, Math.max(0.2, s * factor)));
+            }}
+            onMouseDown={(e) => void onStageMouseDown(e)}
+            onMouseMove={(e) => onStageMouseMove(e)}
+            onMouseUp={() => void onStageMouseUp()}
+            onMouseLeave={() => void onStageMouseUp()}
+          >
+            <Layer>
+              {map && (
+                <Rect name="bg" width={map.width} height={map.height} fill="#1a1a1a" />
+              )}
+              {bgImg && map && (
+                <KonvaImage image={bgImg} width={map.width} height={map.height} name="bg" />
+              )}
+              {gridLines.map((pts, i) => (
+                <Line
+                  key={`g-${i}`}
+                  name="grid"
+                  points={pts}
+                  stroke="rgba(255,255,255,0.18)"
+                  strokeWidth={1}
+                  listening={false}
+                />
+              ))}
+            </Layer>
+
+            <Layer listening={false}>
+              {visionPolys.map((v) =>
+                v.points.length >= 6 ? (
+                  <Line
+                    key={v.key}
+                    points={v.points}
+                    closed
+                    fill={v.dim ? "rgba(255,220,120,0.08)" : "rgba(255,220,120,0.14)"}
+                    listening={false}
+                  />
+                ) : null
+              )}
+            </Layer>
+
+            <Layer>
+              {lights.map((L) => (
+                <Circle
+                  key={L.id}
+                  x={L.x}
+                  y={L.y}
+                  radius={8}
+                  fill="#f5c542"
+                  stroke={selectedLightId === L.id ? "#fff" : "#a67c00"}
+                  onClick={() => {
+                    setSelectedLightId(L.id);
+                    setSelectedTokenId(null);
+                  }}
+                  draggable={tool === "select"}
+                  onDragStart={(ev) => {
+                    ev.cancelBubble = true;
+                  }}
+                  onDragEnd={async (ev) => {
+                    ev.cancelBubble = true;
+                    const updated = await api.patchMapLight(L.id, {
+                      x: ev.target.x(),
+                      y: ev.target.y(),
+                    });
+                    setLights((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                  }}
+                />
+              ))}
+              {walls.map((w) => (
+                <Line
+                  key={w.id}
+                  points={w.points}
+                  stroke={
+                    w.door
+                      ? w.door_open
+                        ? "#6bcb77"
+                        : "#e87a3a"
+                      : selectedWallId === w.id
+                        ? "#7ec8ff"
+                        : "#c44"
+                  }
+                  strokeWidth={w.door ? 5 : 4}
+                  lineCap="round"
+                  lineJoin="round"
+                  onClick={async () => {
+                    setSelectedWallId(w.id);
+                    if (w.door && tool === "select") {
+                      const updated = await api.patchMapWall(w.id, {
+                        door_open: !w.door_open,
+                      });
+                      setWalls((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                    }
+                  }}
+                />
+              ))}
+              {wallDraft.length >= 2 && (
+                <Line points={wallDraft} stroke="#7ec8ff" strokeWidth={3} dash={[6, 4]} />
+              )}
+              {portals.map((p) => (
+                <Group
+                  key={p.id}
+                  x={p.x}
+                  y={p.y}
+                  draggable={tool === "select"}
+                  onDragStart={(ev) => {
+                    ev.cancelBubble = true;
+                  }}
+                  onClick={() => setSelectedPortalId(p.id)}
+                  onDblClick={async () => {
+                    if (selectedTokenId) {
+                      await api.traversePortal(p.id, [selectedTokenId]);
+                      await loadState(p.target_map_id);
+                    } else {
+                      await switchMap(p.target_map_id);
+                    }
+                  }}
+                  onDragEnd={async (ev) => {
+                    ev.cancelBubble = true;
+                    const updated = await api.patchMapPortal(p.id, {
+                      x: ev.target.x(),
+                      y: ev.target.y(),
+                    });
+                    setPortals((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                  }}
+                >
+                  <Circle
+                    radius={p.radius}
+                    stroke="#9b59ff"
+                    strokeWidth={2}
+                    dash={[4, 4]}
+                    fill="rgba(155,89,255,0.15)"
+                  />
+                  <Text text={p.label} y={-p.radius - 14} fontSize={12} fill="#d7bfff" />
+                </Group>
+              ))}
+            </Layer>
+
+            <Layer>
+              {tokens.map((t) => {
+                const side = (map?.grid_size_px || 50) * (t.size_sq || 1);
+                return (
+                  <TokenNode
+                    key={t.id}
+                    token={t}
+                    side={side}
+                    selected={selectedTokenId === t.id}
+                    draggable={tool === "select"}
+                    onSelect={() => {
+                      setSelectedTokenId(t.id);
+                      setSelectedWallId(null);
+                    }}
+                    onDragEnd={(x, y) => void onTokenDragEnd(t, x, y)}
+                  />
+                );
+              })}
+            </Layer>
+
+            <Layer listening={false}>
+              {measure && (
+                <>
+                  <Line points={measure} stroke="#5ad" strokeWidth={2} dash={[8, 4]} />
+                  <Text
+                    x={(measure[0] + measure[2]) / 2}
+                    y={(measure[1] + measure[3]) / 2 - 16}
+                    text={measureLabel || ""}
+                    fill="#9cf"
+                    fontSize={14}
+                  />
+                </>
+              )}
+            </Layer>
+
+            {/* Only show fog while editing it or in player preview — always-on fog looked like a blank black map. */}
+            {fogCanvasImage && map && (playerPreview || tool === "fog" || tool === "fog-erase") && (
+              <Layer listening={false}>
+                <KonvaImage
+                  key={`fog-${fogVersion}`}
+                  name="fog"
+                  image={fogCanvasImage}
+                  width={map.width}
+                  height={map.height}
+                  opacity={playerPreview ? 1 : 0.55}
+                />
+              </Layer>
+            )}
+          </Stage>
+        </div>
+
+        <aside className="map-inspector">
+          <h3>Inspector</h3>
+          <p className="muted small">
+            <strong>Select</strong> moves tokens. <strong>Move map</strong> click-drags the board
+            (or hold Space). Yellow rings = vision/light — use <strong>Vision OFF</strong> to hide.
+          </p>
+          {selectedToken && (
+            <div className="map-inspector-block">
+              <strong>{selectedToken.label}</strong>
+              <label>
+                Size
+                <select
+                  value={selectedToken.size}
+                  onChange={async (e) => {
+                    const size = e.target.value;
+                    const updated = await api.patchMapToken(selectedToken.id, {
+                      size,
+                      size_sq: sizeToSquares(size),
+                    });
+                    setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                  }}
+                >
+                  {CREATURE_SIZES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Vision (ft)
+                <input
+                  type="number"
+                  value={selectedToken.vision_ft}
+                  onChange={async (e) => {
+                    const updated = await api.patchMapToken(selectedToken.id, {
+                      vision_ft: Number(e.target.value) || 0,
+                    });
+                    setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={async () => {
+                  await api.deleteMapToken(selectedToken.id);
+                  setTokens((prev) => prev.filter((t) => t.id !== selectedToken.id));
+                  setSelectedTokenId(null);
+                }}
+              >
+                Remove from map
+              </button>
+            </div>
+          )}
+          {selectedWallId && (
+            <div className="map-inspector-block">
+              <strong>Wall / door</strong>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={async () => {
+                  await api.deleteMapWall(selectedWallId);
+                  setWalls((prev) => prev.filter((w) => w.id !== selectedWallId));
+                  setSelectedWallId(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+          {selectedLightId && (
+            <div className="map-inspector-block">
+              <strong>Light</strong>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={async () => {
+                  await api.deleteMapLight(selectedLightId);
+                  setLights((prev) => prev.filter((L) => L.id !== selectedLightId));
+                  setSelectedLightId(null);
+                }}
+              >
+                Delete light
+              </button>
+            </div>
+          )}
+          {selectedPortalId && (
+            <div className="map-inspector-block">
+              <strong>Portal</strong>
+              <button
+                type="button"
+                className="btn"
+                disabled={!selectedTokenId}
+                onClick={async () => {
+                  if (!selectedTokenId) return;
+                  await api.traversePortal(selectedPortalId, [selectedTokenId]);
+                  const p = portals.find((x) => x.id === selectedPortalId);
+                  if (p) await loadState(p.target_map_id);
+                }}
+              >
+                Traverse with selected
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={async () => {
+                  await api.deleteMapPortal(selectedPortalId);
+                  setPortals((prev) => prev.filter((p) => p.id !== selectedPortalId));
+                  setSelectedPortalId(null);
+                }}
+              >
+                Delete portal
+              </button>
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function TokenNode({
+  token,
+  side,
+  selected,
+  draggable,
+  onSelect,
+  onDragEnd,
+}: {
+  token: MapToken;
+  side: number;
+  selected: boolean;
+  draggable: boolean;
+  onSelect: () => void;
+  onDragEnd: (x: number, y: number) => void;
+}) {
+  // PCs: only show a real uploaded portrait (match console). Never invent a face.
+  const isPc = token.kind === "pc";
+  const fallback =
+    token.kind === "npc"
+      ? "/media/tokens/token-npc-generic.png"
+      : "/media/tokens/token-humanoid.png";
+  let path: string | null = token.image_url || null;
+  if (path && path.endsWith(".svg") && path.includes("/monsters/")) {
+    path = path.replace(/\.svg$/i, ".png");
+  }
+  if (
+    path &&
+    (/\/media\/monsters\/srd\/generic\.(png|svg)$/i.test(path) ||
+      /\/media\/npcs\/srd\/generic\./i.test(path))
+  ) {
+    path = isPc ? null : fallback;
+  }
+  // Strip accidental humanoid fallback that was applied to PCs earlier.
+  if (isPc && path && path.includes("/media/tokens/token-humanoid")) {
+    path = null;
+  }
+  if (!isPc && !path) {
+    path = fallback;
+  }
+  const url = path ? mediaUrlSync(path, API_BASE) : null;
+  const img = useHtmlImage(url);
+  const fill =
+    token.kind === "pc" ? "#2d6a4f" : token.kind === "enemy" ? "#9b2226" : "#1d3557";
+  const initials = (token.label || "?")
+    .split(/\s+/)
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <Group
+      x={token.x}
+      y={token.y}
+      draggable={draggable}
+      onClick={(e) => {
+        e.cancelBubble = true;
+        onSelect();
+      }}
+      onTap={(e) => {
+        e.cancelBubble = true;
+        onSelect();
+      }}
+      onDragStart={(e) => {
+        e.cancelBubble = true;
+      }}
+      onDragMove={(e) => {
+        e.cancelBubble = true;
+      }}
+      onDragEnd={(e) => {
+        e.cancelBubble = true;
+        onDragEnd(e.target.x(), e.target.y());
+      }}
+    >
+      {img ? (
+        <KonvaImage
+          image={img}
+          width={side}
+          height={side}
+          cornerRadius={side * 0.15}
+          stroke={selected ? "#fff" : "#000"}
+          strokeWidth={selected ? 3 : 1}
+        />
+      ) : (
+        <>
+          <Rect
+            width={side}
+            height={side}
+            fill={fill}
+            cornerRadius={side * 0.15}
+            stroke={selected ? "#fff" : "#000"}
+            strokeWidth={selected ? 3 : 1}
+          />
+          {isPc && (
+            <Text
+              text={initials}
+              width={side}
+              height={side}
+              align="center"
+              verticalAlign="middle"
+              fontSize={Math.max(12, side * 0.35)}
+              fill="#fff"
+              fontStyle="bold"
+            />
+          )}
+        </>
+      )}
+      <Text
+        text={token.label}
+        width={side}
+        y={side + 2}
+        fontSize={Math.max(10, side * 0.22)}
+        fill="#eee"
+        align="center"
+      />
+    </Group>
+  );
+}
+
+function defaultTokenImage(kind: string): string {
+  if (kind === "npc") return "/media/tokens/token-npc-generic.png";
+  return "/media/tokens/token-humanoid.png";
+}

@@ -42,22 +42,53 @@ def reload_catalog() -> None:
 def image_url_for(npc: dict[str, Any]) -> str:
     mid = npc.get("id") or "generic"
     image = npc.get("image") or f"{mid}.svg"
-    custom = CUSTOM_IMAGE_DIR / image
+
+    # 1) Custom uploads
+    for path in (
+        CUSTOM_IMAGE_DIR / image,
+        CUSTOM_IMAGE_DIR / f"{mid}.png",
+        CUSTOM_IMAGE_DIR / f"{mid}.jpg",
+    ):
+        if path.exists() and path.is_file():
+            # Preserve nested relative names for StaticFiles (e.g. tokens/foo.jpg under custom)
+            rel = path.relative_to(CUSTOM_IMAGE_DIR).as_posix()
+            return f"{MEDIA_NPCS}/custom/{rel}"
+
+    # 2) Catalog image (PD tokens under images/tokens/..., etc.)
     srd = SRD_IMAGE_DIR / image
-    srd_by_id = SRD_IMAGE_DIR / f"{mid}.svg"
-    if custom.exists():
-        return f"{MEDIA_NPCS}/custom/{image}"
-    if srd.exists():
-        return f"{MEDIA_NPCS}/srd/{image}"
-    if srd_by_id.exists():
-        return f"{MEDIA_NPCS}/srd/{mid}.svg"
+    if srd.exists() and srd.is_file() and "generic" not in srd.name.lower():
+        return f"{MEDIA_NPCS}/srd/{Path(image).as_posix()}"
+
+    for path in (
+        SRD_IMAGE_DIR / f"{mid}.jpg",
+        SRD_IMAGE_DIR / f"{mid}.png",
+        SRD_IMAGE_DIR / f"{mid}.svg",
+    ):
+        if path.exists() and path.is_file() and "generic" not in path.name.lower():
+            return f"{MEDIA_NPCS}/srd/{path.name}"
+
+    # 3) Role/id portraits from token-portraits pack
+    try:
+        from .token_art import TOKEN_DIR, npc_portrait
+
+        url = npc_portrait(npc)
+        fname = url.rsplit("/", 1)[-1]
+        if (TOKEN_DIR / fname).is_file():
+            return url
+    except Exception:
+        pass
+
+    generic_jpg = SRD_IMAGE_DIR / "generic.jpg"
+    if generic_jpg.exists():
+        return f"{MEDIA_NPCS}/srd/generic.jpg"
     return f"{MEDIA_NPCS}/srd/generic.svg"
 
 
 def with_image(npc: dict[str, Any]) -> dict[str, Any]:
+    from .creature_size import ensure_creature_size
     from .xp import normalize_cr, xp_for_creature
 
-    out = dict(npc)
+    out = ensure_creature_size(dict(npc), "Medium")
     out["image_url"] = image_url_for(npc)
     out.setdefault("cr", "0")
     out["cr"] = normalize_cr(out.get("cr"))
@@ -104,7 +135,7 @@ def find_template_by_name(text: str) -> dict[str, Any] | None:
 
 
 _LABEL_RE = re.compile(
-    r"\b([a-z][a-z\- ]{1,30}?)\s*[- ]?\s*([a-z]|\d+)\b",
+    r"\b([a-z][a-z'\-]{2,24}(?:\s+[a-z][a-z'\-]{2,24}){0,3})(?:\s+|-)([a-z]|\d+)\b",
     re.IGNORECASE,
 )
 
@@ -210,6 +241,17 @@ def save_custom_npc(data: dict[str, Any]) -> dict[str, Any]:
     return with_image(data)
 
 
+def set_npc_image(npc_id: str, dest_name: str) -> dict[str, Any]:
+    ensure_scene_tables()
+    tmpl = get_template(npc_id) or _load_all_npcs().get(npc_id)
+    if not tmpl:
+        raise ValueError(f"Unknown NPC: {npc_id}")
+    data = {k: v for k, v in dict(tmpl).items() if k not in {"image_url", "size_sq"}}
+    data["id"] = npc_id
+    data["image"] = dest_name
+    return save_custom_npc(data)
+
+
 def list_scene() -> list[dict[str, Any]]:
     ensure_scene_tables()
     sid = db.active_session_id()
@@ -225,7 +267,13 @@ def list_scene() -> list[dict[str, Any]]:
         ).fetchall()
         out = []
         for r in rows:
-            tmpl = with_image(json.loads(r["data_json"]))
+            snap = json.loads(r["data_json"])
+            live = get_template(r["npc_id"])
+            tmpl = with_image(snap)
+            # Prefer live catalog art so portrait pack updates apply to existing scenes
+            if live and live.get("image_url"):
+                tmpl["image"] = live.get("image") or tmpl.get("image")
+                tmpl["image_url"] = live["image_url"]
             out.append(
                 {
                     "id": r["id"],
@@ -239,6 +287,8 @@ def list_scene() -> list[dict[str, Any]]:
                     "kind": "npc",
                     "cr": tmpl.get("cr"),
                     "xp": tmpl.get("xp"),
+                    "size": tmpl.get("size"),
+                    "size_sq": tmpl.get("size_sq"),
                     "template": tmpl,
                     "image_url": tmpl.get("image_url") or image_url_for(tmpl),
                 }

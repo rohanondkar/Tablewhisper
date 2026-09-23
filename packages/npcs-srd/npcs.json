@@ -23,7 +23,7 @@
         "insight_dc": 13
       },
       "notes": "Human bartender; knows every regular.",
-      "image": "mira.svg",
+      "image": "tokens/token_00.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -34,7 +34,8 @@
       ],
       "kind": "npc",
       "cr": "0",
-      "xp": 10
+      "xp": 10,
+      "size": "Medium"
     },
     {
       "id": "tamsin",
@@ -55,7 +56,7 @@
         "insight_dc": 12
       },
       "notes": "Halfling server; quick with gossip.",
-      "image": "tamsin.svg",
+      "image": "tokens/token_01.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -66,7 +67,8 @@
       ],
       "kind": "npc",
       "cr": "0",
-      "xp": 10
+      "xp": 10,
+      "size": "Small"
     },
     {
       "id": "harlan",
@@ -86,7 +88,7 @@
         "insight_dc": 15
       },
       "notes": "Dwarf owner; fair but firm on tab.",
-      "image": "harlan.svg",
+      "image": "tokens/token_02.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -97,7 +99,8 @@
       ],
       "kind": "npc",
       "cr": "1/8",
-      "xp": 25
+      "xp": 25,
+      "size": "Medium"
     },
     {
       "id": "cole",
@@ -118,7 +121,7 @@
         "insight_dc": 13
       },
       "notes": "Human guard; watches for trouble.",
-      "image": "cole.svg",
+      "image": "tokens/token_03.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -129,7 +132,8 @@
       ],
       "kind": "npc",
       "cr": "1/8",
-      "xp": 25
+      "xp": 25,
+      "size": "Medium"
     },
     {
       "id": "brenna",
@@ -149,7 +153,7 @@
         "insight_dc": 14
       },
       "notes": "Sells curios; drives a hard bargain.",
-      "image": "brenna.svg",
+      "image": "tokens/token_04.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -160,7 +164,8 @@
       ],
       "kind": "npc",
       "cr": "1/8",
-      "xp": 25
+      "xp": 25,
+      "size": "Medium"
     },
     {
       "id": "lilo",
@@ -182,7 +187,7 @@
         "performance_dc": 10
       },
       "notes": "Elf performer; loves an audience.",
-      "image": "lilo.svg",
+      "image": "tokens/token_05.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -193,7 +198,8 @@
       ],
       "kind": "npc",
       "cr": "1/8",
-      "xp": 25
+      "xp": 25,
+      "size": "Small"
     },
     {
       "id": "vex",
@@ -214,7 +220,7 @@
         "insight_dc": 15
       },
       "notes": "Keeps to the corner booth.",
-      "image": "vex.svg",
+      "image": "tokens/token_06.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -225,7 +231,8 @@
       ],
       "kind": "npc",
       "cr": "1/2",
-      "xp": 100
+      "xp": 100,
+      "size": "Medium"
     },
     {
       "id": "elara",
@@ -246,7 +253,7 @@
         "insight_dc": 13
       },
       "notes": "Offers healing for a donation.",
-      "image": "elara.svg",
+      "image": "tokens/token_07.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -257,7 +264,8 @@
       ],
       "kind": "npc",
       "cr": "1/2",
-      "xp": 100
+      "xp": 100,
+      "size": "Medium"
     },
     {
       "id": "garr",
@@ -277,7 +285,7 @@
         "insight_dc": 13
       },
       "notes": "Repairs gear between drinks.",
-      "image": "garr.svg",
+      "image": "tokens/token_08.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -288,7 +296,8 @@
       ],
       "kind": "npc",
       "cr": "1/4",
-      "xp": 50
+      "xp": 50,
+      "size": "Medium"
     },
     {
       "id": "pip",
@@ -310,7 +319,7 @@
         "animal_handling_dc": 10
       },
       "notes": "Knows every horse in town.",
-      "image": "pip.svg",
+      "image": "tokens/token_09.jpg",
       "attacks": [
         {
           "name": "Improvised",
@@ -321,7 +330,8 @@
       ],
       "kind": "npc",
       "cr": "0",
-      "xp": 10
+      "xp": 10,
+      "size": "Small"
     }
   ]
 }

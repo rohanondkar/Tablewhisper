@@ -91,7 +91,7 @@ def dc_label(ruleset: dict[str, Any], dc: int | None) -> str | None:
 
 
 def guidance_score(text: str, item: dict[str, Any]) -> int:
-    """Score keyword hits using word boundaries (not substrings)."""
+    """Score keyword hits using word boundaries (allows simple inflections)."""
     lowered = text.lower()
     score = 0
     for kw in item.get("keywords", []):
@@ -99,7 +99,17 @@ def guidance_score(text: str, item: dict[str, Any]) -> int:
         if not phrase:
             continue
         parts = [re.escape(p) for p in phrase.split()]
-        pattern = r"\b" + r"\s+".join(parts) + r"\b"
+        if len(parts) == 1:
+            # climb → climbs/climbing; sneak → sneaks/sneaking
+            pattern = r"\b" + parts[0] + r"\w*\b"
+        else:
+            # Multi-word: allow inflection on first and last tokens
+            # ("look around" → "looks around"; "sneak past" → "sneaks past")
+            mid = parts[1:-1]
+            mid_pat = (r"\s+" + r"\s+".join(mid)) if mid else ""
+            pattern = (
+                r"\b" + parts[0] + r"\w*" + mid_pat + r"\s+" + parts[-1] + r"\w*\b"
+            )
         if re.search(pattern, lowered):
             score += 1 + len(phrase.split())
     return score
@@ -118,3 +128,36 @@ def match_guidance(text: str, ruleset: dict[str, Any]) -> dict[str, Any] | None:
     out = dict(best)
     out["_score"] = best_score
     return out
+
+
+def adjust_dc_from_query(text: str, base_dc: int | None, ruleset: dict[str, Any]) -> int | None:
+    """Shift suggested DC from difficulty words in the query (Basic Rules DC ladder)."""
+    if base_dc is None:
+        return None
+    lowered = text.lower()
+    delta = 0
+    matched_label: str | None = None
+    for item in ruleset.get("dc_modifiers", []):
+        hit = False
+        for kw in item.get("keywords", []):
+            phrase = kw.lower().strip()
+            if not phrase:
+                continue
+            parts = [re.escape(p) for p in phrase.split()]
+            pattern = r"\b" + r"\s+".join(parts) + r"\b"
+            if re.search(pattern, lowered):
+                hit = True
+                break
+        if not hit:
+            continue
+        delta = int(item.get("delta") or 0)
+        matched_label = item.get("label")
+        # Prefer the first matching modifier group (list is ordered specific→general).
+        break
+    dc = max(5, min(30, int(base_dc) + delta))
+    if matched_label:
+        bands = {b["label"].lower(): int(b["dc"]) for b in ruleset.get("dc_bands", [])}
+        key = matched_label.lower()
+        if key in bands:
+            dc = bands[key]
+    return dc

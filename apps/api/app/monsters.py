@@ -37,26 +37,72 @@ def reload_catalog() -> None:
     _load_all_monsters.cache_clear()
 
 
+def _is_letter_placeholder(path: Path) -> bool:
+    """SRD pack used to ship SVG→PNG letter tokens (M / ? silhouettes) — not real art."""
+    name = path.name.lower()
+    if name in {"generic.png", "generic.svg"}:
+        return True
+    # Tiny rasterized letter tokens are ~7–25KB; real portraits are much larger.
+    # Prefer rejecting known placeholder stems when token-portraits exists.
+    try:
+        if path.suffix.lower() in {".png", ".svg"} and path.stat().st_size < 28_000:
+            # Heuristic: letter/glyph placeholders from import_open5e_monsters.make_svg
+            return True
+    except OSError:
+        pass
+    return False
+
+
 def image_url_for(monster: dict[str, Any]) -> str:
     mid = monster.get("id") or "generic"
     image = monster.get("image") or f"{mid}.svg"
-    # Prefer custom uploaded file, then SRD pack, else generic
-    custom = CUSTOM_IMAGE_DIR / image
-    srd = SRD_IMAGE_DIR / image
-    srd_by_id = SRD_IMAGE_DIR / f"{mid}.svg"
-    if custom.exists():
-        return f"{MEDIA_MONSTERS}/custom/{image}"
-    if srd.exists():
-        return f"{MEDIA_MONSTERS}/srd/{image}"
-    if srd_by_id.exists():
-        return f"{MEDIA_MONSTERS}/srd/{mid}.svg"
-    return f"{MEDIA_MONSTERS}/srd/generic.svg"
+    stem = Path(str(image)).stem or mid
+
+    # 1) DM custom uploads always win (Pictures tab / set_monster_image).
+    for path in (
+        CUSTOM_IMAGE_DIR / f"{stem}.png",
+        CUSTOM_IMAGE_DIR / image,
+        CUSTOM_IMAGE_DIR / f"{mid}.png",
+        CUSTOM_IMAGE_DIR / f"{mid}.jpg",
+        CUSTOM_IMAGE_DIR / f"{mid}.webp",
+    ):
+        if path.exists() and path.is_file():
+            return f"{MEDIA_MONSTERS}/custom/{path.name}"
+
+    # 2) Built-in circular creature portraits (packages/token-portraits).
+    try:
+        from .token_art import TOKEN_DIR, monster_portrait
+
+        url = monster_portrait(monster)
+        fname = url.rsplit("/", 1)[-1]
+        if (TOKEN_DIR / fname).is_file():
+            return url
+    except Exception:
+        pass
+
+    # 3) Last resort: SRD pack files that aren't letter placeholders.
+    for path in (
+        SRD_IMAGE_DIR / f"{stem}.png",
+        SRD_IMAGE_DIR / f"{mid}.png",
+        SRD_IMAGE_DIR / image,
+        SRD_IMAGE_DIR / f"{mid}.svg",
+    ):
+        if path.exists() and path.is_file() and not _is_letter_placeholder(path):
+            return f"{MEDIA_MONSTERS}/srd/{path.name}"
+
+    try:
+        from .token_art import media_url
+
+        return media_url("token-humanoid.png")
+    except Exception:
+        return f"{MEDIA_MONSTERS}/srd/generic.png"
 
 
 def with_image(monster: dict[str, Any]) -> dict[str, Any]:
+    from .creature_size import ensure_creature_size
     from .xp import normalize_cr, xp_for_creature
 
-    out = dict(monster)
+    out = ensure_creature_size(dict(monster), "Medium")
     out["image_url"] = image_url_for(monster)
     out["cr"] = normalize_cr(out.get("cr"))
     out["xp"] = xp_for_creature(out)
@@ -96,7 +142,7 @@ def find_template_by_name(text: str) -> dict[str, Any] | None:
 
 
 _LABEL_RE = re.compile(
-    r"\b([a-z][a-z\- ]{1,30}?)\s*[- ]?\s*([a-z]|\d+)\b",
+    r"\b([a-z][a-z'\-]{2,24}(?:\s+[a-z][a-z'\-]{2,24}){0,3})(?:\s+|-)([a-z]|\d+)\b",
     re.IGNORECASE,
 )
 
@@ -187,6 +233,18 @@ def save_custom_monster(data: dict[str, Any]) -> dict[str, Any]:
     return with_image(data)
 
 
+def set_monster_image(monster_id: str, dest_name: str) -> dict[str, Any]:
+    """Attach/override portrait for a catalog monster (stored as custom image file + custom row)."""
+    ensure_encounter_tables()
+    tmpl = get_template(monster_id) or _load_all_monsters().get(monster_id)
+    if not tmpl:
+        raise ValueError(f"Unknown monster: {monster_id}")
+    data = {k: v for k, v in dict(tmpl).items() if k not in {"image_url", "size_sq"}}
+    data["id"] = monster_id
+    data["image"] = dest_name
+    return save_custom_monster(data)
+
+
 def list_encounter() -> list[dict[str, Any]]:
     ensure_encounter_tables()
     sid = db.active_session_id()
@@ -202,7 +260,12 @@ def list_encounter() -> list[dict[str, Any]]:
         ).fetchall()
         out = []
         for r in rows:
-            tmpl = with_image(json.loads(r["data_json"]))
+            snap = json.loads(r["data_json"])
+            live = get_template(r["monster_id"])
+            tmpl = with_image(snap)
+            if live and live.get("image_url"):
+                tmpl["image"] = live.get("image") or tmpl.get("image")
+                tmpl["image_url"] = live["image_url"]
             out.append(
                 {
                     "id": r["id"],
@@ -214,6 +277,8 @@ def list_encounter() -> list[dict[str, Any]]:
                     "current_hp": r["current_hp"],
                     "cr": tmpl.get("cr"),
                     "xp": tmpl.get("xp"),
+                    "size": tmpl.get("size"),
+                    "size_sq": tmpl.get("size_sq"),
                     "template": tmpl,
                     "image_url": tmpl.get("image_url") or image_url_for(tmpl),
                 }
@@ -232,6 +297,10 @@ def get_enemy(enemy_id: str) -> dict[str, Any] | None:
         if not r:
             return None
         tmpl = with_image(json.loads(r["data_json"]))
+        live = get_template(r["monster_id"])
+        if live and live.get("image_url"):
+            tmpl["image"] = live.get("image") or tmpl.get("image")
+            tmpl["image_url"] = live["image_url"]
         return {
             "id": r["id"],
             "label": r["label"],
