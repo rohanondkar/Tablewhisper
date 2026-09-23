@@ -53,8 +53,10 @@ KEYWORD_PORTRAITS: list[tuple[str, str]] = [
     ("mummy", "token-undead.png"),
     ("ghoul", "token-undead.png"),
     ("wight", "token-undead.png"),
-    ("dragon", "token-dragon.png"),
-    ("wyrmling", "token-dragon.png"),
+    ("ankheg", "token-ankheg.png"),
+    ("kraken", "token-kraken.png"),
+    ("dragon", "token-dragon-red.png"),
+    ("wyrmling", "token-dragon-red.png"),
     ("devil", "token-fiend.png"),
     ("demon", "token-fiend.png"),
     ("yugoloth", "token-fiend.png"),
@@ -71,8 +73,8 @@ KEYWORD_PORTRAITS: list[tuple[str, str]] = [
     ("troll", "token-giant.png"),
     ("ettin", "token-giant.png"),
     ("cyclops", "token-giant.png"),
-    ("mimic", "token-monstrosity.png"),
-    ("owlbear", "token-monstrosity.png"),
+    ("mimic", "token-chest.png"),
+    ("owlbear", "token-owlbear.png"),
     ("hydra", "token-monstrosity.png"),
     ("chimera", "token-monstrosity.png"),
     ("manticore", "token-monstrosity.png"),
@@ -167,11 +169,76 @@ def _first_type(raw: Any) -> str:
     return text.split(",")[0].split("(")[0].strip()
 
 
+DRAGON_COLORS = (
+    "black",
+    "blue",
+    "green",
+    "white",
+    "brass",
+    "bronze",
+    "copper",
+    "gold",
+    "silver",
+    "red",
+)
+
+
+def dragon_file(hay: str) -> str | None:
+    """Pick a colored dragon portrait. Color words only count inside a dragon name."""
+    if "dragon" not in hay and "wyrmling" not in hay:
+        return None
+    for color in DRAGON_COLORS:
+        fname = f"token-dragon-{color}.png"
+        if color in hay and exists(fname):
+            return fname
+    if exists("token-dragon-red.png"):
+        return "token-dragon-red.png"
+    if exists("token-dragon.png"):
+        return "token-dragon.png"
+    return None
+
+
+def mimic_portrait(revealed: bool) -> str:
+    fname = "token-mimic.png" if revealed else "token-chest.png"
+    if exists(fname):
+        return media_url(fname)
+    return media_url("token-monstrosity.png")
+
+
+def placed_enemy_image(encounter: dict[str, Any], token: dict[str, Any] | None = None) -> str:
+    """Catalog portrait, except a mimic stays a chest until the map token is revealed."""
+    img = encounter.get("image_url") or "/media/tokens/token-humanoid.png"
+    template = encounter.get("template") if isinstance(encounter.get("template"), dict) else {}
+    token = token or {}
+    hay = " ".join(
+        str(part or "")
+        for part in (
+            encounter.get("label"),
+            encounter.get("name"),
+            token.get("label"),
+            template.get("id"),
+            template.get("name"),
+        )
+    ).lower()
+    if "mimic" in hay:
+        data = token.get("data") if isinstance(token.get("data"), dict) else {}
+        return mimic_portrait(bool(data.get("mimic_revealed")))
+    return img
+
+
 def monster_portrait(monster: dict[str, Any]) -> str:
     """Return /media/tokens/... URL for a monster."""
     mid = str(monster.get("id") or "").lower()
     name = str(monster.get("name") or "").lower()
     hay = f"{mid} {name}"
+
+    unique = f"monsters/{mid}.png"
+    if mid and exists(unique):
+        return media_url(unique)
+
+    dragon = dragon_file(hay)
+    if dragon:
+        return media_url(dragon)
 
     for needle, fname in KEYWORD_PORTRAITS:
         if needle in hay and exists(fname):

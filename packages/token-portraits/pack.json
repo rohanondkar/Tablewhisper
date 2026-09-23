@@ -2,6 +2,6 @@
   "id": "token-portraits",
   "name": "D&D 5e-style token portraits",
   "version": "1.0.0",
-  "description": "Offline circular VTT token art for monsters (by type/keyword) and tavern NPCs. Custom uploads in Pictures still override these.",
+  "description": "Offline circular VTT token art. Each SRD monster has its own picture in monsters/. Tavern NPCs still share role portraits. Custom uploads in Pictures still override these.",
   "media_path": "/media/tokens"
 }

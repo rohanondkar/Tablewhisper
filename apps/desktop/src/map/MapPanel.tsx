@@ -2225,6 +2225,24 @@ export default function MapPanel({
               <button type="button" className="btn ghost" onClick={() => setMarks([])}>
                 Clear marks
               </button>
+              {/mimic/i.test(selectedToken.label) && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={async () => {
+                    const revealed = !selectedToken.data?.mimic_revealed;
+                    const updated = await api.patchMapToken(selectedToken.id, {
+                      image_url: revealed
+                        ? "/media/tokens/token-mimic.png"
+                        : "/media/tokens/token-chest.png",
+                      data: { ...(selectedToken.data || {}), mimic_revealed: revealed },
+                    });
+                    setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+                  }}
+                >
+                  {selectedToken.data?.mimic_revealed ? "Disguise as chest" : "Reveal mimic"}
+                </button>
+              )}
               <label>
                 Vision (ft)
                 <input

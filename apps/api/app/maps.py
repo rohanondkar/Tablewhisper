@@ -10,6 +10,7 @@ from typing import Any
 
 from . import db, monsters, npcs
 from .config import DATA_DIR
+from .token_art import placed_enemy_image
 from .creature_size import ensure_creature_size, normalize_size, size_to_squares
 
 MAP_IMAGE_DIR = DATA_DIR / "map_images"
@@ -531,7 +532,8 @@ def sync_tokens(map_id: str) -> list[dict[str, Any]]:
 
     for e in monsters.list_encounter():
         key = ("enemy", e["id"])
-        img = e.get("image_url") or "/media/tokens/token-humanoid.png"
+        existing_tok = by_key.get(key)
+        img = placed_enemy_image(e, existing_tok)
         if img.endswith(".svg") and "/media/monsters/" in img:
             img = img[:-4] + ".png"
         data = e.get("template") or e.get("data") or {}
@@ -957,7 +959,7 @@ def refresh_token_portraits(map_id: str) -> None:
         tok = by_key.get(("enemy", e["id"]))
         if not tok:
             continue
-        img = e.get("image_url") or "/media/tokens/token-humanoid.png"
+        img = placed_enemy_image(e, tok)
         data = e.get("template") or {}
         sized = ensure_creature_size(data if isinstance(data, dict) else {})
         size = e.get("size") or sized["size"]
