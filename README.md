@@ -6,6 +6,12 @@ Local DM console for D&D 5e: Beyond PDF sheets, whispered rulings, SRD combat fo
 
 Open cmd: Start → type `cmd` → Enter.
 
+## How it connects
+
+![Tablewhisper architecture](ARCHITECTURE.png)
+
+Boxes are the running app, the screens, the API modules, and the files they read. Blue lines are UI calls, green lines are API routes, purple lines are saved data, and gold lines are optional local tools (Ollama and Whisper). The same diagram as code is [ARCHITECTURE.html](ARCHITECTURE.html) — open it in a browser.
+
 Project folder used below:
 
 ```bat
@@ -244,5 +250,6 @@ py -3 -m venv .venv
 | `data\` | SQLite + uploads (runtime; not committed) |
 | `fixtures\` | Sample Beyond PDF |
 | `start-dev.bat` | One-click launcher |
+| `ARCHITECTURE.html` | Box diagram as code (open in a browser). `ARCHITECTURE.png` is the picture shown above. |
 
 Discord VC bot code (if present locally) lives under `apps\discord-bot\` and is gitignored — tokens stay on your machine.
