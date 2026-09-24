@@ -1695,25 +1695,29 @@ export default function MapPanel({
             <>
               <h3>Party</h3>
               {characters.map((c) => (
-                <button
+                <TrayRow
                   key={c.id}
-                  type="button"
-                  className="map-tray-item"
+                  name={c.name}
+                  size={c.size || "Medium"}
+                  current={c.current_hp ?? c.max_hp}
+                  max={c.max_hp}
+                  temp={c.temp_hp ?? 0}
+                  loss={damageShown?.[c.id]}
                   onClick={() =>
                     void placeExisting("pc", c.id, c.name, c.size || "Medium", c.image_url)
                   }
-                >
-                  {c.name}
-                  <span className="muted small">{c.size || "Medium"}</span>
-                </button>
+                />
               ))}
               <h3>Foes (encounter)</h3>
               {encounter.length === 0 && <p className="muted small">None yet — use + Foe</p>}
               {encounter.map((e) => (
-                <button
+                <TrayRow
                   key={e.id}
-                  type="button"
-                  className="map-tray-item"
+                  name={e.label}
+                  size={e.size || ""}
+                  current={e.current_hp}
+                  max={e.max_hp}
+                  loss={damageShown?.[e.id]}
                   onClick={() =>
                     void placeExisting(
                       "enemy",
@@ -1723,24 +1727,22 @@ export default function MapPanel({
                       e.image_url
                     )
                   }
-                >
-                  {e.label}
-                  <span className="muted small">{e.size || ""}</span>
-                </button>
+                />
               ))}
               <h3>Scene NPCs</h3>
               {scene.length === 0 && <p className="muted small">None yet — use + NPC</p>}
               {scene.map((n) => (
-                <button
+                <TrayRow
                   key={n.id}
-                  type="button"
-                  className="map-tray-item"
+                  name={n.label}
+                  size={n.size || ""}
+                  current={n.current_hp}
+                  max={n.max_hp}
+                  loss={damageShown?.[n.id]}
                   onClick={() =>
                     void placeExisting("npc", n.id, n.label, n.size || "Medium", n.image_url)
                   }
-                >
-                  {n.label}
-                </button>
+                />
               ))}
             </>
           )}
@@ -2078,8 +2080,6 @@ export default function MapPanel({
                     selected={selectedTokenId === t.id}
                     acting={t.id === activeTokenId}
                     faded={tokenFaded(t)}
-                    vitals={tokenVitals(t)}
-                    loss={t.ref_id ? damageShown?.[t.ref_id] : undefined}
                     draggable={tool === "select" && !armed}
                     onSelect={() => {
                       if (armed && map) {
@@ -2391,12 +2391,54 @@ export default function MapPanel({
   );
 }
 
-function hpBarFill(current: number, max: number): string {
-  if (max <= 0) return "#d1242f";
+function hpTone(current: number, max: number): "ok" | "mid" | "low" {
+  if (max <= 0) return "low";
   const ratio = current / max;
-  if (ratio > 0.5) return "#2ea043";
-  if (ratio > 0.2) return "#e6a317";
-  return "#d1242f";
+  if (ratio > 0.5) return "ok";
+  if (ratio > 0.2) return "mid";
+  return "low";
+}
+
+function TrayRow({
+  name,
+  size,
+  current,
+  max,
+  temp,
+  loss,
+  onClick,
+}: {
+  name: string;
+  size?: string;
+  current: number;
+  max: number;
+  temp?: number;
+  loss?: number;
+  onClick: () => void;
+}) {
+  const shown = max > 0;
+  const pct = shown ? Math.max(0, Math.min(100, (current / max) * 100)) : 0;
+  const tone = hpTone(current, max);
+  return (
+    <button type="button" className="map-tray-item" onClick={onClick}>
+      <span className="tray-id">
+        <span>{name}</span>
+        {size ? <span className="muted small">{size}</span> : null}
+      </span>
+      {shown && (
+        <span className={`tray-hp tone-${tone}`}>
+          <span className="tray-hp-num">
+            {current}/{max}
+            {temp ? ` +${temp}` : ""}
+            {loss ? <span className="hp-loss"> −{loss}</span> : null}
+          </span>
+          <span className="tray-hp-track">
+            <span style={{ width: `${pct}%` }} />
+          </span>
+        </span>
+      )}
+    </button>
+  );
 }
 
 function TokenNode({
@@ -2405,8 +2447,6 @@ function TokenNode({
   selected,
   acting,
   faded,
-  vitals,
-  loss,
   draggable,
   onSelect,
   onDragEnd,
@@ -2416,8 +2456,6 @@ function TokenNode({
   selected: boolean;
   acting?: boolean;
   faded?: boolean;
-  vitals: { current: number; max: number; temp: number } | null;
-  loss?: number;
   draggable: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
@@ -2456,16 +2494,9 @@ function TokenNode({
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const barH = Math.max(5, Math.min(9, side * 0.1));
-  const hpText = vitals
-    ? vitals.temp
-      ? `${vitals.current}/${vitals.max} +${vitals.temp}`
-      : `${vitals.current}/${vitals.max}`
-    : "";
-  const hpSize = Math.max(9, Math.min(13, side * 0.16));
-  const showLoss = loss != null && loss > 0;
-  const nameY = vitals ? side + barH + hpSize + (showLoss ? hpSize + 2 : 0) + 4 : side + 2;
-  const fillWidth = vitals ? Math.max(0, Math.min(side, (vitals.current / vitals.max) * side)) : 0;
+  const nameSize = 15;
+  const nameWidth = Math.ceil(token.label.length * nameSize * 0.74) + 18;
+  const [hovered, setHovered] = useState(false);
   return (
     <Group
       x={token.x}
@@ -2490,6 +2521,8 @@ function TokenNode({
         e.cancelBubble = true;
         onDragEnd(e.target.x(), e.target.y());
       }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
       {acting && (
         <Rect
@@ -2536,57 +2569,33 @@ function TokenNode({
           )}
         </>
       )}
-      {vitals && (
+      {hovered && (
         <>
           <Rect
-            y={side + 2}
-            width={side}
-            height={barH}
-            fill="#12151c"
-            stroke="#2a2f3a"
+            x={(side - nameWidth) / 2 - 10}
+            y={-nameSize - 16}
+            width={nameWidth + 20}
+            height={nameSize + 12}
+            fill="rgba(16, 14, 12, 0.92)"
+            stroke="rgba(203, 180, 134, 0.7)"
             strokeWidth={1}
-            cornerRadius={barH / 2}
-            listening={false}
-          />
-          <Rect
-            y={side + 3}
-            width={fillWidth}
-            height={Math.max(1, barH - 2)}
-            fill={hpBarFill(vitals.current, vitals.max)}
-            cornerRadius={barH / 2}
+            cornerRadius={8}
             listening={false}
           />
           <Text
-            text={hpText}
-            width={side}
-            y={side + barH + 2}
-            fontSize={hpSize}
-            fill={hpBarFill(vitals.current, vitals.max)}
+            text={token.label}
+            x={(side - nameWidth) / 2}
+            y={-nameSize - 10}
+            width={nameWidth}
+            fontSize={nameSize}
+            fontFamily="Cinzel, Palatino Linotype, serif"
+            fill="#f6efe2"
             align="center"
+            wrap="none"
             listening={false}
           />
-          {showLoss && (
-            <Text
-              text={`−${loss}`}
-              width={side}
-              y={side + barH + hpSize + 2}
-              fontSize={hpSize}
-              fill="#ff6a4d"
-              fontStyle="bold"
-              align="center"
-              listening={false}
-            />
-          )}
         </>
       )}
-      <Text
-        text={token.label}
-        width={side}
-        y={nameY}
-        fontSize={Math.max(10, side * 0.22)}
-        fill="#eee"
-        align="center"
-      />
     </Group>
   );
 }

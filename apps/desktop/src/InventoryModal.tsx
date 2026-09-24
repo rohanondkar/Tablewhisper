@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { api, mediaUrl, type BagSummary, type Character } from "./api";
 import HeldHand, {
@@ -660,13 +661,19 @@ function HandPad({
   const effect = showItem && item ? item.effect || "" : "";
   const baked = showItem && item ? held(item.name) : "";
   const flip = baked ? side === "left" || side === "light-1" : mirror;
+  const [plate, setPlate] = useState<{ x: number; y: number } | null>(null);
   return (
     <div
       className={`hand-pad ${side} ${item ? "gripping" : ""} ${effect === "shield" ? "held-shield" : ""} ${compact ? "compact" : ""} ${selected === index && index >= 0 ? "on" : ""}`}
       data-drop={`hand:${side}`}
-      title={item?.name || ""}
       onPointerDown={item && index >= 0 ? (event) => onDrag(event, index) : undefined}
       onClick={item && index >= 0 ? () => onPick(index) : undefined}
+      onMouseEnter={(event) => {
+        if (!item) return;
+        const box = event.currentTarget.getBoundingClientRect();
+        setPlate({ x: box.left + box.width / 2, y: box.top });
+      }}
+      onMouseLeave={() => setPlate(null)}
     >
       <HeldHand
         handUrl={baked || handUrl}
@@ -678,6 +685,14 @@ function HandPad({
         skinOnly={!!baked}
       />
       {dragging === index && index >= 0 ? <span className="hand-dragging" /> : null}
+      {plate && item && dragging !== index
+        ? createPortal(
+            <span className="name-plate" style={{ left: plate.x, top: plate.y }}>
+              {item.name}
+            </span>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -707,11 +722,11 @@ function ItemBlock({
   style?: CSSProperties;
   className?: string;
 }) {
+  const [plate, setPlate] = useState<{ x: number; y: number } | null>(null);
   return (
     <div
       className={`${className || "gear-token"} ${selected ? "on" : ""} ${dragging ? "is-dragging" : ""}`}
       style={style}
-      title={item.name}
       onPointerDown={(event) => onDrag(event, index)}
       onClick={() => onPick(index)}
       onContextMenu={(event) => {
@@ -719,6 +734,11 @@ function ItemBlock({
         onPick(index);
         onRotate(index);
       }}
+      onMouseEnter={(event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        setPlate({ x: box.left + box.width / 2, y: box.top });
+      }}
+      onMouseLeave={() => setPlate(null)}
     >
       {picture ? (
         <img src={picture} alt="" draggable={false} />
@@ -734,6 +754,14 @@ function ItemBlock({
           />
         </label>
       ) : null}
+      {plate && !dragging
+        ? createPortal(
+            <span className="name-plate" style={{ left: plate.x, top: plate.y }}>
+              {item.name}
+            </span>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
