@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import uuid
+import zlib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -17,26 +19,197 @@ CUSTOM_IMAGE_DIR = DATA_DIR / "npc_images"
 SRD_IMAGE_DIR = RULES_DIR / "npcs-srd" / "images"
 
 
+def _portrait_catalog() -> dict[str, dict[str, Any]]:
+    """Painted people. Stats come from the block. Race and gender only pick the face."""
+    path = RULES_DIR / "npcs-srd" / "portraits.json"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rows = data.get("portraits") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    blocks = _blocks()
+    by_id: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("id"):
+            continue
+        block = blocks.get(str(row.get("block") or ""), {})
+        race = str(row.get("race") or "Human")
+        role = str(block.get("name") or row.get("block") or "NPC")
+        name = str(row.get("default_name") or role)
+        aliases = [name, role] + [str(a) for a in (row.get("aliases") or [])]
+        npc = {
+            "id": str(row["id"]),
+            "name": name,
+            "role": role,
+            "block": str(row.get("block") or ""),
+            "race": race,
+            "gender": str(row.get("gender") or ""),
+            "ethnicity": str(row.get("ethnicity") or ""),
+            "image": str(row.get("image") or ""),
+            "size": "Small" if race in {"Halfling", "Gnome"} else "Medium",
+            "kind": "npc",
+            "attitude": "indifferent",
+            "aliases": list(dict.fromkeys(a for a in aliases if a)),
+        }
+        by_id[npc["id"]] = _apply_block(npc)
+    return by_id
+
+
 def _catalog_paths() -> list[Path]:
-    paths = [
-        RULES_DIR / "npcs-srd" / "npcs.json",
-        RULES_DIR / "npcs-custom" / "npcs.json",
-    ]
-    return [p for p in paths if p.exists()]
+    custom = RULES_DIR / "npcs-custom" / "npcs.json"
+    return [custom] if custom.exists() else []
+
+
+@lru_cache(maxsize=1)
+def _blocks() -> dict[str, dict[str, Any]]:
+    path = RULES_DIR / "rules-dnd5e" / "npc_blocks.json"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    rows = data.get("blocks") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    return {str(row.get("id")): row for row in rows if isinstance(row, dict) and row.get("id")}
+
+
+def _apply_block(npc: dict[str, Any]) -> dict[str, Any]:
+    block = _blocks().get(str(npc.get("block") or ""))
+    if not block:
+        return npc
+    out = dict(npc)
+    for key in (
+        "ac",
+        "hp",
+        "hit_dice",
+        "speed",
+        "abilities",
+        "saves",
+        "skills",
+        "attacks",
+        "spell_attack",
+        "spell_save_dc",
+        "cr",
+        "xp",
+    ):
+        if block.get(key) is not None:
+            out[key] = block[key]
+    return out
+
+
+def _merge_live(snap: dict[str, Any], live: dict[str, Any] | None) -> dict[str, Any]:
+    tmpl = with_image(snap)
+    if not live:
+        return tmpl
+    for key in (
+        "abilities",
+        "saves",
+        "skills",
+        "attacks",
+        "spell_attack",
+        "spell_save_dc",
+        "hit_dice",
+        "speed",
+        "block",
+    ):
+        if live.get(key) is not None:
+            tmpl[key] = live[key]
+    if live.get("ac") is not None:
+        tmpl["ac"] = live["ac"]
+    if live.get("hp") is not None:
+        tmpl["hp"] = live["hp"]
+    return tmpl
 
 
 @lru_cache(maxsize=4)
 def _load_all_npcs() -> dict[str, dict[str, Any]]:
-    by_id: dict[str, dict[str, Any]] = {}
+    by_id = _portrait_catalog()
     for path in _catalog_paths():
         data = json.loads(path.read_text(encoding="utf-8"))
         for n in data.get("npcs", []):
-            by_id[n["id"]] = n
+            by_id[n["id"]] = _apply_block(n)
     return by_id
 
 
 def reload_catalog() -> None:
+    _blocks.cache_clear()
     _load_all_npcs.cache_clear()
+
+
+def _unique_label(base: str, used: set[str]) -> str:
+    """Last resort when every listed name is already on the scene."""
+    name = " ".join((base or "").split()) or "Someone"
+    if name.lower() not in used:
+        return name
+    n = 2
+    while f"{name} {n}".lower() in used:
+        n += 1
+    return f"{name} {n}"
+
+
+_GENDER_POOL = {
+    "woman": "female",
+    "man": "male",
+    "nonbinary": "nonbinary",
+}
+
+
+def _unused_names(names: list[str], used: set[str], seen: set[str]) -> list[str]:
+    free: list[str] = []
+    for name in names:
+        low = name.lower()
+        if low in used or low in seen:
+            continue
+        free.append(name)
+        seen.add(low)
+    return free
+
+
+def _npc_name_pool(npc: dict[str, Any]) -> list[str]:
+    """A person draws from the male, female, or nonbinary list. Race lists are for monsters."""
+    from .monsters import _name_pools
+
+    pools = _name_pools()
+    gender = str(npc.get("gender") or "").strip().lower()
+    key = _GENDER_POOL.get(gender, "")
+    if key and pools.get(key):
+        return list(pools[key])
+    race = str(npc.get("race") or "")
+    race_key = {"Elf": "elf", "Dwarf": "dwarf", "Half-orc": "orc"}.get(race, "generic")
+    return list(pools.get(race_key) or pools.get("generic") or [])
+
+
+def _scene_name(npc: dict[str, Any], typed: str, used: set[str]) -> str:
+    """A person gets a real name. A taken name picks another unused one, not Name 2."""
+    preferred = " ".join((typed or npc.get("name") or "").split())
+    if preferred and preferred.lower() not in used:
+        return preferred
+    from .monsters import _name_pools
+
+    pools = _name_pools()
+    seen: set[str] = set()
+    free = _unused_names(_npc_name_pool(npc), used, seen)
+    if not free:
+        for key in ("female", "male", "nonbinary"):
+            free.extend(_unused_names(pools.get(key) or [], used, seen))
+    if not free:
+        for key, names in pools.items():
+            if key in _GENDER_POOL.values():
+                continue
+            free.extend(_unused_names(names, used, seen))
+    if free:
+        return random.choice(free)
+    return _unique_label(preferred or "Someone", used)
+
+
+def _distinct_portrait(npc_id: str) -> str | None:
+    """Pick one of the painted manuscript tokens so two people do not share a face."""
+    files = sorted(SRD_IMAGE_DIR.glob("tokens/token_*.jpg"))
+    if not files:
+        return None
+    chosen = files[zlib.adler32(npc_id.encode("utf-8")) % len(files)]
+    rel = chosen.relative_to(SRD_IMAGE_DIR).as_posix()
+    return f"{MEDIA_NPCS}/srd/{rel}"
 
 
 def image_url_for(npc: dict[str, Any]) -> str:
@@ -54,7 +227,14 @@ def image_url_for(npc: dict[str, Any]) -> str:
             rel = path.relative_to(CUSTOM_IMAGE_DIR).as_posix()
             return f"{MEDIA_NPCS}/custom/{rel}"
 
-    # 2) Catalog image (PD tokens under images/tokens/..., etc.)
+    # 2) Painted token in packages/token-portraits (people/name.png).
+    from .token_art import MEDIA_TOKENS, TOKEN_DIR
+
+    token = TOKEN_DIR / str(image)
+    if image and token.is_file():
+        return f"{MEDIA_TOKENS}/{Path(image).as_posix()}"
+
+    # 3) Older catalog image (PD tokens under images/tokens/..., etc.)
     srd = SRD_IMAGE_DIR / image
     if srd.exists() and srd.is_file() and "generic" not in srd.name.lower():
         return f"{MEDIA_NPCS}/srd/{Path(image).as_posix()}"
@@ -67,16 +247,11 @@ def image_url_for(npc: dict[str, Any]) -> str:
         if path.exists() and path.is_file() and "generic" not in path.name.lower():
             return f"{MEDIA_NPCS}/srd/{path.name}"
 
-    # 3) Role/id portraits from token-portraits pack
-    try:
-        from .token_art import TOKEN_DIR, npc_portrait
-
-        url = npc_portrait(npc)
-        fname = url.rsplit("/", 1)[-1]
-        if (TOKEN_DIR / fname).is_file():
-            return url
-    except Exception:
-        pass
+    # 3) A manuscript portrait of this person. Shared role icons made every
+    # guard (and every king) look identical in the picker.
+    pooled = _distinct_portrait(str(mid))
+    if pooled:
+        return pooled
 
     generic_jpg = SRD_IMAGE_DIR / "generic.jpg"
     if generic_jpg.exists():
@@ -269,20 +444,30 @@ def list_scene() -> list[dict[str, Any]]:
         for r in rows:
             snap = json.loads(r["data_json"])
             live = get_template(r["npc_id"])
-            tmpl = with_image(snap)
-            # Prefer live catalog art so portrait pack updates apply to existing scenes
+            tmpl = _merge_live(snap, live)
             if live and live.get("image_url"):
                 tmpl["image"] = live.get("image") or tmpl.get("image")
                 tmpl["image_url"] = live["image_url"]
+            ac = int(live["ac"]) if live and live.get("ac") is not None else int(r["ac"])
+            max_hp = int(r["max_hp"])
+            current_hp = int(r["current_hp"])
+            block_hp = int(live["hp"]) if live and live.get("hp") is not None else None
+            if block_hp is not None and current_hp == max_hp and block_hp != max_hp:
+                max_hp = block_hp
+                current_hp = block_hp
+                conn.execute(
+                    "UPDATE scene_npcs SET ac = ?, max_hp = ?, current_hp = ? WHERE id = ?",
+                    (ac, max_hp, current_hp, r["id"]),
+                )
             out.append(
                 {
                     "id": r["id"],
                     "label": r["label"],
                     "npc_id": r["npc_id"],
                     "name": r["name"],
-                    "ac": r["ac"],
-                    "max_hp": r["max_hp"],
-                    "current_hp": r["current_hp"],
+                    "ac": ac,
+                    "max_hp": max_hp,
+                    "current_hp": current_hp,
                     "attitude": r["attitude"] or tmpl.get("attitude") or "indifferent",
                     "kind": "npc",
                     "cr": tmpl.get("cr"),
@@ -306,13 +491,15 @@ def get_scene_npc(npc_instance_id: str) -> dict[str, Any] | None:
         ).fetchone()
         if not r:
             return None
-        tmpl = with_image(json.loads(r["data_json"]))
+        live = get_template(r["npc_id"])
+        tmpl = _merge_live(json.loads(r["data_json"]), live)
+        ac = int(live["ac"]) if live and live.get("ac") is not None else int(r["ac"])
         return {
             "id": r["id"],
             "label": r["label"],
             "npc_id": r["npc_id"],
             "name": r["name"],
-            "ac": r["ac"],
+            "ac": ac,
             "max_hp": r["max_hp"],
             "current_hp": r["current_hp"],
             "attitude": r["attitude"] or tmpl.get("attitude") or "indifferent",
@@ -364,29 +551,16 @@ def spawn_npc(
     sid = db.active_session_id()
     existing = list_scene()
     spawned: list[dict[str, Any]] = []
-    for i in range(max(1, count)):
-        if label and count == 1:
-            use_label = label
-        else:
-            used = {e["label"].lower() for e in existing + spawned}
-            # Prefer bare name once, then Name A, B...
-            if inst["name"].lower() not in used and not label:
-                use_label = inst["name"]
-            else:
-                letter = None
-                for code in range(ord("A"), ord("Z") + 1):
-                    candidate = f"{inst['name']} {chr(code)}"
-                    if candidate.lower() not in used:
-                        letter = chr(code)
-                        break
-                use_label = f"{inst['name']} {letter or i + 1}"
+    for _i in range(max(1, count)):
+        used = {e["label"].lower() for e in existing + spawned}
+        use_label = _scene_name(inst, label or "", used)
         eid = str(uuid.uuid4())
         attitude = inst.get("attitude") or "indifferent"
         row = {
             "id": eid,
             "label": use_label,
             "npc_id": inst["id"],
-            "name": inst["name"],
+            "name": use_label,
             "ac": int(inst["ac"]),
             "max_hp": int(inst["hp"]),
             "current_hp": int(inst["hp"]),
@@ -409,7 +583,7 @@ def spawn_npc(
                     sid,
                     use_label,
                     inst["id"],
-                    inst["name"],
+                    use_label,
                     row["ac"],
                     row["max_hp"],
                     row["current_hp"],

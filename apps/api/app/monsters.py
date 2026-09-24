@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import uuid
 from functools import lru_cache
@@ -69,9 +70,8 @@ def image_url_for(monster: dict[str, Any]) -> str:
         if path.exists() and path.is_file():
             return f"{MEDIA_MONSTERS}/custom/{path.name}"
 
-    # 2) Built-in circular creature portraits (packages/token-portraits).
-    # Unique art lives in token-portraits/monsters/{id}.png, so the check has to
-    # keep that subfolder. The last path segment alone is not a file.
+    # 2) Painted circular portraits (token-beast.png and the rest).
+    # monster_portrait skips the flat icons in token-portraits/monsters/.
     try:
         from .token_art import MEDIA_TOKENS, TOKEN_DIR, monster_portrait
 
@@ -108,6 +108,7 @@ def with_image(monster: dict[str, Any]) -> dict[str, Any]:
     out["image_url"] = image_url_for(monster)
     out["cr"] = normalize_cr(out.get("cr"))
     out["xp"] = xp_for_creature(out)
+    out["personal_name"] = deserves_personal_name(monster)
     return out
 
 
@@ -326,6 +327,114 @@ def find_enemy_by_label(label: str) -> dict[str, Any] | None:
     return None
 
 
+_MINDLESS_TYPES = {"beast", "ooze", "plant", "construct", "swarm", "elemental"}
+_NAMED_ELEMENTALS = ("mephit", "genie", "djinni", "dao", "efreeti", "marid")
+_MINDLESS_WORDS = (
+    "mimic",
+    "zombie",
+    "skeleton",
+    "crawling claw",
+    "flying sword",
+    "rug of smothering",
+    "animated",
+)
+# Longer keys first so hobgoblin is not filed as a goblin.
+_NAME_KEYS = (
+    ("hobgoblin", "hobgoblin"),
+    ("bugbear", "bugbear"),
+    ("lizardfolk", "lizardfolk"),
+    ("lizard folk", "lizardfolk"),
+    ("kobold", "kobold"),
+    ("gnoll", "gnoll"),
+    ("goblin", "goblin"),
+    ("drow", "drow"),
+    ("elf", "elf"),
+    ("dwarf", "dwarf"),
+    ("wyrmling", "dragon"),
+    ("dragon", "dragon"),
+    ("orog", "orc"),
+    ("orc", "orc"),
+    ("ogre", "giant"),
+    ("troll", "giant"),
+    ("ettin", "giant"),
+    ("giant", "giant"),
+)
+
+
+def _creature_type(monster: dict[str, Any]) -> str:
+    text = str(monster.get("type") or "").lower()
+    return text.split(",")[0].split("(")[0].strip()
+
+
+def _hay(monster: dict[str, Any]) -> str:
+    return f"{monster.get('id') or ''} {monster.get('name') or ''}".lower()
+
+
+def _mentions(hay: str, needle: str) -> bool:
+    if " " in needle:
+        return needle in hay
+    return re.search(rf"\b{re.escape(needle)}\b", hay) is not None
+
+
+def deserves_personal_name(monster: dict[str, Any]) -> bool:
+    """People, dragons, and other talking creatures get a name. A mimic does not."""
+    hay = _hay(monster)
+    if any(_mentions(hay, word) for word in _MINDLESS_WORDS):
+        return False
+    kind = _creature_type(monster)
+    if kind == "elemental" and any(_mentions(hay, word) for word in _NAMED_ELEMENTALS):
+        return True
+    if kind in _MINDLESS_TYPES:
+        return False
+    return True
+
+
+@lru_cache(maxsize=1)
+def _name_pools() -> dict[str, list[str]]:
+    path = RULES_DIR / "monsters-srd" / "names.json"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return {}
+    pools: dict[str, list[str]] = {}
+    for key, names in data.items():
+        if isinstance(names, list):
+            pools[str(key)] = [str(n).strip() for n in names if str(n).strip()]
+    return pools
+
+
+def _pool_for(monster: dict[str, Any]) -> list[str]:
+    pools = _name_pools()
+    hay = _hay(monster)
+    for needle, key in _NAME_KEYS:
+        if _mentions(hay, needle) and pools.get(key):
+            return pools[key]
+    if _creature_type(monster) == "fiend" and pools.get("fiend"):
+        return pools["fiend"]
+    return pools.get("generic") or []
+
+
+def _random_personal_name(monster: dict[str, Any], used: set[str]) -> str:
+    pool = _pool_for(monster)
+    free = [name for name in pool if name.lower() not in used]
+    if free:
+        return random.choice(free)
+    fallback = str(monster.get("name") or "Foe")
+    return _unique_label(fallback, used)
+
+
+def _unique_label(base: str, used: set[str]) -> str:
+    """First copy keeps the creature name. The next is Name 2, not Name A."""
+    name = " ".join((base or "").split()) or "Foe"
+    if name.lower() not in used:
+        return name
+    n = 2
+    while f"{name} {n}".lower() in used:
+        n += 1
+    return f"{name} {n}"
+
+
 def spawn_enemy(
     monster_id: str,
     label: str | None = None,
@@ -359,25 +468,21 @@ def spawn_enemy(
     sid = db.active_session_id()
     existing = list_encounter()
     spawned: list[dict[str, Any]] = []
-    for i in range(max(1, count)):
-        if label and count == 1:
-            use_label = label
+    for _i in range(max(1, count)):
+        used = {e["label"].lower() for e in existing + spawned}
+        typed = " ".join((label or "").split())
+        if typed:
+            use_label = _unique_label(typed, used)
+        elif deserves_personal_name(inst):
+            use_label = _random_personal_name(inst, used)
         else:
-            # Assign next letter A, B, C...
-            used = {e["label"].lower() for e in existing + spawned}
-            letter = None
-            for code in range(ord("A"), ord("Z") + 1):
-                candidate = f"{inst['name']} {chr(code)}"
-                if candidate.lower() not in used:
-                    letter = chr(code)
-                    break
-            use_label = f"{inst['name']} {letter or i + 1}"
+            use_label = _unique_label(inst.get("name") or "Foe", used)
         eid = str(uuid.uuid4())
         row = {
             "id": eid,
             "label": use_label,
             "monster_id": inst["id"],
-            "name": inst["name"],
+            "name": use_label,
             "ac": int(inst["ac"]),
             "max_hp": int(inst["hp"]),
             "current_hp": int(inst["hp"]),
@@ -398,7 +503,7 @@ def spawn_enemy(
                     sid,
                     use_label,
                     inst["id"],
-                    inst["name"],
+                    use_label,
                     row["ac"],
                     row["max_hp"],
                     row["current_hp"],

@@ -1,6 +1,6 @@
 # Tablewhisper
 
-Local DM console for D&D 5e: Beyond PDF sheets, whispered rulings, SRD combat foes, tavern Scene NPCs, optional voice (Ctrl+N) + Ollama. Runs fully local.
+Local DM console for D&D 5e: Beyond PDF sheets, whispered rulings, SRD combat foes, painted scene NPCs, optional voice (Ctrl+N) + Ollama. Runs fully local.
 
 **Use Command Prompt (`cmd`), not PowerShell** — avoids script-policy errors with `Activate.ps1` / `npm.ps1`.
 
@@ -241,11 +241,13 @@ The right column uses tabs so you are not scrolling through everything at once:
 
 | Tab | Purpose |
 |-----|---------|
-| **Foes** | Active combat enemies. **Add foe** opens a modal (filter 322 SRD monsters → Spawn, or Custom monster). |
-| **Scene** | Friendly / social cast (bartender, innkeeper, …). **Add NPC** opens a modal (filter → Spawn, or Custom NPC). |
+| **Foes** | Active combat enemies. **Add foe** opens a dialog. Filter the 322 SRD monsters, or add a custom monster. |
+| **Scene** | People at the table. **Add NPC** opens the same kind of dialog. Filter by role, species, gender, and, for humans, ethnicity. |
 | **Log** | Short list of past rulings. The top-bar **Log** is the book. |
 
-Naming a creature or NPC in the query can also spawn/match them.
+Leave a speaking monster's name blank and one is chosen from that creature's list. A mimic, beast, or other mindless creature keeps the species name, then Mimic 2. An NPC is a person, so the name is never numbered. A blank name uses the name on the card when it is free. A taken name, typed or suggested, picks another unused name from the list that matches the portrait: 1,000 male, 1,000 female, and 1,000 nonbinary names in `packages\monsters-srd\names.json`.
+
+Naming a creature or NPC in the query can also spawn or match them.
 
 ### Quit
 
@@ -295,9 +297,9 @@ py -3 -m venv .venv
 | `apps\api\app\gear_art` | Bundled weapon, armor, pack, gear, and hand pictures |
 | `apps\desktop` | React + Electron UI (console and map) |
 | `packages\rules-dnd5e` | 5e SRD rules, DC ladder, and check-verb guidance |
-| `packages\monsters-srd` | All 322 WOTC SRD 5.1 monsters (Open5e; not full DDB) |
-| `packages\npcs-srd` | Tavern / scene NPC cast (social DCs, attitudes, portraits) |
-| `packages\token-portraits` | Circular token art used on the map and ruling card |
+| `packages\monsters-srd` | All 322 WOTC SRD 5.1 monsters (Open5e; not full DDB), plus `names.json`: 1,000 male, 1,000 female, and 1,000 nonbinary names, and shorter lists for speaking monsters |
+| `packages\npcs-srd` | Painted people. Role, species, and gender choose the face. Printed stats come from the matching block in `packages\rules-dnd5e` |
+| `packages\token-portraits` | Circular token art for the map and the ruling card, including one shared face for each species and gender |
 | `scripts\import_open5e_monsters.py` | Re-fetch SRD monster pack |
 | `scripts\quit-dm.bat` / `quit-dm.ps1` | Force-close API/UI terminals + free ports |
 | `packages\rules-custom-blank` | Template for next game |

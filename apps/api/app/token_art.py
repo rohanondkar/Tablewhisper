@@ -227,14 +227,14 @@ def placed_enemy_image(encounter: dict[str, Any], token: dict[str, Any] | None =
 
 
 def monster_portrait(monster: dict[str, Any]) -> str:
-    """Return /media/tokens/... URL for a monster."""
+    """Return /media/tokens/... URL for a monster.
+
+    Painted type portraits (token-beast.png and the rest) are the creature art.
+    The flat icons in monsters/{id}.png are skipped.
+    """
     mid = str(monster.get("id") or "").lower()
     name = str(monster.get("name") or "").lower()
     hay = f"{mid} {name}"
-
-    unique = f"monsters/{mid}.png"
-    if mid and exists(unique):
-        return media_url(unique)
 
     dragon = dragon_file(hay)
     if dragon:

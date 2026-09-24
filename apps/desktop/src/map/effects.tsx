@@ -416,6 +416,8 @@ export type RulingCreature = {
   kind: string;
   label: string;
   tile: Tile | null;
+  abilities?: Record<string, number | { score?: number; modifier?: number }>;
+  saves?: Record<string, number | { modifier?: number }>;
 };
 
 export type MarkPulse = {

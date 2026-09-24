@@ -137,6 +137,8 @@ export interface CheckResult {
   dice: string;
   modifier: number | null;
   suggested_dc: number | null;
+  /** Ability the defender adds when this card is a saving throw. */
+  save_ability?: string | null;
   dc_label: string | null;
   notes: string;
   roll_line: string;
@@ -189,6 +191,7 @@ export interface MonsterTemplate {
   size?: string;
   size_sq?: number;
   type?: string;
+  personal_name?: boolean;
   notes?: string;
   aliases?: string[];
   image_url?: string;
@@ -214,7 +217,12 @@ export interface EncounterEnemy {
   size?: string;
   size_sq?: number;
   image_url?: string;
-  template?: { attacks?: StatAttack[]; notes?: string };
+  template?: {
+    attacks?: StatAttack[];
+    notes?: string;
+    abilities?: Record<string, number | { score?: number; modifier?: number }>;
+    saves?: Record<string, number | { modifier?: number }>;
+  };
 }
 
 export interface NpcTemplate {
@@ -227,6 +235,10 @@ export interface NpcTemplate {
   size?: string;
   size_sq?: number;
   role?: string;
+  block?: string;
+  race?: string;
+  gender?: string;
+  ethnicity?: string;
   attitude?: string;
   aliases?: string[];
   notes?: string;
@@ -248,7 +260,12 @@ export interface SceneNpc {
   size?: string;
   size_sq?: number;
   image_url?: string;
-  template?: { attacks?: StatAttack[]; notes?: string };
+  template?: {
+    attacks?: StatAttack[];
+    notes?: string;
+    abilities?: Record<string, number | { score?: number; modifier?: number }>;
+    saves?: Record<string, number | { modifier?: number }>;
+  };
 }
 
 export interface XpAwardResult {
@@ -316,6 +333,10 @@ export interface MapWall {
   door_open: boolean;
   block_movement: boolean;
   block_sight: boolean;
+  target_map_id?: string | null;
+  target_x?: number | null;
+  target_y?: number | null;
+  link_wall_id?: string | null;
 }
 
 export interface MapLight {
@@ -325,6 +346,43 @@ export interface MapLight {
   y: number;
   bright_ft: number;
   dim_ft: number;
+  kind?: "torch" | "lamp" | string;
+}
+
+export interface MapSetupBody {
+  name?: string;
+  width?: number;
+  height?: number;
+  grid_size_px?: number;
+  grid_offset_x?: number;
+  grid_offset_y?: number;
+  feet_per_square?: number;
+  walls: Array<{
+    points: number[];
+    door: boolean;
+    door_open?: boolean;
+    target_map_id?: string | null;
+    target_x?: number | null;
+    target_y?: number | null;
+    link_wall_id?: string | null;
+    both_ways?: boolean;
+  }>;
+  lights: Array<{
+    x: number;
+    y: number;
+    bright_ft: number;
+    dim_ft: number;
+    kind: "torch" | "lamp";
+  }>;
+  portals: Array<{
+    x: number;
+    y: number;
+    radius: number;
+    target_map_id: string;
+    target_x: number;
+    target_y: number;
+    label: string;
+  }>;
 }
 
 export interface MapPortal {
@@ -796,5 +854,31 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token_ids: tokenIds }),
+    }),
+  traverseWall: (wallId: string, tokenIds: string[]) =>
+    request<{ map: BattleMap; tokens: MapToken[] }>(`/maps/walls/${wallId}/traverse`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_ids: tokenIds }),
+    }),
+  suggestMapMarks: async (file: File, width: number, height: number, gridSizePx: number) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    form.append("width", String(width));
+    form.append("height", String(height));
+    form.append("grid_size_px", String(gridSizePx));
+    const res = await fetch(`${base}/maps/suggest`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<{
+      walls: Array<{ points: number[]; door: boolean }>;
+      lights: Array<{ x: number; y: number; bright_ft: number; dim_ft: number; kind: "torch" | "lamp" }>;
+    }>;
+  },
+  applyMapSetup: (mapId: string, body: MapSetupBody) =>
+    request<MapState>(`/maps/${mapId}/setup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     }),
 };

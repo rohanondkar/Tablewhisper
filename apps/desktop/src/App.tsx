@@ -24,6 +24,7 @@ import { spellFxMode, type MapRuling, type MarkPulse, type RulingCreature } from
 import PicturesPanel from "./map/PicturesPanel";
 import { CREATURE_SIZES } from "./map/sizes";
 import { PortraitFileButton } from "./PortraitEditor";
+import { SpawnDialog } from "./SpawnDialog";
 import { sfxVolume } from "./map/attackSounds";
 import { applyThemeChrome, setTitleTheme, TitleAtmosphere, TITLE_THEMES, titleTheme, titleThemeId, type LogDevice, type TitleThemeId } from "./titleThemes";
 
@@ -906,60 +907,6 @@ function PartyAvatar({
   );
 }
 
-const CR_OPTIONS = [
-  "0",
-  "1/8",
-  "1/4",
-  "1/2",
-  "1",
-  "2",
-  "3",
-  "4",
-  "5",
-  "6",
-  "7",
-  "8",
-  "9",
-  "10",
-  "11",
-  "12",
-  "13",
-  "14",
-  "15",
-  "16",
-  "17",
-  "18",
-  "19",
-  "20",
-];
-
-const CR_TO_XP: Record<string, number> = {
-  "0": 10,
-  "1/8": 25,
-  "1/4": 50,
-  "1/2": 100,
-  "1": 200,
-  "2": 450,
-  "3": 700,
-  "4": 1100,
-  "5": 1800,
-  "6": 2300,
-  "7": 2900,
-  "8": 3900,
-  "9": 5000,
-  "10": 5900,
-  "11": 7200,
-  "12": 8400,
-  "13": 10000,
-  "14": 11500,
-  "15": 13000,
-  "16": 15000,
-  "17": 18000,
-  "18": 20000,
-  "19": 22000,
-  "20": 25000,
-};
-
 export default function App() {
   const [status, setStatus] = useState<StatusInfo | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -971,12 +918,8 @@ export default function App() {
   const [rulesets, setRulesets] = useState<RulesetSummary[]>([]);
   const [monsters, setMonsters] = useState<MonsterTemplate[]>([]);
   const [encounter, setEncounter] = useState<EncounterEnemy[]>([]);
-  const [spawnId, setSpawnId] = useState("orc");
-  const [monsterFilter, setMonsterFilter] = useState("");
   const [npcs, setNpcs] = useState<NpcTemplate[]>([]);
   const [scene, setScene] = useState<SceneNpc[]>([]);
-  const [spawnNpcId, setSpawnNpcId] = useState("mira");
-  const [npcFilter, setNpcFilter] = useState("");
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<CheckResult | null>(null);
   const [mapRuling, setMapRuling] = useState<MapRuling | null>(null);
@@ -993,20 +936,6 @@ export default function App() {
   const [reuploadFile, setReuploadFile] = useState<File | null>(null);
   const [reuploadPreview, setReuploadPreview] = useState<CharacterPreview | null>(null);
   const reuploadFileRef = useRef<HTMLInputElement>(null);
-  const [customMonster, setCustomMonster] = useState({
-    name: "",
-    ac: 13,
-    hp: 15,
-    image: null as File | null,
-  });
-  const [customNpc, setCustomNpc] = useState({
-    name: "",
-    ac: 12,
-    hp: 12,
-    attitude: "indifferent",
-    role: "",
-    image: null as File | null,
-  });
   const [apiBase, setApiBase] = useState(API_BASE);
   const [gameMode, setGameMode] = useState<boolean | null>(window.dmDesktop?.isGame ? null : false);
   const [themeId, setThemeId] = useState<TitleThemeId>(titleThemeId);
@@ -1024,8 +953,6 @@ export default function App() {
   const [loadOpen, setLoadOpen] = useState(false);
   const [saves, setSaves] = useState<{ name: string; saved_at: string }[]>([]);
   const [addModal, setAddModal] = useState<null | "monster" | "npc">(null);
-  const [showCustomInModal, setShowCustomInModal] = useState(false);
-  const [spawnTune, setSpawnTune] = useState({ cr: "0", xp: 10, ac: 10, hp: 10 });
   const [xpAward, setXpAward] = useState<null | {
     kind: "defeat" | "milestone";
     label: string;
@@ -1047,30 +974,6 @@ export default function App() {
     () => sessions.find((s) => s.active) || sessions[0] || null,
     [sessions]
   );
-  const filteredMonsters = useMemo(() => {
-    const q = monsterFilter.trim().toLowerCase();
-    if (!q) return monsters;
-    return monsters.filter(
-      (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.id.toLowerCase().includes(q) ||
-        (m.type || "").toLowerCase().includes(q) ||
-        String(m.cr || "").toLowerCase().includes(q)
-    );
-  }, [monsters, monsterFilter]);
-  const filteredNpcs = useMemo(() => {
-    const q = npcFilter.trim().toLowerCase();
-    if (!q) return npcs;
-    return npcs.filter(
-      (n) =>
-        n.name.toLowerCase().includes(q) ||
-        n.id.toLowerCase().includes(q) ||
-        (n.role || "").toLowerCase().includes(q) ||
-        (n.attitude || "").toLowerCase().includes(q) ||
-        (n.aliases || []).some((a) => a.toLowerCase().includes(q))
-    );
-  }, [npcs, npcFilter]);
-
   const refresh = useCallback(async () => {
     const [s, chars, ev, rs, mons, enc, npcList, sceneList] = await Promise.all([
       api.status(),
@@ -1096,14 +999,8 @@ export default function App() {
     } catch {
       setSessions([]);
     }
-    if (mons.length && !mons.find((m) => m.id === spawnId)) {
-      setSpawnId(mons[0].id);
-    }
-    if (npcList.length && !npcList.find((n) => n.id === spawnNpcId)) {
-      setSpawnNpcId(npcList[0].id);
-    }
     if (!selectedId && chars.length) setSelectedId(chars[0].id);
-  }, [selectedId, spawnId, spawnNpcId]);
+  }, [selectedId]);
 
   useEffect(() => {
     applyThemeChrome(themeId);
@@ -1162,32 +1059,6 @@ export default function App() {
     else if (scene.length > 0) setRightTab("scene");
     else setRightTab("foes");
   }, [encounter.length, scene.length, monsters.length, npcs.length]);
-
-  useEffect(() => {
-    if (!addModal) return;
-    if (addModal === "monster") {
-      const m =
-        monsters.find((x) => x.id === spawnId) ||
-        filteredMonsters[0] ||
-        monsters[0];
-      if (!m) return;
-      setSpawnTune({
-        cr: String(m.cr || "0"),
-        xp: m.xp ?? CR_TO_XP[String(m.cr || "0")] ?? 10,
-        ac: m.ac,
-        hp: m.hp,
-      });
-    } else {
-      const n = npcs.find((x) => x.id === spawnNpcId) || filteredNpcs[0] || npcs[0];
-      if (!n) return;
-      setSpawnTune({
-        cr: String(n.cr || "0"),
-        xp: n.xp ?? CR_TO_XP[String(n.cr || "0")] ?? 10,
-        ac: n.ac,
-        hp: n.hp,
-      });
-    }
-  }, [addModal, spawnId, spawnNpcId, monsters, npcs, filteredMonsters, filteredNpcs]);
 
   useEffect(() => {
     if (!addModal && !reuploadOpen && !xpAward) return;
@@ -1316,7 +1187,11 @@ export default function App() {
   }
 
   async function applyCreature(creature: RulingCreature, amount: number, heal = mapRuling?.heal ?? false) {
-    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (!Number.isFinite(amount) || amount < 0) return;
+    if (amount === 0 && !heal) {
+      if (creature.refId) setDamageShown((prev) => ({ ...prev, [creature.refId as string]: 0 }));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -1364,7 +1239,6 @@ export default function App() {
       if (!heal && creature.refId) {
         const dealt = amount;
         setDamageShown((prev) => ({ ...prev, [creature.refId as string]: dealt }));
-        recordFate(`${creature.label} takes ${dealt} damage and now has ${next} health.`);
       }
       if (!creature.refId) {
         setMapRuling((prev) =>
@@ -1397,7 +1271,6 @@ export default function App() {
   }
 
   function missCreature(creature: RulingCreature) {
-    recordFate(`${creature.label} misses. Health stays.`);
     setMapRuling((prev) =>
       prev ? { ...prev, creatures: prev.creatures.filter((item) => item.key !== creature.key) } : prev
     );
@@ -1908,8 +1781,9 @@ export default function App() {
             markPulse={markPulse}
             ruling={mapRuling}
             onRuling={acceptRuling}
-            onApply={(creature, amount) => void applyCreature(creature, amount)}
+            onApply={(creature, amount) => applyCreature(creature, amount)}
             onMiss={missCreature}
+            onFate={recordFate}
             damageShown={damageShown}
             applyBusy={busy}
             onError={(msg) => setError(msg)}
@@ -2038,7 +1912,7 @@ export default function App() {
                     <span>
                       {hp}/{c.max_hp}
                       {c.temp_hp ? ` +${c.temp_hp}` : ""}
-                      {damageShown[c.id] ? <span className="hp-loss"> −{damageShown[c.id]}</span> : null}
+                      {damageShown[c.id] != null ? <span className="hp-loss"> −{damageShown[c.id]}</span> : null}
                     </span>
                   </div>
                   <div className="hp-meter-track">
@@ -2269,7 +2143,7 @@ export default function App() {
         <section className="panel query-box">
           <h2>What needs a roll?</h2>
           <textarea
-            placeholder='e.g. "Shardon stabs orc A" or "Shardon tries to sneak past the guards"'
+            placeholder='e.g. "Shardon stabs Grukk" or "Shardon tries to sneak past the guards"'
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -2315,14 +2189,19 @@ export default function App() {
               monsters={monsters}
               apiBase={apiBase}
             >
-              {(result.check_type === "attack" || result.check_type === "save" || mapRuling?.heal) && (
+              {(result.check_type === "attack" ||
+                result.check_type === "save" ||
+                result.check_type === "skill" ||
+                result.check_type === "ability" ||
+                mapRuling?.heal) && (
                 <HitEntry
                   result={result}
                   creatures={mapRuling?.blocked ? [] : mapRuling?.creatures || []}
                   heal={Boolean(mapRuling?.heal)}
                   busy={busy}
-                  onApply={(creature, amount) => void applyCreature(creature, amount)}
+                  onApply={(creature, amount) => applyCreature(creature, amount)}
                   onMiss={missCreature}
+                  onFate={recordFate}
                 />
               )}
               {(result.check_type === "skill" ||
@@ -2407,16 +2286,13 @@ export default function App() {
 
           {rightTab === "foes" && (
             <div className="rail-body" role="tabpanel">
-              <p className="section-note">Combat foes — e.g. “stabs orc A”.</p>
+              <p className="section-note">Leave the name blank and an orc gets a name. A mimic stays Mimic 2.</p>
               <div className="row" style={{ marginBottom: "0.5rem" }}>
                 <button
                   type="button"
                   className="btn primary"
                   disabled={busy}
-                  onClick={() => {
-                    setShowCustomInModal(false);
-                    setAddModal("monster");
-                  }}
+                  onClick={() => setAddModal("monster")}
                 >
                   Add foe
                 </button>
@@ -2450,7 +2326,7 @@ export default function App() {
                             <span>AC {e.ac}</span>
                             <span>
                               HP {e.current_hp}/{e.max_hp}
-                              {damageShown[e.id] ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
+                              {damageShown[e.id] != null ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
                             </span>
                             {e.cr != null && <span>CR {e.cr}</span>}
                             {e.xp != null && <span>XP {e.xp}</span>}
@@ -2498,10 +2374,7 @@ export default function App() {
                   type="button"
                   className="btn primary"
                   disabled={busy}
-                  onClick={() => {
-                    setShowCustomInModal(false);
-                    setAddModal("npc");
-                  }}
+                  onClick={() => setAddModal("npc")}
                 >
                   Add NPC
                 </button>
@@ -2538,7 +2411,7 @@ export default function App() {
                             <span>AC {e.ac}</span>
                             <span>
                               HP {e.current_hp}/{e.max_hp}
-                              {damageShown[e.id] ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
+                              {damageShown[e.id] != null ? <span className="hp-loss"> −{damageShown[e.id]}</span> : null}
                             </span>
                             {e.cr != null && <span>CR {e.cr}</span>}
                             {e.xp != null && <span>XP {e.xp}</span>}
@@ -2854,484 +2727,30 @@ export default function App() {
       )}
 
       {addModal && (
-        <div
-          className="modal-backdrop"
-          role="presentation"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setAddModal(null);
+        <SpawnDialog
+          kind={addModal}
+          monsters={monsters}
+          npcs={npcs}
+          apiBase={apiBase}
+          onClose={() => setAddModal(null)}
+          onError={(message) => setError(message)}
+          onCatalogChange={async () => {
+            setMonsters(await api.listMonsters());
+            setNpcs(await api.listNpcs());
           }}
-        >
-          <div
-            className="modal-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label={addModal === "monster" ? "Add foe" : "Add scene NPC"}
-          >
-            <div className="modal-header">
-              <h2>{addModal === "monster" ? "Add foe" : "Add scene NPC"}</h2>
-              <button type="button" className="btn ghost" onClick={() => setAddModal(null)}>
-                Close
-              </button>
-            </div>
-            <div className="modal-body">
-              {addModal === "monster" ? (
-                <>
-                  <p className="muted small">{monsters.length} SRD monsters (Open5e).</p>
-                  <div className="spawn-row modal-spawn">
-                    {monsters.find((m) => m.id === spawnId)?.image_url && (
-                      <img
-                        className="spawn-preview"
-                        src={mediaUrlSync(
-                          monsters.find((m) => m.id === spawnId)?.image_url,
-                          apiBase
-                        )}
-                        alt=""
-                      />
-                    )}
-                    <input
-                      className="btn spawn-filter"
-                      placeholder="Filter monsters…"
-                      value={monsterFilter}
-                      onChange={(e) => setMonsterFilter(e.target.value)}
-                      autoFocus
-                    />
-                    <select
-                      className="btn"
-                      value={
-                        filteredMonsters.some((m) => m.id === spawnId)
-                          ? spawnId
-                          : filteredMonsters[0]?.id || ""
-                      }
-                      onChange={(e) => setSpawnId(e.target.value)}
-                    >
-                      {filteredMonsters.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} · CR {m.cr || "?"} · XP {m.xp ?? "?"} · AC {m.ac} · HP {m.hp}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="spawn-tune">
-                      <p className="muted small">
-                        Monsters use <strong>Challenge Rating (CR)</strong>, not PC levels. Adjust
-                        before spawn to scale this fight (XP updates with CR).
-                      </p>
-                      <div className="spawn-tune-grid">
-                        <label>
-                          CR
-                          <select
-                            className="btn"
-                            value={
-                              CR_OPTIONS.includes(spawnTune.cr) ? spawnTune.cr : spawnTune.cr
-                            }
-                            onChange={(e) => {
-                              const cr = e.target.value;
-                              setSpawnTune((t) => ({
-                                ...t,
-                                cr,
-                                xp: CR_TO_XP[cr] ?? t.xp,
-                              }));
-                            }}
-                          >
-                            {!CR_OPTIONS.includes(spawnTune.cr) && (
-                              <option value={spawnTune.cr}>{spawnTune.cr}</option>
-                            )}
-                            {CR_OPTIONS.map((cr) => (
-                              <option key={cr} value={cr}>
-                                {cr}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          XP
-                          <input
-                            type="number"
-                            min={0}
-                            value={spawnTune.xp}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({ ...t, xp: Number(e.target.value) || 0 }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          AC
-                          <input
-                            type="number"
-                            value={spawnTune.ac}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({ ...t, ac: Number(e.target.value) || 0 }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          HP
-                          <input
-                            type="number"
-                            min={1}
-                            value={spawnTune.hp}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({
-                                ...t,
-                                hp: Math.max(1, Number(e.target.value) || 1),
-                              }))
-                            }
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <button
-                      className="btn primary"
-                      disabled={
-                        busy ||
-                        !(filteredMonsters.some((m) => m.id === spawnId)
-                          ? spawnId
-                          : filteredMonsters[0]?.id)
-                      }
-                      onClick={async () => {
-                        const id = filteredMonsters.some((m) => m.id === spawnId)
-                          ? spawnId
-                          : filteredMonsters[0]?.id;
-                        if (!id) return;
-                        setBusy(true);
-                        try {
-                          await api.spawnEnemy(id, 1, undefined, {
-                            cr: spawnTune.cr,
-                            xp: spawnTune.xp,
-                            ac: spawnTune.ac,
-                            hp: spawnTune.hp,
-                          });
-                          setSpawnId(id);
-                          setEncounter(await api.listEncounter());
-                          setRightTab("foes");
-                          setAddModal(null);
-                        } catch (e) {
-                          setError(String(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      Spawn
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    style={{ marginTop: "0.75rem" }}
-                    onClick={() => setShowCustomInModal((v) => !v)}
-                  >
-                    {showCustomInModal ? "Hide custom monster" : "Custom monster…"}
-                  </button>
-                  {showCustomInModal && (
-                    <div className="edit-form" style={{ marginTop: "0.5rem" }}>
-                      <label>
-                        Name
-                        <input
-                          value={customMonster.name}
-                          onChange={(e) =>
-                            setCustomMonster((c) => ({ ...c, name: e.target.value }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        AC
-                        <input
-                          type="number"
-                          value={customMonster.ac}
-                          onChange={(e) =>
-                            setCustomMonster((c) => ({ ...c, ac: Number(e.target.value) }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        HP
-                        <input
-                          type="number"
-                          value={customMonster.hp}
-                          onChange={(e) =>
-                            setCustomMonster((c) => ({ ...c, hp: Number(e.target.value) }))
-                          }
-                        />
-                      </label>
-                      <label className="btn file-btn">
-                        {customMonster.image ? "Portrait ready" : "Portrait image"}
-                        <PortraitFileButton onFile={(file) => setCustomMonster((c) => ({ ...c, image: file }))} />
-                      </label>
-                      <button
-                        className="btn"
-                        disabled={busy || !customMonster.name.trim()}
-                        onClick={async () => {
-                          setBusy(true);
-                          try {
-                            const saved = await api.addCustomMonster({
-                              name: customMonster.name.trim(),
-                              ac: customMonster.ac,
-                              hp: customMonster.hp,
-                              image: customMonster.image,
-                            });
-                            setMonsters(await api.listMonsters());
-                            setSpawnId(saved.id);
-                            setMonsterFilter(saved.name);
-                            setCustomMonster({ name: "", ac: 13, hp: 15, image: null });
-                            setAddModal(null);
-                            setRightTab("foes");
-                          } catch (e) {
-                            setError(String(e));
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        Save to bestiary
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  <p className="muted small">{npcs.length} scene NPCs in catalog.</p>
-                  <div className="spawn-row modal-spawn">
-                    {npcs.find((n) => n.id === spawnNpcId)?.image_url && (
-                      <img
-                        className="spawn-preview"
-                        src={mediaUrlSync(
-                          npcs.find((n) => n.id === spawnNpcId)?.image_url,
-                          apiBase
-                        )}
-                        alt=""
-                      />
-                    )}
-                    <input
-                      className="btn spawn-filter"
-                      placeholder="Filter NPCs… (bartender, mira…)"
-                      value={npcFilter}
-                      onChange={(e) => setNpcFilter(e.target.value)}
-                      autoFocus
-                    />
-                    <select
-                      className="btn"
-                      value={
-                        filteredNpcs.some((n) => n.id === spawnNpcId)
-                          ? spawnNpcId
-                          : filteredNpcs[0]?.id || ""
-                      }
-                      onChange={(e) => setSpawnNpcId(e.target.value)}
-                    >
-                      {filteredNpcs.map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.name} · {n.role || "NPC"} · XP {n.xp ?? "?"} · AC {n.ac}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="spawn-tune">
-                      <p className="muted small">
-                        Scene NPCs also use <strong>CR</strong> (not class levels). Tweak CR / XP /
-                        HP before spawning this instance.
-                      </p>
-                      <div className="spawn-tune-grid">
-                        <label>
-                          CR
-                          <select
-                            className="btn"
-                            value={spawnTune.cr}
-                            onChange={(e) => {
-                              const cr = e.target.value;
-                              setSpawnTune((t) => ({
-                                ...t,
-                                cr,
-                                xp: CR_TO_XP[cr] ?? t.xp,
-                              }));
-                            }}
-                          >
-                            {!CR_OPTIONS.includes(spawnTune.cr) && (
-                              <option value={spawnTune.cr}>{spawnTune.cr}</option>
-                            )}
-                            {CR_OPTIONS.map((cr) => (
-                              <option key={cr} value={cr}>
-                                {cr}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          XP
-                          <input
-                            type="number"
-                            min={0}
-                            value={spawnTune.xp}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({ ...t, xp: Number(e.target.value) || 0 }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          AC
-                          <input
-                            type="number"
-                            value={spawnTune.ac}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({ ...t, ac: Number(e.target.value) || 0 }))
-                            }
-                          />
-                        </label>
-                        <label>
-                          HP
-                          <input
-                            type="number"
-                            min={1}
-                            value={spawnTune.hp}
-                            onChange={(e) =>
-                              setSpawnTune((t) => ({
-                                ...t,
-                                hp: Math.max(1, Number(e.target.value) || 1),
-                              }))
-                            }
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <button
-                      className="btn primary"
-                      disabled={
-                        busy ||
-                        !(filteredNpcs.some((n) => n.id === spawnNpcId)
-                          ? spawnNpcId
-                          : filteredNpcs[0]?.id)
-                      }
-                      onClick={async () => {
-                        const id = filteredNpcs.some((n) => n.id === spawnNpcId)
-                          ? spawnNpcId
-                          : filteredNpcs[0]?.id;
-                        if (!id) return;
-                        setBusy(true);
-                        try {
-                          await api.spawnNpc(id, 1, undefined, {
-                            cr: spawnTune.cr,
-                            xp: spawnTune.xp,
-                            ac: spawnTune.ac,
-                            hp: spawnTune.hp,
-                          });
-                          setSpawnNpcId(id);
-                          setScene(await api.listScene());
-                          setRightTab("scene");
-                          setAddModal(null);
-                        } catch (e) {
-                          setError(String(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      Spawn
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    style={{ marginTop: "0.75rem" }}
-                    onClick={() => setShowCustomInModal((v) => !v)}
-                  >
-                    {showCustomInModal ? "Hide custom NPC" : "Custom NPC…"}
-                  </button>
-                  {showCustomInModal && (
-                    <div className="edit-form" style={{ marginTop: "0.5rem" }}>
-                      <label>
-                        Name
-                        <input
-                          value={customNpc.name}
-                          onChange={(e) => setCustomNpc((c) => ({ ...c, name: e.target.value }))}
-                        />
-                      </label>
-                      <label>
-                        Role
-                        <input
-                          value={customNpc.role}
-                          onChange={(e) => setCustomNpc((c) => ({ ...c, role: e.target.value }))}
-                          placeholder="Bartender"
-                        />
-                      </label>
-                      <label>
-                        Attitude
-                        <select
-                          className="btn"
-                          value={customNpc.attitude}
-                          onChange={(e) =>
-                            setCustomNpc((c) => ({ ...c, attitude: e.target.value }))
-                          }
-                        >
-                          <option value="friendly">friendly</option>
-                          <option value="indifferent">indifferent</option>
-                          <option value="hostile">hostile</option>
-                        </select>
-                      </label>
-                      <label>
-                        AC
-                        <input
-                          type="number"
-                          value={customNpc.ac}
-                          onChange={(e) =>
-                            setCustomNpc((c) => ({ ...c, ac: Number(e.target.value) }))
-                          }
-                        />
-                      </label>
-                      <label>
-                        HP
-                        <input
-                          type="number"
-                          value={customNpc.hp}
-                          onChange={(e) =>
-                            setCustomNpc((c) => ({ ...c, hp: Number(e.target.value) }))
-                          }
-                        />
-                      </label>
-                      <label className="btn file-btn">
-                        {customNpc.image ? "Portrait ready" : "Portrait image"}
-                        <PortraitFileButton onFile={(file) => setCustomNpc((c) => ({ ...c, image: file }))} />
-                      </label>
-                      <button
-                        className="btn"
-                        disabled={busy || !customNpc.name.trim()}
-                        onClick={async () => {
-                          setBusy(true);
-                          try {
-                            const saved = await api.addCustomNpc({
-                              name: customNpc.name.trim(),
-                              ac: customNpc.ac,
-                              hp: customNpc.hp,
-                              attitude: customNpc.attitude,
-                              role: customNpc.role.trim(),
-                              image: customNpc.image,
-                            });
-                            setNpcs(await api.listNpcs());
-                            setSpawnNpcId(saved.id);
-                            setNpcFilter(saved.name);
-                            setCustomNpc({
-                              name: "",
-                              ac: 12,
-                              hp: 12,
-                              attitude: "indifferent",
-                              role: "",
-                              image: null,
-                            });
-                            setAddModal(null);
-                            setRightTab("scene");
-                          } catch (e) {
-                            setError(String(e));
-                          } finally {
-                            setBusy(false);
-                          }
-                        }}
-                      >
-                        Save to scene catalog
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+          onSpawned={async (kind) => {
+            if (kind === "monster") {
+              setEncounter(await api.listEncounter());
+              setRightTab("foes");
+            } else {
+              setScene(await api.listScene());
+              setRightTab("scene");
+            }
+            setAddModal(null);
+          }}
+        />
       )}
+
       {bagFor && characters.find((c) => c.id === bagFor) && (
         <InventoryModal
           character={characters.find((c) => c.id === bagFor)!}

@@ -2,7 +2,7 @@
   "id": "npcs-srd",
   "name": "Tavern & scene NPCs",
   "version": "1.0.0",
-  "description": "Friendly/indifferent cast for social scenes (not combat Encounter).",
+  "description": "Scene NPCs. Combat numbers come from the NPC stat block each person uses.",
   "npcs": [
     {
       "id": "mira",
@@ -14,8 +14,6 @@
       ],
       "role": "Bartender",
       "attitude": "friendly",
-      "ac": 12,
-      "hp": 18,
       "social": {
         "persuasion_dc": 12,
         "deception_dc": 13,
@@ -24,18 +22,9 @@
       },
       "notes": "Human bartender; knows every regular.",
       "image": "tokens/token_00.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "0",
-      "xp": 10,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "commoner"
     },
     {
       "id": "tamsin",
@@ -47,8 +36,6 @@
       ],
       "role": "Barmaid",
       "attitude": "friendly",
-      "ac": 11,
-      "hp": 12,
       "social": {
         "persuasion_dc": 11,
         "deception_dc": 12,
@@ -57,18 +44,9 @@
       },
       "notes": "Halfling server; quick with gossip.",
       "image": "tokens/token_01.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "0",
-      "xp": 10,
-      "size": "Small"
+      "size": "Small",
+      "block": "commoner"
     },
     {
       "id": "harlan",
@@ -79,8 +57,6 @@
       ],
       "role": "Innkeeper",
       "attitude": "indifferent",
-      "ac": 13,
-      "hp": 22,
       "social": {
         "persuasion_dc": 14,
         "deception_dc": 14,
@@ -89,18 +65,9 @@
       },
       "notes": "Dwarf owner; fair but firm on tab.",
       "image": "tokens/token_02.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/8",
-      "xp": 25,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "commoner"
     },
     {
       "id": "cole",
@@ -112,8 +79,6 @@
       ],
       "role": "Door guard",
       "attitude": "indifferent",
-      "ac": 16,
-      "hp": 32,
       "social": {
         "persuasion_dc": 15,
         "deception_dc": 14,
@@ -122,18 +87,9 @@
       },
       "notes": "Human guard; watches for trouble.",
       "image": "tokens/token_03.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/8",
-      "xp": 25,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "guard"
     },
     {
       "id": "brenna",
@@ -144,8 +100,6 @@
       ],
       "role": "Traveling merchant",
       "attitude": "indifferent",
-      "ac": 12,
-      "hp": 16,
       "social": {
         "persuasion_dc": 13,
         "deception_dc": 15,
@@ -154,18 +108,9 @@
       },
       "notes": "Sells curios; drives a hard bargain.",
       "image": "tokens/token_04.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/8",
-      "xp": 25,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "commoner"
     },
     {
       "id": "lilo",
@@ -177,8 +122,6 @@
       ],
       "role": "Tavern bard",
       "attitude": "friendly",
-      "ac": 13,
-      "hp": 20,
       "social": {
         "persuasion_dc": 11,
         "deception_dc": 12,
@@ -188,18 +131,9 @@
       },
       "notes": "Elf performer; loves an audience.",
       "image": "tokens/token_05.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/8",
-      "xp": 25,
-      "size": "Small"
+      "size": "Small",
+      "block": "commoner"
     },
     {
       "id": "vex",
@@ -211,8 +145,6 @@
       ],
       "role": "Shady patron",
       "attitude": "hostile",
-      "ac": 14,
-      "hp": 24,
       "social": {
         "persuasion_dc": 16,
         "deception_dc": 14,
@@ -221,18 +153,9 @@
       },
       "notes": "Keeps to the corner booth.",
       "image": "tokens/token_06.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/2",
-      "xp": 100,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "spy"
     },
     {
       "id": "elara",
@@ -244,8 +167,6 @@
       ],
       "role": "Traveling priest",
       "attitude": "friendly",
-      "ac": 15,
-      "hp": 28,
       "social": {
         "persuasion_dc": 12,
         "deception_dc": 15,
@@ -254,18 +175,9 @@
       },
       "notes": "Offers healing for a donation.",
       "image": "tokens/token_07.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/2",
-      "xp": 100,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "priest"
     },
     {
       "id": "garr",
@@ -276,8 +188,6 @@
       ],
       "role": "Blacksmith",
       "attitude": "indifferent",
-      "ac": 14,
-      "hp": 30,
       "social": {
         "persuasion_dc": 13,
         "deception_dc": 14,
@@ -286,18 +196,9 @@
       },
       "notes": "Repairs gear between drinks.",
       "image": "tokens/token_08.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "1/4",
-      "xp": 50,
-      "size": "Medium"
+      "size": "Medium",
+      "block": "commoner"
     },
     {
       "id": "pip",
@@ -309,8 +210,6 @@
       ],
       "role": "Stable hand",
       "attitude": "friendly",
-      "ac": 10,
-      "hp": 9,
       "social": {
         "persuasion_dc": 10,
         "deception_dc": 11,
@@ -320,18 +219,779 @@
       },
       "notes": "Knows every horse in town.",
       "image": "tokens/token_09.jpg",
-      "attacks": [
-        {
-          "name": "Improvised",
-          "attack_bonus": 2,
-          "damage": "1d4",
-          "damage_type": "bludgeoning"
-        }
-      ],
       "kind": "npc",
-      "cr": "0",
-      "xp": 10,
-      "size": "Small"
+      "size": "Small",
+      "block": "commoner"
+    },
+    {
+      "id": "king-alden",
+      "name": "King Alden",
+      "aliases": [
+        "alden"
+      ],
+      "role": "King",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "King.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "queen-maris",
+      "name": "Queen Maris",
+      "aliases": [
+        "maris"
+      ],
+      "role": "Queen",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "Queen.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "prince-oren",
+      "name": "Prince Oren",
+      "aliases": [
+        "oren"
+      ],
+      "role": "Prince",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "Prince.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "princess-sera",
+      "name": "Princess Sera",
+      "aliases": [
+        "sera"
+      ],
+      "role": "Princess",
+      "attitude": "friendly",
+      "block": "noble",
+      "notes": "Princess.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "lord-harwick",
+      "name": "Lord Harwick",
+      "aliases": [
+        "harwick"
+      ],
+      "role": "Lord",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "Lord.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "lady-vess",
+      "name": "Lady Vess",
+      "aliases": [
+        "vess"
+      ],
+      "role": "Lady",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "Lady.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "baron-kell",
+      "name": "Baron Kell",
+      "aliases": [
+        "kell"
+      ],
+      "role": "Baron",
+      "attitude": "hostile",
+      "block": "noble",
+      "notes": "Baron.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "ambassador-rhee",
+      "name": "Ambassador Rhee",
+      "aliases": [
+        "rhee"
+      ],
+      "role": "Ambassador",
+      "attitude": "indifferent",
+      "block": "noble",
+      "notes": "Ambassador.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "sergeant-bram",
+      "name": "Sergeant Bram",
+      "aliases": [
+        "bram"
+      ],
+      "role": "Watch sergeant",
+      "attitude": "indifferent",
+      "block": "veteran",
+      "notes": "Watch sergeant.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "guard-tomas",
+      "name": "Guard Tomas",
+      "aliases": [
+        "tomas"
+      ],
+      "role": "Castle guard",
+      "attitude": "indifferent",
+      "block": "guard",
+      "notes": "Castle guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "guard-ilya",
+      "name": "Guard Ilya",
+      "aliases": [
+        "ilya"
+      ],
+      "role": "Castle guard",
+      "attitude": "indifferent",
+      "block": "guard",
+      "notes": "Castle guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "guard-petyr",
+      "name": "Guard Petyr",
+      "aliases": [
+        "petyr"
+      ],
+      "role": "Castle guard",
+      "attitude": "indifferent",
+      "block": "guard",
+      "notes": "Castle guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "guard-hana",
+      "name": "Guard Hana",
+      "aliases": [
+        "hana"
+      ],
+      "role": "Castle guard",
+      "attitude": "friendly",
+      "block": "guard",
+      "notes": "Castle guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "gate-rusk",
+      "name": "Gate Guard Rusk",
+      "aliases": [
+        "rusk"
+      ],
+      "role": "Gate guard",
+      "attitude": "indifferent",
+      "block": "guard",
+      "notes": "Gate guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "guard-sela",
+      "name": "Guard Sela",
+      "aliases": [
+        "sela"
+      ],
+      "role": "Castle guard",
+      "attitude": "indifferent",
+      "block": "guard",
+      "notes": "Castle guard.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "captain-dain",
+      "name": "Captain Dain",
+      "aliases": [
+        "dain"
+      ],
+      "role": "Watch captain",
+      "attitude": "indifferent",
+      "block": "veteran",
+      "notes": "Watch captain.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "sir-calder",
+      "name": "Sir Calder",
+      "aliases": [
+        "calder"
+      ],
+      "role": "Knight",
+      "attitude": "indifferent",
+      "block": "knight",
+      "notes": "Knight.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "dame-elowen",
+      "name": "Dame Elowen",
+      "aliases": [
+        "elowen"
+      ],
+      "role": "Knight",
+      "attitude": "friendly",
+      "block": "knight",
+      "notes": "Knight.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "sir-joss",
+      "name": "Sir Joss",
+      "aliases": [
+        "joss"
+      ],
+      "role": "Knight",
+      "attitude": "indifferent",
+      "block": "knight",
+      "notes": "Knight.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "dame-briony",
+      "name": "Dame Briony",
+      "aliases": [
+        "briony"
+      ],
+      "role": "Knight",
+      "attitude": "indifferent",
+      "block": "knight",
+      "notes": "Knight.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "veteran-mora",
+      "name": "Veteran Mora",
+      "aliases": [
+        "mora"
+      ],
+      "role": "Veteran",
+      "attitude": "indifferent",
+      "block": "veteran",
+      "notes": "Veteran.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "veteran-holt",
+      "name": "Veteran Holt",
+      "aliases": [
+        "holt"
+      ],
+      "role": "Veteran",
+      "attitude": "indifferent",
+      "block": "veteran",
+      "notes": "Veteran.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "sergeant-voss",
+      "name": "Sergeant Voss",
+      "aliases": [
+        "voss"
+      ],
+      "role": "Sergeant",
+      "attitude": "hostile",
+      "block": "veteran",
+      "notes": "Sergeant.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "high-priest-malric",
+      "name": "High Priest Malric",
+      "aliases": [
+        "malric"
+      ],
+      "role": "High priest",
+      "attitude": "indifferent",
+      "block": "priest",
+      "notes": "High priest.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "priestess-yenna",
+      "name": "Priestess Yenna",
+      "aliases": [
+        "yenna"
+      ],
+      "role": "Priestess",
+      "attitude": "friendly",
+      "block": "priest",
+      "notes": "Priestess.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "acolyte-fen",
+      "name": "Acolyte Fen",
+      "aliases": [
+        "fen"
+      ],
+      "role": "Acolyte",
+      "attitude": "friendly",
+      "block": "acolyte",
+      "notes": "Acolyte.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "acolyte-sable",
+      "name": "Acolyte Sable",
+      "aliases": [
+        "sable"
+      ],
+      "role": "Acolyte",
+      "attitude": "indifferent",
+      "block": "acolyte",
+      "notes": "Acolyte.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "acolyte-wren",
+      "name": "Acolyte Wren",
+      "aliases": [
+        "wren"
+      ],
+      "role": "Acolyte",
+      "attitude": "friendly",
+      "block": "acolyte",
+      "notes": "Acolyte.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "archmage-veyra",
+      "name": "Archmage Veyra",
+      "aliases": [
+        "veyra"
+      ],
+      "role": "Archmage",
+      "attitude": "indifferent",
+      "block": "archmage",
+      "notes": "Archmage.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "mage-corin",
+      "name": "Mage Corin",
+      "aliases": [
+        "corin"
+      ],
+      "role": "Mage",
+      "attitude": "indifferent",
+      "block": "mage",
+      "notes": "Mage.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "mage-lissa",
+      "name": "Mage Lissa",
+      "aliases": [
+        "lissa"
+      ],
+      "role": "Mage",
+      "attitude": "friendly",
+      "block": "mage",
+      "notes": "Mage.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "mage-odric",
+      "name": "Mage Odric",
+      "aliases": [
+        "odric"
+      ],
+      "role": "Mage",
+      "attitude": "hostile",
+      "block": "mage",
+      "notes": "Mage.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "spy-quill",
+      "name": "Spy Quill",
+      "aliases": [
+        "quill"
+      ],
+      "role": "Spy",
+      "attitude": "indifferent",
+      "block": "spy",
+      "notes": "Spy.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "spy-maren",
+      "name": "Spy Maren",
+      "aliases": [
+        "maren"
+      ],
+      "role": "Spy",
+      "attitude": "hostile",
+      "block": "spy",
+      "notes": "Spy.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "assassin-shade",
+      "name": "Assassin Shade",
+      "aliases": [
+        "shade"
+      ],
+      "role": "Assassin",
+      "attitude": "hostile",
+      "block": "assassin",
+      "notes": "Assassin.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "bandit-red-jack",
+      "name": "Red Jack",
+      "aliases": [
+        "red jack"
+      ],
+      "role": "Bandit",
+      "attitude": "hostile",
+      "block": "bandit",
+      "notes": "Bandit.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "bandit-nell",
+      "name": "Nell",
+      "aliases": [
+        "nell"
+      ],
+      "role": "Bandit",
+      "attitude": "hostile",
+      "block": "bandit",
+      "notes": "Bandit.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "bandit-captain-crowe",
+      "name": "Captain Crowe",
+      "aliases": [
+        "crowe"
+      ],
+      "role": "Bandit captain",
+      "attitude": "hostile",
+      "block": "bandit-captain",
+      "notes": "Bandit captain.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "thug-brigg",
+      "name": "Brigg",
+      "aliases": [
+        "brigg"
+      ],
+      "role": "Thug",
+      "attitude": "hostile",
+      "block": "thug",
+      "notes": "Thug.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "thug-opal",
+      "name": "Opal",
+      "aliases": [
+        "opal"
+      ],
+      "role": "Thug",
+      "attitude": "hostile",
+      "block": "thug",
+      "notes": "Thug.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "berserker-korr",
+      "name": "Korr",
+      "aliases": [
+        "korr"
+      ],
+      "role": "Berserker",
+      "attitude": "hostile",
+      "block": "berserker",
+      "notes": "Berserker.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "gladiator-axen",
+      "name": "Axen",
+      "aliases": [
+        "axen"
+      ],
+      "role": "Gladiator",
+      "attitude": "indifferent",
+      "block": "gladiator",
+      "notes": "Gladiator.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "druid-maelis",
+      "name": "Maelis",
+      "aliases": [
+        "maelis"
+      ],
+      "role": "Druid",
+      "attitude": "friendly",
+      "block": "druid",
+      "notes": "Druid.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "scout-lin",
+      "name": "Scout Lin",
+      "aliases": [
+        "lin"
+      ],
+      "role": "Scout",
+      "attitude": "indifferent",
+      "block": "scout",
+      "notes": "Scout.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "scout-haru",
+      "name": "Scout Haru",
+      "aliases": [
+        "haru"
+      ],
+      "role": "Scout",
+      "attitude": "friendly",
+      "block": "scout",
+      "notes": "Scout.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "tribal-sura",
+      "name": "Sura",
+      "aliases": [
+        "sura"
+      ],
+      "role": "Tribal warrior",
+      "attitude": "indifferent",
+      "block": "tribal-warrior",
+      "notes": "Tribal warrior.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "tribal-tak",
+      "name": "Tak",
+      "aliases": [
+        "tak"
+      ],
+      "role": "Tribal warrior",
+      "attitude": "hostile",
+      "block": "tribal-warrior",
+      "notes": "Tribal warrior.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "cultist-venn",
+      "name": "Venn",
+      "aliases": [
+        "venn"
+      ],
+      "role": "Cultist",
+      "attitude": "hostile",
+      "block": "cultist",
+      "notes": "Cultist.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "cult-fanatic-idris",
+      "name": "Idris",
+      "aliases": [
+        "idris"
+      ],
+      "role": "Cult fanatic",
+      "attitude": "hostile",
+      "block": "cult-fanatic",
+      "notes": "Cult fanatic.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "baker-oswin",
+      "name": "Baker Oswin",
+      "aliases": [
+        "oswin"
+      ],
+      "role": "Baker",
+      "attitude": "friendly",
+      "block": "commoner",
+      "notes": "Baker.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "farmer-edda",
+      "name": "Farmer Edda",
+      "aliases": [
+        "edda"
+      ],
+      "role": "Farmer",
+      "attitude": "friendly",
+      "block": "commoner",
+      "notes": "Farmer.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "fisher-jol",
+      "name": "Fisher Jol",
+      "aliases": [
+        "jol"
+      ],
+      "role": "Fisher",
+      "attitude": "indifferent",
+      "block": "commoner",
+      "notes": "Fisher.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "stable-wrenna",
+      "name": "Wrenna",
+      "aliases": [
+        "wrenna"
+      ],
+      "role": "Stable hand",
+      "attitude": "friendly",
+      "block": "commoner",
+      "notes": "Stable hand.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "merchant-otto",
+      "name": "Merchant Otto",
+      "aliases": [
+        "otto"
+      ],
+      "role": "Merchant",
+      "attitude": "indifferent",
+      "block": "commoner",
+      "notes": "Merchant.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
+    },
+    {
+      "id": "herald-pim",
+      "name": "Herald Pim",
+      "aliases": [
+        "pim"
+      ],
+      "role": "Herald",
+      "attitude": "friendly",
+      "block": "commoner",
+      "notes": "Herald.",
+      "image": "generic.svg",
+      "kind": "npc",
+      "size": "Medium"
     }
   ]
 }
