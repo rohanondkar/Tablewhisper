@@ -937,6 +937,49 @@ def refresh_token_portraits(map_id: str) -> None:
 
     by_key = {(t["kind"], t.get("ref_id")): t for t in list_tokens(map_id) if t.get("ref_id")}
 
+    import re
+
+    enemy_ids = {e["id"] for e in monsters.list_encounter()}
+    by_name = {str(m.get("name") or "").lower(): m for m in monsters.list_templates()}
+    for tok in list_tokens(map_id):
+        if tok.get("kind") != "enemy" or not tok.get("ref_id") or tok["ref_id"] in enemy_ids:
+            continue
+        bare = re.sub(r"\s+[A-Z]$", "", str(tok.get("label") or "")).strip()
+        tmpl = by_name.get(bare.lower())
+        if not tmpl:
+            continue
+        sized = ensure_creature_size(dict(tmpl))
+        img = monsters.image_url_for(tmpl)
+        sid = db.active_session_id()
+        with db.db() as conn:
+            conn.execute(
+                """
+                INSERT INTO encounter_enemies(
+                  id, session_id, label, monster_id, name, ac, max_hp, current_hp, data_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tok["ref_id"],
+                    sid,
+                    tok.get("label") or tmpl.get("name"),
+                    tmpl.get("id"),
+                    tmpl.get("name"),
+                    int(tmpl.get("ac") or 10),
+                    int(tmpl.get("hp") or 1),
+                    int(tmpl.get("hp") or 1),
+                    json.dumps(tmpl),
+                    db.utcnow(),
+                ),
+            )
+        patch_token(
+            tok["id"],
+            {
+                "image_url": img,
+                "size": sized["size"],
+                "size_sq": float(sized["size_sq"]),
+            },
+        )
+
     for c in db.list_characters():
         c = with_portrait(ensure_character_size(c))
         tok = by_key.get(("pc", c["id"]))

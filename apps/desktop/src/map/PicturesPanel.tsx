@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { api, mediaUrlSync, type Character, type MonsterTemplate, type NpcTemplate } from "../api";
+import { PortraitFileButton } from "../PortraitEditor";
 
 const API_BASE = "http://127.0.0.1:8766";
 
@@ -136,17 +137,7 @@ function PictureCard({
         {sub && <span className="muted small">{sub}</span>}
         <label className="btn ghost picture-upload-btn">
           {src ? "Replace" : "Upload"}
-          <input
-            type="file"
-            accept="image/*"
-            hidden
-            disabled={disabled}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFile(f);
-              e.target.value = "";
-            }}
-          />
+          <PortraitFileButton hidden disabled={disabled} onFile={onFile} />
         </label>
       </div>
     </div>

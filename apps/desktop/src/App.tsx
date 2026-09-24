@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   api,
   mediaUrlSync,
@@ -20,11 +20,665 @@ import MapPanel from "./map/MapPanel";
 import MapErrorBoundary from "./map/MapErrorBoundary";
 import { HitEntry } from "./map/ResolveModal";
 import ResolveCard from "./map/ResolveCard";
-import type { MapRuling, MarkPulse, RulingCreature } from "./map/effects";
+import { spellFxMode, type MapRuling, type MarkPulse, type RulingCreature } from "./map/effects";
 import PicturesPanel from "./map/PicturesPanel";
 import { CREATURE_SIZES } from "./map/sizes";
+import { PortraitFileButton } from "./PortraitEditor";
+import { sfxVolume } from "./map/attackSounds";
+import { applyThemeChrome, setTitleTheme, TitleAtmosphere, TITLE_THEMES, titleTheme, titleThemeId, type LogDevice, type TitleThemeId } from "./titleThemes";
 
 const API_BASE = "http://127.0.0.1:8766";
+
+const SPELL_FX_KEY = "tablewhisper-spell-fx";
+const MUSIC_KEY = "tablewhisper-music-volume";
+const SFX_KEY = "tablewhisper-sfx-volume";
+const WHISPER_MODELS = ["tiny", "base", "small", "medium"];
+let titleAudio: HTMLAudioElement | null = null;
+let titleMusicHolders = 0;
+
+function musicVolume(): number {
+  const saved = Number(localStorage.getItem(MUSIC_KEY));
+  if (!Number.isFinite(saved)) return 0.4;
+  return Math.max(0, Math.min(1, saved / 100));
+}
+
+function ensureTitleAudio(): HTMLAudioElement {
+  const theme = titleTheme();
+  if (!titleAudio) {
+    titleAudio = new Audio(theme.file);
+    titleAudio.loop = true;
+    titleAudio.dataset.theme = theme.id;
+  } else if (titleAudio.dataset.theme !== theme.id) {
+    const wasPlaying = !titleAudio.paused;
+    titleAudio.src = theme.file;
+    titleAudio.loop = true;
+    titleAudio.dataset.theme = theme.id;
+    if (wasPlaying) void titleAudio.play().catch(() => undefined);
+  }
+  titleAudio.volume = musicVolume();
+  return titleAudio;
+}
+
+function TitleMusic() {
+  useEffect(() => {
+    titleMusicHolders += 1;
+    const audio = ensureTitleAudio();
+    const apply = () => {
+      const next = ensureTitleAudio();
+      if (titleMusicHolders > 0 && next.paused) void next.play().catch(() => undefined);
+    };
+    window.addEventListener("tablewhisper-music", apply);
+    window.addEventListener("tablewhisper-theme", apply);
+    const start = () => {
+      void audio.play().catch(() => undefined);
+    };
+    void audio.play().catch(() => window.addEventListener("pointerdown", start, { once: true }));
+    return () => {
+      titleMusicHolders -= 1;
+      window.removeEventListener("tablewhisper-music", apply);
+      window.removeEventListener("tablewhisper-theme", apply);
+      window.removeEventListener("pointerdown", start);
+      window.setTimeout(() => {
+        if (titleMusicHolders === 0) audio.pause();
+      }, 0);
+    };
+  }, []);
+  return null;
+}
+
+function QuitDialog({
+  title,
+  body,
+  onStay,
+  onQuit,
+}: {
+  title: string;
+  body: string;
+  onStay: () => void;
+  onQuit: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onStay();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onStay]);
+
+  return (
+    <div className="modal-backdrop" onClick={onStay}>
+      <div className="modal-panel quit-dialog" role="dialog" aria-modal="true" aria-labelledby="quit-dialog-title" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <h2 id="quit-dialog-title">{title}</h2>
+        </div>
+        <div className="modal-body">
+          <p>{body}</p>
+          <div className="quit-dialog-actions">
+            <button type="button" className="btn ghost" autoFocus onClick={onStay}>
+              Stay
+            </button>
+            <button type="button" className="btn quit-btn" onClick={onQuit}>
+              Quit
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const OPT_ROWS = ["display", "music", "sfx", "whisper", "buffer", "listen", "spell", "theme"] as const;
+type OptRow = (typeof OPT_ROWS)[number];
+
+const OPT_GROUP: Record<OptRow, string> = {
+  display: "Display",
+  music: "Audio",
+  sfx: "Audio",
+  whisper: "Listening",
+  buffer: "Listening",
+  listen: "Listening",
+  spell: "Graphics",
+  theme: "Theme",
+};
+
+const SPELLS = ["full", "reduced", "off"] as const;
+const BUFFERS = [15, 30, 45, 60, 90, 120, 180];
+
+function optCopy(row: OptRow, themeLabel: string): { title: string; body: string } {
+  if (row === "display") return { title: "Display", body: "Choose a free window, a preset size, or fullscreen. Fullscreen stays locked while a preset size is selected. Apply commits the size." };
+  if (row === "music") return { title: "Title music", body: "How loud the title music plays. The change is heard right away." };
+  if (row === "sfx") return { title: "Attack sounds", body: "How loud map attacks sound. Zero hides the sting. The picture still follows Graphics." };
+  if (row === "whisper") return { title: "Whisper", body: "Which speech model the table uses when it listens." };
+  if (row === "buffer") return { title: "Listen length", body: "How many seconds of audio the table keeps." };
+  if (row === "listen") return { title: "Listening", body: "Start or stop the table listening to the room." };
+  if (row === "spell") return { title: "Spell effects", body: "Full plays the cast for the length of the sound. Reduced is a short flash. Off hides the picture." };
+  return { title: themeLabel, body: titleTheme().credit };
+}
+
+function displayLabel(displays: DisplayPanel[], choice: DisplayChoice | null): string {
+  if (!choice) return "Reading the monitors…";
+  const panel = displays.find((item) => item.id === choice.displayId);
+  const prefix = displays.length > 1 && panel ? `${panel.label} · ` : "";
+  if (choice.mode === "free") return `${prefix}Windowed — Free`;
+  if (choice.mode === "fullscreen") return `${prefix}Fullscreen`;
+  return `${prefix}${choice.width}×${choice.height}`;
+}
+
+function legalModes(displays: DisplayPanel[], draft: DisplayChoice | null): DisplayChoice[] {
+  const locked = draft?.mode === "window";
+  const out: DisplayChoice[] = [];
+  for (const panel of displays) {
+    for (const mode of panel.modes) {
+      if (locked && mode.mode === "fullscreen") continue;
+      out.push({
+        displayId: panel.id,
+        mode: mode.mode,
+        width: mode.width,
+        height: mode.height,
+      });
+    }
+  }
+  return out;
+}
+
+function sameDisplay(a: DisplayChoice | null, b: DisplayChoice | null): boolean {
+  if (!a || !b) return false;
+  return a.displayId === b.displayId && a.mode === b.mode && a.width === b.width && a.height === b.height;
+}
+
+function VolumeBars({ value, onChange }: { value: number; onChange: (next: number) => void }) {
+  return (
+    <span className="opt-bars">
+      {Array.from({ length: 10 }, (_, index) => (
+        <i
+          key={index}
+          className={value >= (index + 1) * 10 ? "on" : ""}
+          onClick={(event) => {
+            event.stopPropagation();
+            onChange((index + 1) * 10);
+          }}
+        />
+      ))}
+      <span>{value}</span>
+    </span>
+  );
+}
+
+function OptionsScreen({ onBack }: { onBack: () => void }) {
+  const [displays, setDisplays] = useState<DisplayPanel[]>([]);
+  const [current, setCurrent] = useState<DisplayChoice | null>(null);
+  const [draft, setDraft] = useState<DisplayChoice | null>(null);
+  const [whisper, setWhisper] = useState("small");
+  const [buffer, setBuffer] = useState(45);
+  const [listening, setListening] = useState(false);
+  const [sourceLine, setSourceLine] = useState("Audio idle");
+  const [spellFx, setSpellFx] = useState(spellFxMode());
+  const [music, setMusic] = useState(() => Math.round(musicVolume() * 100));
+  const [sfx, setSfx] = useState(() => Math.round(sfxVolume() * 100));
+  const [themeId, setThemeId] = useState<TitleThemeId>(titleThemeId);
+  const [focus, setFocus] = useState(0);
+  const screenRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    let stop = false;
+    const load = async () => {
+      const view = await window.dmDesktop?.getDisplay?.();
+      if (!stop && view) {
+        setDisplays(view.displays);
+        setCurrent(view.current);
+      }
+      try {
+        const settings = await api.settings();
+        const status = await api.status();
+        if (stop) return;
+        setWhisper(String(settings.whisper_model || "small"));
+        setBuffer(Math.max(10, Math.min(180, Number(settings.buffer_seconds) || 45)));
+        setListening(Boolean(status.audio.capturing));
+        setSourceLine(
+          status.audio.source === "discord"
+            ? "Discord"
+            : status.audio.source === "wasapi" || status.audio.capturing
+              ? "System audio"
+              : "Audio idle"
+        );
+      } catch {
+        /* the table may still be starting */
+      }
+    };
+    void load();
+    return () => {
+      stop = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (current) setDraft(current);
+  }, [current]);
+
+  useEffect(() => {
+    const sync = () => setThemeId(titleThemeId());
+    window.addEventListener("tablewhisper-theme", sync);
+    return () => window.removeEventListener("tablewhisper-theme", sync);
+  }, []);
+
+  useEffect(() => {
+    screenRef.current?.focus();
+  }, []);
+
+  const row = OPT_ROWS[focus] || "display";
+  const theme = TITLE_THEMES.find((item) => item.id === themeId) || TITLE_THEMES[0];
+  const modes = legalModes(displays, draft);
+  const modeIndex = Math.max(0, modes.findIndex((item) => sameDisplay(item, draft)));
+
+  function step(delta: number, which: OptRow = row) {
+    if (which === "display") {
+      if (!modes.length) return;
+      const next = modes[(modeIndex + delta + modes.length) % modes.length];
+      setDraft(next);
+      return;
+    }
+    if (which === "music") {
+      const next = Math.max(0, Math.min(100, music + delta * 10));
+      setMusic(next);
+      localStorage.setItem(MUSIC_KEY, String(next));
+      window.dispatchEvent(new Event("tablewhisper-music"));
+      return;
+    }
+    if (which === "sfx") {
+      const next = Math.max(0, Math.min(100, sfx + delta * 10));
+      setSfx(next);
+      localStorage.setItem(SFX_KEY, String(next));
+      return;
+    }
+    if (which === "whisper") {
+      const index = Math.max(0, WHISPER_MODELS.indexOf(whisper as (typeof WHISPER_MODELS)[number]));
+      const next = WHISPER_MODELS[(index + delta + WHISPER_MODELS.length) % WHISPER_MODELS.length];
+      setWhisper(next);
+      void api.updateSettings({ whisper_model: next });
+      return;
+    }
+    if (which === "buffer") {
+      const index = Math.max(0, BUFFERS.indexOf(buffer));
+      const next = BUFFERS[Math.max(0, Math.min(BUFFERS.length - 1, (index < 0 ? 2 : index) + delta))];
+      setBuffer(next);
+      void api.updateSettings({ buffer_seconds: next });
+      return;
+    }
+    if (which === "spell") {
+      const index = Math.max(0, SPELLS.indexOf(spellFx as (typeof SPELLS)[number]));
+      const next = SPELLS[(index + delta + SPELLS.length) % SPELLS.length];
+      setSpellFx(next);
+      localStorage.setItem(SPELL_FX_KEY, next);
+      return;
+    }
+    if (which === "theme") {
+      const index = Math.max(0, TITLE_THEMES.findIndex((item) => item.id === themeId));
+      const next = TITLE_THEMES[(index + delta + TITLE_THEMES.length) % TITLE_THEMES.length];
+      setTitleTheme(next.id);
+      setThemeId(next.id);
+    }
+  }
+
+  function resetRow() {
+    if (row === "display") {
+      setDraft(current);
+      return;
+    }
+    if (row === "music") {
+      setMusic(40);
+      localStorage.setItem(MUSIC_KEY, "40");
+      window.dispatchEvent(new Event("tablewhisper-music"));
+      return;
+    }
+    if (row === "sfx") {
+      setSfx(70);
+      localStorage.setItem(SFX_KEY, "70");
+      return;
+    }
+    if (row === "whisper") {
+      setWhisper("small");
+      void api.updateSettings({ whisper_model: "small" });
+      return;
+    }
+    if (row === "buffer") {
+      setBuffer(45);
+      void api.updateSettings({ buffer_seconds: 45 });
+      return;
+    }
+    if (row === "listen") {
+      if (listening) void api.audioStop().then(() => setListening(false));
+      return;
+    }
+    if (row === "spell") {
+      localStorage.removeItem(SPELL_FX_KEY);
+      setSpellFx(spellFxMode());
+      return;
+    }
+    setTitleTheme("hearth");
+    setThemeId("hearth");
+  }
+
+  async function applyDisplay() {
+    if (!draft) return;
+    const panel = displays.find((item) => item.id === draft.displayId);
+    const mode = panel?.modes.find(
+      (item) => item.mode === draft.mode && item.width === draft.width && item.height === draft.height
+    );
+    if (!panel || !mode) return;
+    const keepSize = mode.mode === "free" && current && current.mode !== "fullscreen";
+    const next = await window.dmDesktop?.setDisplay?.({
+      displayId: panel.id,
+      mode: mode.mode,
+      width: keepSize && current ? current.width : mode.width,
+      height: keepSize && current ? current.height : mode.height,
+    });
+    if (next) {
+      setCurrent(next.current);
+      setDraft(next.current);
+    }
+  }
+
+  function onKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setFocus((value) => (value + 1) % OPT_ROWS.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setFocus((value) => (value - 1 + OPT_ROWS.length) % OPT_ROWS.length);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      step(1);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      step(-1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      void applyDisplay();
+    } else if (event.key === "r" || event.key === "R") {
+      event.preventDefault();
+      resetRow();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onBack();
+    }
+  }
+
+  const copy = optCopy(row, theme.label);
+  let groupSeen = "";
+
+  return (
+    <div
+      className={`title-screen opt-game theme-${themeId}`}
+      ref={screenRef}
+      tabIndex={0}
+      onKeyDown={onKey}
+    >
+      {themeId === "hearth" ? <TitleEmbers /> : <TitleAtmosphere theme={themeId} />}
+      <h1>Options</h1>
+      <div className="opt-layout">
+        <div className="opt-rows">
+          {OPT_ROWS.map((id, index) => {
+            const showGroup = OPT_GROUP[id] !== groupSeen;
+            if (showGroup) groupSeen = OPT_GROUP[id];
+            return (
+              <div key={id}>
+                {showGroup ? <div className="opt-group">{OPT_GROUP[id]}</div> : null}
+                <div role="presentation" className={`opt-row${index === focus ? " on" : ""}`} onClick={() => setFocus(index)}>
+                  <span>
+                    {id === "display" && "Display"}
+                    {id === "music" && "Title music"}
+                    {id === "sfx" && "Attack sounds"}
+                    {id === "whisper" && "Whisper"}
+                    {id === "buffer" && "Listen length"}
+                    {id === "listen" && "Listening"}
+                    {id === "spell" && "Spell effects"}
+                    {id === "theme" && "Theme"}
+                  </span>
+                  {id === "display" && (
+                    <span className="opt-step">
+                      <button type="button" aria-label="Previous display" onClick={() => { setFocus(index); step(-1, "display"); }}>‹</button>
+                      {displayLabel(displays, draft)}
+                      <button type="button" aria-label="Next display" onClick={() => { setFocus(index); step(1, "display"); }}>›</button>
+                    </span>
+                  )}
+                  {(id === "music" || id === "sfx") && (
+                    <VolumeBars
+                      value={id === "music" ? music : sfx}
+                      onChange={(next) => {
+                        setFocus(index);
+                        if (id === "music") {
+                          setMusic(next);
+                          localStorage.setItem(MUSIC_KEY, String(next));
+                          window.dispatchEvent(new Event("tablewhisper-music"));
+                        } else {
+                          setSfx(next);
+                          localStorage.setItem(SFX_KEY, String(next));
+                        }
+                      }}
+                    />
+                  )}
+                  {id === "whisper" && (
+                    <span className="opt-step">
+                      <button type="button" onClick={() => { setFocus(index); step(-1, "whisper"); }}>‹</button>
+                      {whisper}
+                      <button type="button" onClick={() => { setFocus(index); step(1, "whisper"); }}>›</button>
+                    </span>
+                  )}
+                  {id === "buffer" && (
+                    <span className="opt-step">
+                      <button type="button" onClick={() => { setFocus(index); step(-1, "buffer"); }}>‹</button>
+                      {buffer}s
+                      <button type="button" onClick={() => { setFocus(index); step(1, "buffer"); }}>›</button>
+                    </span>
+                  )}
+                  {id === "listen" && (
+                    <span
+                      className={`opt-switch${listening ? " on" : ""}`}
+                      onClick={() => {
+                        setFocus(index);
+                        void (listening ? api.audioStop() : api.audioStart()).then(() => setListening((value) => !value));
+                      }}
+                    />
+                  )}
+                  {id === "spell" && (
+                    <span className="opt-step">
+                      <button type="button" onClick={() => { setFocus(index); step(-1, "spell"); }}>‹</button>
+                      {spellFx}
+                      <button type="button" onClick={() => { setFocus(index); step(1, "spell"); }}>›</button>
+                    </span>
+                  )}
+                  {id === "theme" && (
+                    <span className="opt-step">
+                      <button type="button" onClick={() => { setFocus(index); step(-1, "theme"); }}>‹</button>
+                      {theme.label}
+                      <button type="button" onClick={() => { setFocus(index); step(1, "theme"); }}>›</button>
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          <p className="muted small">{sourceLine}</p>
+        </div>
+        <aside className="opt-side">
+          <h2>{copy.title}</h2>
+          <p>{copy.body}</p>
+        </aside>
+      </div>
+      <div className="opt-foot">
+        <span><span className="opt-key">Enter</span>Apply</span>
+        <span><span className="opt-key">↑↓</span>Move</span>
+        <span><span className="opt-key">←→</span>Change</span>
+        <span><span className="opt-key">R</span>Reset option</span>
+        <span><span className="opt-key">Esc</span>Back</span>
+      </div>
+    </div>
+  );
+}
+
+
+const TITLE_EMBERS = Array.from({ length: 42 }, (_, index) => ({
+  id: index,
+  left: `${(index * 19 + 4) % 100}%`,
+  size: 3 + (index % 6),
+  duration: 8 + (index % 9),
+  delay: -((index * 1.7) % 12),
+  drift: `${(index % 2 === 0 ? 1 : -1) * (10 + (index % 36))}px`,
+}));
+
+function TitleEmbers() {
+  return (
+    <div className="title-embers" aria-hidden="true">
+      {TITLE_EMBERS.map((ember) => (
+        <span
+          key={ember.id}
+          className="ember"
+          style={{
+            left: ember.left,
+            width: ember.size,
+            height: ember.size,
+            animationDuration: `${ember.duration}s`,
+            animationDelay: `${ember.delay}s`,
+            ["--drift" as string]: ember.drift,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TitleScreen({ onEnter, onOptions }: { onEnter: () => void; onOptions: () => void }) {
+  const [ready, setReady] = useState(false);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [statusLine, setStatusLine] = useState("Preparing the table…");
+  const [credits, setCredits] = useState(false);
+  const [quitOpen, setQuitOpen] = useState(false);
+  const [themeId, setThemeId] = useState<TitleThemeId>(titleThemeId);
+  const [themeOpen, setThemeOpen] = useState(false);
+
+  useEffect(() => {
+    let stop = false;
+    const tick = async () => {
+      try {
+        const base = window.dmDesktop?.getApiBase ? await window.dmDesktop.getApiBase() : API_BASE;
+        const health = await fetch(`${base}/health`);
+        if (!health.ok) throw new Error("not ready");
+        const list = await api.listSessions();
+        if (stop) return;
+        setSessions(list);
+        setReady(true);
+        setStatusLine("The table is set.");
+      } catch {
+        if (!stop) {
+          setReady(false);
+          setStatusLine("Preparing the table…");
+        }
+      }
+    };
+    void tick();
+    const timer = setInterval(() => void tick(), 700);
+    return () => {
+      stop = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  async function newTable() {
+    const name = window.prompt("Name this table", "New table");
+    if (name === null) return;
+    await api.newSession(name.trim() || undefined);
+    onEnter();
+  }
+
+  async function quitGame() {
+    if (window.dmDesktop?.quitAll) {
+      await window.dmDesktop.quitAll();
+      return;
+    }
+    window.close();
+  }
+
+  return (
+    <div className={`title-screen theme-${themeId}`}>
+      {themeId === "hearth" ? <TitleEmbers /> : <TitleAtmosphere theme={themeId} />}
+      <div className="title-theme-pick">
+        <button type="button" className="btn ghost title-theme-btn" onClick={() => setThemeOpen((open) => !open)}>
+          {TITLE_THEMES.find((theme) => theme.id === themeId)?.label}
+        </button>
+        {themeOpen && (
+          <div className="title-theme-menu">
+            {TITLE_THEMES.map((theme) => (
+              <button
+                key={theme.id}
+                type="button"
+                className={`btn ghost ${theme.id === themeId ? "on" : ""}`}
+                onClick={() => {
+                  setTitleTheme(theme.id);
+                  setThemeId(theme.id);
+                  setThemeOpen(false);
+                }}
+              >
+                {theme.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="title-card">
+        <p className="title-kicker">A dungeon master&apos;s table</p>
+        <h1>Tablewhisper</h1>
+        {credits ? (
+          <div className="title-credits">
+            <p className="title-kicker">Credits</p>
+            <p>Developer: Rohan</p>
+            <p>
+              Attack sounds: Sonniss GDC game-audio bundles (sonniss.com/gameaudiogdc). No attribution is required.
+            </p>
+            {TITLE_THEMES.map((theme) => (
+              <p key={theme.id}>
+                <strong>{theme.label}.</strong> {theme.credit}
+              </p>
+            ))}
+            <button type="button" className="btn ghost title-btn" onClick={() => setCredits(false)}>
+              Back
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="title-status">{statusLine}</p>
+            <div className="title-actions">
+              {ready && sessions.length > 0 && (
+                <button type="button" className="btn title-btn" onClick={onEnter}>
+                  Continue
+                </button>
+              )}
+              <button type="button" className="btn title-btn" disabled={!ready} onClick={() => void newTable()}>
+                New table
+              </button>
+              <button type="button" className="btn title-btn" onClick={onOptions}>
+                Options
+              </button>
+              <button type="button" className="btn title-btn" onClick={() => setCredits(true)}>
+                Credits
+              </button>
+              <button type="button" className="btn ghost title-btn" onClick={() => setQuitOpen(true)}>
+                Quit
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      {quitOpen && (
+        <QuitDialog
+          title="Quit Tablewhisper?"
+          body="This closes the table. Your save stays beside the exe."
+          onStay={() => setQuitOpen(false)}
+          onQuit={() => void quitGame()}
+        />
+      )}
+    </div>
+  );
+}
 
 function logWhen(iso: string): { day: string; time: string } {
   const date = new Date(iso);
@@ -48,11 +702,22 @@ function LogEntry({ event }: { event: SessionEvent }) {
         <div>
           <p className="story-in">{event.query}</p>
           {event.result?.roll_line ? <p className="story-out">{event.result.roll_line}</p> : null}
+          {event.result?.outcome ? <p className="story-fate">{event.result.outcome}</p> : null}
         </div>
       </article>
     </>
   );
 }
+
+const LOG_FACE: Record<LogDevice, { kicker: string; open: string; close: string; empty: string }> = {
+  book: { kicker: "A record of the table", open: "Open", close: "Cover", empty: "The pages are still blank." },
+  scroll: { kicker: "A scroll of the table", open: "Unroll", close: "Roll up", empty: "The scroll is still blank." },
+  hologram: { kicker: "Holorecord", open: "Project", close: "Close", empty: "The hologram has no entries." },
+  terminal: { kicker: "Session shard", open: "Connect", close: "Disconnect", empty: "The shard is empty." },
+  commlink: { kicker: "Commlink log", open: "Open channel", close: "Close", empty: "No messages yet." },
+  dossier: { kicker: "Case file", open: "Open file", close: "Close file", empty: "The file is empty." },
+  dispatch: { kicker: "Field report", open: "Read report", close: "File it", empty: "No reports filed." },
+};
 
 function LogPage({
   events,
@@ -75,6 +740,12 @@ function LogPage({
 }) {
   const [opened, setOpened] = useState(false);
   const [coverAnim, setCoverAnim] = useState<"" | "opening" | "closing">("");
+  const theme = titleTheme();
+  const face = LOG_FACE[theme.logDevice];
+  const [night, setNight] = useState(() => window.localStorage.getItem("tablewhisper-log-night") === "1");
+  useEffect(() => {
+    window.localStorage.setItem("tablewhisper-log-night", night ? "1" : "0");
+  }, [night]);
   const ordered = useMemo(() => [...events].reverse(), [events]);
   const found = entryId ? ordered.findIndex((row) => row.id === entryId) : -1;
   const index = pinned || found < 0 ? 0 : found;
@@ -109,7 +780,16 @@ function LogPage({
   }
 
   return (
-    <main className="log-page">
+    <main className={`log-page log-device-${theme.logDevice}${night ? " log-night log-dim" : ""}`}>
+      <div className="book-column">
+      <div className="book-lamp" role="group" aria-label="Log page look">
+        <button type="button" className={night ? "" : "on"} onClick={() => setNight(false)}>
+          {theme.contrast[0]}
+        </button>
+        <button type="button" className={night ? "on" : ""} onClick={() => setNight(true)}>
+          {theme.contrast[1]}
+        </button>
+      </div>
       <div className={`book${opened ? " is-open" : ""}`}>
         {!opened && (
           <button
@@ -124,11 +804,11 @@ function LogPage({
             <span className="book-spine" />
             <span className="book-cover-face">
               <span className="book-rule" />
-              <span className="book-kicker">A record of the table</span>
+              <span className="book-kicker">{face.kicker}</span>
               <h2>Log</h2>
               <p>{sessionName}</p>
               <span className="book-rule" />
-              <span className="book-open-label">Open</span>
+              <span className="book-open-label">{face.open}</span>
             </span>
           </button>
         )}
@@ -137,7 +817,7 @@ function LogPage({
             <div className="log-turn book-pages">
               {!entry ? (
                 <div className="story-page parchment">
-                  <p className="log-empty">The pages are still blank.</p>
+                  <p className="log-empty">{face.empty}</p>
                 </div>
               ) : (
                 <>
@@ -154,7 +834,7 @@ function LogPage({
             </div>
             <div className="log-nav">
               <button type="button" className="btn ghost" onClick={closeCover}>
-                Cover
+                {face.close}
               </button>
               <button type="button" className="btn ghost" disabled={!entry || index >= ordered.length - 1} onClick={() => go("older")}>
                 Older
@@ -166,6 +846,7 @@ function LogPage({
             </div>
           </div>
         )}
+      </div>
       </div>
     </main>
   );
@@ -220,16 +901,7 @@ function PartyAvatar({
       ) : (
         <div className="avatar initials">{initials}</div>
       )}
-      <input
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onFile(file);
-          e.target.value = "";
-        }}
-      />
+      <PortraitFileButton hidden onFile={onFile} />
     </label>
   );
 }
@@ -336,6 +1008,11 @@ export default function App() {
     image: null as File | null,
   });
   const [apiBase, setApiBase] = useState(API_BASE);
+  const [gameMode, setGameMode] = useState<boolean | null>(window.dmDesktop?.isGame ? null : false);
+  const [themeId, setThemeId] = useState<TitleThemeId>(titleThemeId);
+  const [atTitle, setAtTitle] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [quitOpen, setQuitOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"foes" | "scene" | "log" | "pictures">("foes");
   const [viewMode, setViewMode] = useState<"console" | "map" | "log">("console");
   const [logId, setLogId] = useState<string | null>(null);
@@ -429,6 +1106,36 @@ export default function App() {
   }, [selectedId, spawnId, spawnNpcId]);
 
   useEffect(() => {
+    applyThemeChrome(themeId);
+    const sync = () => setThemeId(titleThemeId());
+    window.addEventListener("tablewhisper-theme", sync);
+    return () => window.removeEventListener("tablewhisper-theme", sync);
+  }, [themeId]);
+
+  useEffect(() => {
+    let cancel = false;
+    if (!window.dmDesktop?.isGame) {
+      setGameMode(false);
+      return;
+    }
+    window.dmDesktop
+      .isGame()
+      .then((yes) => {
+        if (cancel) return;
+        setGameMode(yes);
+        setAtTitle(yes);
+        if (yes) document.title = "Tablewhisper";
+      })
+      .catch(() => {
+        if (!cancel) setGameMode(false);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (gameMode === null || (gameMode && atTitle)) return;
     if (window.dmDesktop?.getApiBase) {
       window.dmDesktop.getApiBase().then(setApiBase).catch(() => undefined);
     }
@@ -437,7 +1144,7 @@ export default function App() {
       api.status().then(setStatus).catch(() => undefined);
     }, 8000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, gameMode, atTitle]);
 
   useEffect(() => {
     if (!window.dmDesktop?.onCaptureHotkey) return;
@@ -657,11 +1364,7 @@ export default function App() {
       if (!heal && creature.refId) {
         const dealt = amount;
         setDamageShown((prev) => ({ ...prev, [creature.refId as string]: dealt }));
-        const from = viewMode === "map" ? "map" : "console";
-        void api
-          .storyNote(result?.roll_line || creature.label, `${creature.label} takes ${dealt}. Now ${next} hit points.`, from)
-          .then(() => api.sessionEvents().then(setEvents))
-          .catch(() => undefined);
+        recordFate(`${creature.label} takes ${dealt} damage and now has ${next} health.`);
       }
       if (!creature.refId) {
         setMapRuling((prev) =>
@@ -684,12 +1387,17 @@ export default function App() {
     }
   }
 
-  function missCreature(creature: RulingCreature) {
+  function recordFate(line: string) {
     const from = viewMode === "map" ? "map" : "console";
-    void api
-      .storyNote(result?.roll_line || creature.label, `${creature.label} misses. Hit points stay.`, from)
-      .then(() => api.sessionEvents().then(setEvents))
-      .catch(() => undefined);
+    const eventId = result?.event_id;
+    const write = eventId
+      ? api.noteOutcome(eventId, line)
+      : api.storyNote(result?.roll_line || line, line, from);
+    void write.then(() => api.sessionEvents().then(setEvents)).catch(() => undefined);
+  }
+
+  function missCreature(creature: RulingCreature) {
+    recordFate(`${creature.label} misses. Health stays.`);
     setMapRuling((prev) =>
       prev ? { ...prev, creatures: prev.creatures.filter((item) => item.key !== creature.key) } : prev
     );
@@ -914,8 +1622,66 @@ export default function App() {
     }
   }
 
+  async function quitFromConsole() {
+    if (gameMode) {
+      if (window.dmDesktop?.quitAll) {
+        await window.dmDesktop.quitAll();
+        return;
+      }
+      window.close();
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.shutdown();
+      if (window.dmDesktop?.quitAll) {
+        await window.dmDesktop.quitAll();
+        return;
+      }
+      window.close();
+    } catch {
+      try {
+        await api.shutdown();
+      } catch {
+        /* ignore — process may already be dying */
+      }
+      if (window.dmDesktop?.quitAll) {
+        try {
+          await window.dmDesktop.quitAll();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      window.close();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (gameMode === null) {
+    return <div className="title-screen" />;
+  }
+
+  if (gameMode && optionsOpen) {
+    return (
+      <>
+        {atTitle ? <TitleMusic /> : null}
+        <OptionsScreen onBack={() => setOptionsOpen(false)} />
+      </>
+    );
+  }
+  if (gameMode && atTitle) {
+    return (
+      <>
+        <TitleMusic />
+        <TitleScreen onEnter={() => setAtTitle(false)} onOptions={() => setOptionsOpen(true)} />
+      </>
+    );
+  }
+
   return (
-    <div className="app">
+    <div className={`app theme-live theme-${themeId}`}>
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">DM</div>
@@ -1000,50 +1766,38 @@ export default function App() {
           <button className="btn ghost" title="Load a save from the application's savedata folder." onClick={() => void openLoad()}>
             Load
           </button>
+          {gameMode && (
+            <button type="button" className="btn ghost" onClick={() => setOptionsOpen(true)}>
+              Options
+            </button>
+          )}
+          {gameMode && (
+            <button type="button" className="btn ghost" onClick={() => setAtTitle(true)}>
+              Title
+            </button>
+          )}
           <button
             className="btn quit-btn"
-            title="Stop API, UI terminals, and close DM Console"
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  "Quit DM Console?\n\nThis closes the app and stops the API / UI terminal windows."
-                )
-              ) {
-                return;
-              }
-              setBusy(true);
-              try {
-                // Always ask the API to run quit-dm.bat (kills API/UI/Discord terminals).
-                await api.shutdown();
-                if (window.dmDesktop?.quitAll) {
-                  await window.dmDesktop.quitAll();
-                  return;
-                }
-                window.close();
-              } catch {
-                try {
-                  await api.shutdown();
-                } catch {
-                  /* ignore — process may already be dying */
-                }
-                if (window.dmDesktop?.quitAll) {
-                  try {
-                    await window.dmDesktop.quitAll();
-                  } catch {
-                    /* ignore */
-                  }
-                  return;
-                }
-                window.close();
-              } finally {
-                setBusy(false);
-              }
-            }}
+            title={gameMode ? "Quit Tablewhisper" : "Stop API, UI terminals, and close DM Console"}
+            onClick={() => setQuitOpen(true)}
           >
             Quit
           </button>
         </div>
       </header>
+
+      {quitOpen && (
+        <QuitDialog
+          title={gameMode ? "Quit Tablewhisper?" : "Quit DM Console?"}
+          body={
+            gameMode
+              ? "This closes the table. Your save stays beside the exe."
+              : "This closes the app and stops the API and UI terminal windows."
+          }
+          onStay={() => setQuitOpen(false)}
+          onQuit={() => void quitFromConsole()}
+        />
+      )}
 
       {saveOpen && (
         <div className="modal-backdrop" onClick={() => setSaveOpen(false)}>
@@ -1849,6 +2603,7 @@ export default function App() {
                   <div key={ev.id} className="log-item">
                     <div className="q">{ev.query}</div>
                     <div className="a">{ev.result.roll_line}</div>
+                    {ev.result.outcome ? <div className="a">{ev.result.outcome}</div> : null}
                   </div>
                 ))}
               </div>
@@ -2299,15 +3054,8 @@ export default function App() {
                         />
                       </label>
                       <label className="btn file-btn">
-                        Portrait image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            setCustomMonster((c) => ({ ...c, image: f }));
-                          }}
-                        />
+                        {customMonster.image ? "Portrait ready" : "Portrait image"}
+                        <PortraitFileButton onFile={(file) => setCustomMonster((c) => ({ ...c, image: file }))} />
                       </label>
                       <button
                         className="btn"
@@ -2537,15 +3285,8 @@ export default function App() {
                         />
                       </label>
                       <label className="btn file-btn">
-                        Portrait image
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0] || null;
-                            setCustomNpc((c) => ({ ...c, image: f }));
-                          }}
-                        />
+                        {customNpc.image ? "Portrait ready" : "Portrait image"}
+                        <PortraitFileButton onFile={(file) => setCustomNpc((c) => ({ ...c, image: file }))} />
                       </label>
                       <button
                         className="btn"

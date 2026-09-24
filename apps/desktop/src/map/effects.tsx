@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Arc, Circle, Group, Line, Rect, Text } from "react-konva";
+import { attackIsMagical, presentAction } from "./attackPresentation";
+import { MotionEffect } from "./attackMotion";
 import type { CheckResult } from "../api";
 import { actionFromSpell, spellByName, spellFromText, spellsNamedIn, type SpellAim, type SpellResolution } from "./spellCatalog";
 import type { Seg } from "./vision";
@@ -49,6 +51,19 @@ export type Grid = {
 
 export type AimTile = Tile & { far: boolean };
 
+export type SpellLook =
+  | "fire"
+  | "lightning"
+  | "cold"
+  | "acid"
+  | "poison"
+  | "thunder"
+  | "radiant"
+  | "necrotic"
+  | "heal"
+  | "force"
+  | "arcane";
+
 export type Travel = {
   id: number;
   family: Family;
@@ -56,6 +71,11 @@ export type Travel = {
   from: { x: number; y: number };
   to: { x: number; y: number };
   tiles: Tile[];
+  look: SpellLook | null;
+  motion: string;
+  sound: string;
+  seconds: number;
+  magical: boolean;
 };
 
 export type Mark = {
@@ -754,7 +774,318 @@ export function AimOverlay({ tiles, grid }: { tiles: AimTile[]; grid: Grid }) {
   );
 }
 
+const LOOK_COLOR: Record<SpellLook, { core: string; edge: string; spark: string }> = {
+  fire: { core: "#fff1c2", edge: "rgba(255, 96, 18, 0.9)", spark: "#ffb020" },
+  lightning: { core: "#ffffff", edge: "rgba(190, 220, 255, 0.95)", spark: "#eef6ff" },
+  cold: { core: "#f4fbff", edge: "rgba(150, 210, 255, 0.85)", spark: "#d6f3ff" },
+  acid: { core: "#f4ff9a", edge: "rgba(150, 186, 36, 0.85)", spark: "#d4ee48" },
+  poison: { core: "#e4ffc4", edge: "rgba(72, 164, 54, 0.85)", spark: "#9ad868" },
+  thunder: { core: "#f4f4ff", edge: "rgba(176, 176, 214, 0.8)", spark: "#d0d0ee" },
+  radiant: { core: "#fff6d4", edge: "rgba(255, 214, 110, 0.92)", spark: "#ffe7a4" },
+  necrotic: { core: "#1c0c24", edge: "rgba(108, 36, 128, 0.9)", spark: "#6a2878" },
+  heal: { core: "#eaffea", edge: "rgba(78, 196, 108, 0.9)", spark: "#9eecc0" },
+  force: { core: "#f6f2ff", edge: "rgba(168, 124, 255, 0.92)", spark: "#d0bcff" },
+  arcane: { core: "#f3e9ff", edge: "rgba(146, 86, 220, 0.8)", spark: "#c49af0" },
+};
+
+export function spellLook(name: string): SpellLook {
+  const n = name.toLowerCase();
+  if (n.includes("lightning") || n.includes("shock")) return "lightning";
+  if (n.includes("thunder")) return "thunder";
+  if (/\b(sacred|holy|radiant)\b/.test(n)) return "radiant";
+  if (/\b(necrotic|chill|inflict)\b/.test(n)) return "necrotic";
+  if (n.includes("fire") || n.includes("flame") || n.includes("burn") || n.includes("scorch")) return "fire";
+  if (/\b(ice|cold|frost)\b/.test(n)) return "cold";
+  if (n.includes("acid")) return "acid";
+  if (n.includes("poison")) return "poison";
+  if (/\b(cure|heal|healing)\b/.test(n)) return "heal";
+  if (n.includes("missile") || n.includes("eldritch") || n.includes("force")) return "force";
+  return "arcane";
+}
+
+export function castTravel(
+  action: MapAction,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  tiles: Tile[]
+): Travel {
+  const shown = presentAction(action);
+  return {
+    id: Date.now(),
+    family: action.family,
+    damageType: action.damageType,
+    from,
+    to,
+    tiles,
+    look: action.id.startsWith("spell-") ? spellLook(action.label) : null,
+    motion: shown.motion,
+    sound: shown.sound,
+    seconds: shown.seconds,
+    magical: attackIsMagical(action),
+  };
+}
+
+export function spellFxMode(): "full" | "reduced" | "off" {
+  try {
+    const saved = localStorage.getItem("tablewhisper-spell-fx");
+    if (saved === "off" || saved === "reduced" || saved === "full") return saved;
+  } catch {
+    /* private mode */
+  }
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full";
+}
+
+function prefersReducedMotion(): boolean {
+  return spellFxMode() === "reduced";
+}
+
+function spellFade(progress: number, reduced: boolean): number {
+  if (reduced) return progress < 0.2 ? 0.9 : Math.max(0, 0.9 * (1 - progress));
+  if (progress < 0.72) return 0.92;
+  return Math.max(0, 0.92 * (1 - (progress - 0.72) / 0.28));
+}
+
+function spreadAngles(id: number, count: number): number[] {
+  const angles: number[] = [];
+  let seed = (Math.abs(id) % 2147483646) + 1;
+  for (let i = 0; i < count; i++) {
+    seed = (seed * 48271) % 2147483647;
+    angles.push((seed % 360) * (Math.PI / 180));
+  }
+  return angles;
+}
+
+function areaReach(travel: Travel, grid: Grid): number {
+  let max = grid.grid_size_px * 0.9;
+  for (const tile of travel.tiles) {
+    const at = tileCenter(tile, grid);
+    max = Math.max(max, Math.hypot(at.x - travel.to.x, at.y - travel.to.y));
+  }
+  return max + grid.grid_size_px * 0.35;
+}
+
+function boltPoints(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  id: number,
+  grown: number
+): number[] {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const steps = 8;
+  const pts = [from.x, from.y];
+  let seed = (Math.abs(id) % 2147483646) + 1;
+  for (let i = 1; i <= steps; i++) {
+    const t = (i / steps) * grown;
+    seed = (seed * 48271) % 2147483647;
+    const jag = i === steps ? 0 : ((seed % 19) - 9) * 3.4;
+    pts.push(from.x + dx * t + nx * jag, from.y + dy * t + ny * jag);
+  }
+  return pts;
+}
+
+function SpellCast({ travel, progress, grid }: { travel: Travel; progress: number; grid: Grid }) {
+  const look = travel.look || "arcane";
+  const color = LOOK_COLOR[look];
+  const reduced = prefersReducedMotion();
+  const alpha = spellFade(progress, reduced);
+  const grown = reduced ? 1 : Math.min(1, progress / 0.62);
+  const reach = areaReach(travel, grid);
+  const span = Math.hypot(travel.to.x - travel.from.x, travel.to.y - travel.from.y);
+  const selfCast = span < 4;
+
+  if (look === "thunder") {
+    const radius = Math.max(grid.grid_size_px * 0.8, reach * grown);
+    return (
+      <Group listening={false} opacity={alpha}>
+        <Circle x={travel.to.x} y={travel.to.y} radius={radius} stroke={color.edge} strokeWidth={5} />
+        <Circle x={travel.to.x} y={travel.to.y} radius={radius * 0.62} stroke={color.core} strokeWidth={2} />
+      </Group>
+    );
+  }
+
+  if (look === "heal") {
+    return (
+      <Group listening={false}>
+        {spreadAngles(travel.id, 6).map((angle, index) => (
+          <Circle
+            key={index}
+            x={travel.to.x + Math.cos(angle) * 10}
+            y={travel.to.y - (reduced ? 16 : 34 * grown) - index * 4}
+            radius={4.5}
+            fill={color.spark}
+            opacity={alpha}
+            listening={false}
+          />
+        ))}
+      </Group>
+    );
+  }
+
+  if (look === "lightning") {
+    const origin =
+      travel.family === "burst" || travel.family === "cube" || selfCast
+        ? { x: travel.to.x, y: travel.to.y - Math.max(reach, grid.grid_size_px) }
+        : travel.from;
+    const points = boltPoints(origin, travel.to, travel.id, grown);
+    return (
+      <Group listening={false} opacity={alpha}>
+        <Line points={points} stroke={color.edge} strokeWidth={8} lineCap="round" lineJoin="round" listening={false} />
+        <Line points={points} stroke={color.core} strokeWidth={2.5} lineCap="round" lineJoin="round" listening={false} />
+        <Circle x={travel.to.x} y={travel.to.y} radius={12 + 10 * grown} fill={color.core} opacity={0.8} listening={false} />
+      </Group>
+    );
+  }
+
+  if (look === "force" && !selfCast && (travel.family === "ray" || travel.family === "shot")) {
+    const nx = -(travel.to.y - travel.from.y) / (span || 1);
+    const ny = (travel.to.x - travel.from.x) / (span || 1);
+    return (
+      <Group listening={false} opacity={alpha}>
+        {[ -10, 0, 10 ].map((offset, index) => {
+          const dart = reduced ? 1 : Math.min(1, Math.max(0, (progress - index * 0.08) / 0.7));
+          const x = travel.from.x + (travel.to.x - travel.from.x) * dart + nx * offset;
+          const y = travel.from.y + (travel.to.y - travel.from.y) * dart + ny * offset;
+          const sx = travel.from.x + nx * offset;
+          const sy = travel.from.y + ny * offset;
+          return (
+            <Group key={offset}>
+              <Line points={[sx, sy, x, y]} stroke={color.edge} strokeWidth={3} lineCap="round" listening={false} />
+              <Circle x={x} y={y} radius={4} fill={color.core} listening={false} />
+            </Group>
+          );
+        })}
+      </Group>
+    );
+  }
+
+  if (look === "arcane") {
+    return (
+      <Group listening={false}>
+        {(travel.tiles.length ? travel.tiles : []).map((tile) => {
+          const rect = tileRect(tile, grid);
+          return (
+            <Rect
+              key={tileKey(tile)}
+              x={rect.x}
+              y={rect.y}
+              width={rect.s}
+              height={rect.s}
+              fill={color.edge}
+              opacity={alpha * 0.5}
+              listening={false}
+            />
+          );
+        })}
+        {travel.tiles.length === 0 && (
+          <Circle x={travel.to.x} y={travel.to.y} radius={grid.grid_size_px * 0.45} fill={color.edge} opacity={alpha} listening={false} />
+        )}
+      </Group>
+    );
+  }
+
+  if (travel.family === "burst" || travel.family === "cube" || selfCast) {
+    const radius = reach * grown;
+    return (
+      <Group listening={false}>
+        {travel.tiles.map((tile) => {
+          const rect = tileRect(tile, grid);
+          return (
+            <Rect
+              key={tileKey(tile)}
+              x={rect.x}
+              y={rect.y}
+              width={rect.s}
+              height={rect.s}
+              fill={color.edge}
+              opacity={alpha * 0.28}
+              listening={false}
+            />
+          );
+        })}
+        <Circle x={travel.to.x} y={travel.to.y} radius={radius} fill={color.edge} opacity={alpha * 0.45} listening={false} />
+        <Circle x={travel.to.x} y={travel.to.y} radius={Math.max(8, radius * 0.28)} fill={color.core} opacity={alpha} listening={false} />
+        {look === "fire" &&
+          spreadAngles(travel.id, 8).map((angle, index) => (
+            <Circle
+              key={index}
+              x={travel.to.x + Math.cos(angle) * radius * (0.45 + (index % 3) * 0.15)}
+              y={travel.to.y + Math.sin(angle) * radius * (0.45 + (index % 3) * 0.15)}
+              radius={3.5}
+              fill={color.spark}
+              opacity={alpha}
+              listening={false}
+            />
+          ))}
+      </Group>
+    );
+  }
+
+  if (travel.family === "cone" || travel.family === "line") {
+    const far = Math.max(span, grid.grid_size_px);
+    return (
+      <Group listening={false}>
+        {(travel.tiles.length ? travel.tiles : []).map((tile) => {
+          const at = tileCenter(tile, grid);
+          const along = Math.hypot(at.x - travel.from.x, at.y - travel.from.y) / far;
+          if (!reduced && grown < along) return null;
+          const rect = tileRect(tile, grid);
+          return (
+            <Rect
+              key={tileKey(tile)}
+              x={rect.x}
+              y={rect.y}
+              width={rect.s}
+              height={rect.s}
+              fill={color.edge}
+              opacity={alpha * 0.72}
+              listening={false}
+            />
+          );
+        })}
+        {travel.tiles.length === 0 && (
+          <Circle x={travel.to.x} y={travel.to.y} radius={grid.grid_size_px * 0.45} fill={color.edge} opacity={alpha} listening={false} />
+        )}
+      </Group>
+    );
+  }
+
+  const head = grown;
+  const x = travel.from.x + (travel.to.x - travel.from.x) * head;
+  const y = travel.from.y + (travel.to.y - travel.from.y) * head;
+  return (
+    <Group listening={false} opacity={alpha}>
+      <Line points={[travel.from.x, travel.from.y, x, y]} stroke={color.edge} strokeWidth={4} lineCap="round" listening={false} />
+      <Circle x={x} y={y} radius={6} fill={color.core} listening={false} />
+      {grown > 0.82 && (
+        <Circle x={travel.to.x} y={travel.to.y} radius={16} stroke={color.spark} strokeWidth={3} listening={false} />
+      )}
+    </Group>
+  );
+}
+
 export function TravelEffect({ travel, progress, grid }: { travel: Travel; progress: number; grid: Grid }) {
+  if (travel.motion) {
+    if (travel.magical && spellFxMode() === "off") return null;
+    return (
+      <MotionEffect
+        motion={travel.motion}
+        progress={progress}
+        from={travel.from}
+        to={travel.to}
+        id={travel.id}
+        centers={travel.tiles.map((tile) => tileCenter(tile, grid))}
+        cell={grid.grid_size_px}
+      />
+    );
+  }
+  if (travel.look) {
+    if (spellFxMode() === "off") return null;
+    return <SpellCast travel={travel} progress={progress} grid={grid} />;
+  }
   const color = travelColor(travel.damageType, travel.family);
   if (travel.family === "burst" || travel.family === "cone" || travel.family === "line" || travel.family === "cube") {
     const alpha = progress < 0.7 ? 0.45 : 0.45 * (1 - (progress - 0.7) / 0.3);

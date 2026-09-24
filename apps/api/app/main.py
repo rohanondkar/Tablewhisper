@@ -54,6 +54,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Fresh data folders (the Steam edition) do not exist until the first launch.
+# StaticFiles checks the path at import time, before the lifespan hook runs.
+for _media_dir in (
+    CUSTOM_IMAGE_DIR,
+    SRD_IMAGE_DIR,
+    NPC_CUSTOM_IMAGE_DIR,
+    NPC_SRD_IMAGE_DIR,
+    MAP_IMAGE_DIR,
+    MAP_FOG_DIR,
+    CHAR_IMAGE_DIR,
+):
+    _media_dir.mkdir(parents=True, exist_ok=True)
+
 # Monster portraits: /media/monsters/srd/... and /media/monsters/custom/...
 app.mount(
     "/media/monsters/srd",
@@ -637,6 +650,20 @@ def remove_session(session_id: str) -> dict[str, bool]:
 @app.get("/sessions/active/events")
 def session_events(limit: int = 200) -> list[dict[str, Any]]:
     return db.list_events(limit=max(1, min(limit, 500)))
+
+
+class EventOutcome(BaseModel):
+    outcome: str
+
+
+@app.post("/sessions/active/events/{event_id}/outcome")
+def write_event_outcome(event_id: str, body: EventOutcome) -> dict[str, Any]:
+    if not body.outcome.strip():
+        raise HTTPException(400, "The log needs an outcome.")
+    row = db.set_event_outcome(event_id, body.outcome.strip())
+    if not row:
+        raise HTTPException(404, "That log entry is gone.")
+    return row
 
 
 class StoryNote(BaseModel):

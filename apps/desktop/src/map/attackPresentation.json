@@ -1,0 +1,3415 @@
+{
+  "byKey": {
+    "acid arrow": {
+      "motion": "acid",
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips. It travels to one creature."
+    },
+    "acid splash": {
+      "motion": "acid",
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips. It travels to one creature."
+    },
+    "aid": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "alarm": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "alter self": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It stays on the creature who used it."
+    },
+    "animal friendship": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "animal messenger": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "animal shapes": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "animate dead": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "animate objects": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "antilife shell": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It stays on the creature who used it."
+    },
+    "antimagic field": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "antipathy/sympathy": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "arcane eye": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "arcane hand": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "arcane lock": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "arcane sword": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "arcanist's magic aura": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "astral projection": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "augury": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "awaken": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "bane": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "banishment": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "barkskin": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "beacon of hope": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "bestow curse": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "black tentacles": {
+      "motion": "tentacle",
+      "sound": "tentacle.mp3",
+      "seconds": 1.4,
+      "sheet": "Tentacle",
+      "animation": "A tentacle lashes out and curls on the target. It travels to one creature."
+    },
+    "blade barrier": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "bless": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "blight": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "blindness/deafness": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "blink": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "blur": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It stays on the creature who used it."
+    },
+    "branding smite": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It stays on the creature who used it."
+    },
+    "burning hands": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the cone."
+    },
+    "call lightning": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "calm emotions": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It fills the burst."
+    },
+    "chain lightning": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "charm person": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "chill touch": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "circle of death": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It fills the burst."
+    },
+    "clairvoyance": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "clone": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "cloudkill": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It fills the burst."
+    },
+    "color spray": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It fills the cone."
+    },
+    "command": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "commune": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "commune with nature": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "comprehend languages": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "compulsion": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "cone of cold": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the cone."
+    },
+    "confusion": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "conjure animals": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "conjure celestial": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "conjure elemental": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "conjure fey": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "conjure minor elementals": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "conjure woodland beings": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "contact other plane": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "contagion": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It travels to one creature."
+    },
+    "contingency": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "continual flame": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "control water": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "control weather": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It stays on the creature who used it."
+    },
+    "counterspell": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "create food and water": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "create or destroy water": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "create undead": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "creation": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "cure wounds": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "dancing lights": {
+      "motion": "light",
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark. It travels to one creature."
+    },
+    "darkness": {
+      "motion": "light",
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark. It fills the burst."
+    },
+    "darkvision": {
+      "motion": "light",
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark. It travels to one creature."
+    },
+    "daylight": {
+      "motion": "light",
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark. It fills the burst."
+    },
+    "death ward": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "delayed blast fireball": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "demiplane": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "detect evil and good": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "detect magic": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "detect poison and disease": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It stays on the creature who used it."
+    },
+    "detect thoughts": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "dimension door": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "disguise self": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It stays on the creature who used it."
+    },
+    "disintegrate": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "dispel evil and good": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "dispel magic": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "divination": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "divine favor": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It stays on the creature who used it."
+    },
+    "divine word": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "dominate beast": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "dominate monster": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "dominate person": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "dream": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It stays on the creature who used it."
+    },
+    "druidcraft": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "earthquake": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "eldritch blast": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "enhance ability": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "enlarge/reduce": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "entangle": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "enthrall": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "etherealness": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "expeditious retreat": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "eyebite": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It stays on the creature who used it."
+    },
+    "fabricate": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "faerie fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "faithful hound": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "false life": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It stays on the creature who used it."
+    },
+    "fear": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It fills the cone."
+    },
+    "feather fall": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "feeblemind": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "find familiar": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "find steed": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "find the path": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "find traps": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "finger of death": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "fire bolt": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "fire shield": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It stays on the creature who used it."
+    },
+    "fire storm": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "fireball": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "flame blade": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It stays on the creature who used it."
+    },
+    "flame strike": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "flaming sphere": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "flesh to stone": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "floating disk": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "fly": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "fog cloud": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the burst."
+    },
+    "forbiddance": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "forcecage": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "foresight": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "freedom of movement": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "freezing sphere": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the burst."
+    },
+    "gaseous form": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "gate": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "geas": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "gentle repose": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "giant insect": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "glibness": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It stays on the creature who used it."
+    },
+    "globe of invulnerability": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "glyph of warding": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "goodberry": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "grease": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "greater invisibility": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "greater restoration": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "guardian of faith": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "guards and wards": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "guidance": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "guiding bolt": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "gust of wind": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "hallow": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "hallucinatory terrain": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "harm": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "haste": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "heal": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "healing word": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "heat metal": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "hellish rebuke": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "heroes' feast": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "heroism": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "hideous laughter": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "hold monster": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "hold person": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "holy aura": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It stays on the creature who used it."
+    },
+    "hunter's mark": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "hypnotic pattern": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "ice storm": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the burst."
+    },
+    "identify": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "illusory script": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "imprisonment": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "incendiary cloud": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "inflict wounds": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "insect plague": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It fills the burst."
+    },
+    "instant summons": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "invisibility": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "irresistible dance": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "jump": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "knock": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "legend lore": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "lesser restoration": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "levitate": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "light": {
+      "motion": "light",
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark. It travels to one creature."
+    },
+    "lightning bolt": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It runs the line."
+    },
+    "locate animals or plants": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "locate creature": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "locate object": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "longstrider": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "mage armor": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "mage hand": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "magic circle": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "magic jar": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It stays on the creature who used it."
+    },
+    "magic missile": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "magic mouth": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "magic weapon": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "magnificent mansion": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "major image": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "mass cure wounds": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It fills the burst."
+    },
+    "mass heal": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "mass healing word": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "mass suggestion": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "maze": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "meld into stone": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "mending": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "message": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "meteor swarm": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "mind blank": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "minor illusion": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "mirage arcane": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "mirror image": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It stays on the creature who used it."
+    },
+    "mislead": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It stays on the creature who used it."
+    },
+    "misty step": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "modify memory": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "moonbeam": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It fills the burst."
+    },
+    "move earth": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "nondetection": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "pass without trace": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "passwall": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "phantasmal killer": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "phantom steed": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "planar ally": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "planar binding": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "plane shift": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "plant growth": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "poison spray": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It travels to one creature."
+    },
+    "polymorph": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "power word kill": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "power word stun": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "prayer of healing": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "prestidigitation": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "prismatic spray": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It fills the cone."
+    },
+    "prismatic wall": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "private sanctum": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "produce flame": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It stays on the creature who used it."
+    },
+    "programmed illusion": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "project image": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "protection from energy": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "protection from evil and good": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "protection from poison": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It travels to one creature."
+    },
+    "purify food and drink": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "raise dead": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "ray of enfeeblement": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "ray of frost": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It travels to one creature."
+    },
+    "regenerate": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "reincarnate": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "remove curse": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "resilient sphere": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "resistance": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "resurrection": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "reverse gravity": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It fills the burst."
+    },
+    "revivify": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "rope trick": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "sacred flame": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "sanctuary": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "scorching ray": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "scrying": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "secret chest": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "see invisibility": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It stays on the creature who used it."
+    },
+    "seeming": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "sending": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "sequester": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "shapechange": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It stays on the creature who used it."
+    },
+    "shatter": {
+      "motion": "thunder",
+      "sound": "thunder.mp3",
+      "seconds": 1.6,
+      "sheet": "Thunder",
+      "animation": "A shock ring is shot along the path and breaks open. It travels to one creature."
+    },
+    "shield": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "shield of faith": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "shillelagh": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "shocking grasp": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "silence": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It fills the burst."
+    },
+    "silent image": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "simulacrum": {
+      "motion": "illusion",
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins. It travels to one creature."
+    },
+    "sleep": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "sleet storm": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It travels to one creature."
+    },
+    "slow": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "spare the dying": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "speak with animals": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "speak with dead": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "speak with plants": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It stays on the creature who used it."
+    },
+    "spider climb": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "spike growth": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "spirit guardians": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It stays on the creature who used it."
+    },
+    "spiritual weapon": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "stinking cloud": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It fills the burst."
+    },
+    "stone shape": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "stoneskin": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "storm of vengeance": {
+      "motion": "thunder",
+      "sound": "thunder.mp3",
+      "seconds": 1.6,
+      "sheet": "Thunder",
+      "animation": "A shock ring is shot along the path and breaks open. It travels to one creature."
+    },
+    "suggestion": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It travels to one creature."
+    },
+    "sunbeam": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It stays on the creature who used it."
+    },
+    "sunburst": {
+      "motion": "radiant",
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target. It travels to one creature."
+    },
+    "symbol": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "telekinesis": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "telepathic bond": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "teleport": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "teleportation circle": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "thaumaturgy": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It travels to one creature."
+    },
+    "thunderwave": {
+      "motion": "thunder",
+      "sound": "thunder.mp3",
+      "seconds": 1.6,
+      "sheet": "Thunder",
+      "animation": "A shock ring is shot along the path and breaks open. It fills the cube."
+    },
+    "time stop": {
+      "motion": "other",
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades. It stays on the creature who used it."
+    },
+    "tiny hut": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It stays on the creature who used it."
+    },
+    "tongues": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "transport via plants": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "tree stride": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "true polymorph": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "true resurrection": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It travels to one creature."
+    },
+    "true seeing": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "true strike": {
+      "motion": "divination",
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points. It travels to one creature."
+    },
+    "unseen servant": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "vampiric touch": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It stays on the creature who used it."
+    },
+    "vicious mockery": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "wall of fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "wall of force": {
+      "motion": "force",
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops. It travels to one creature."
+    },
+    "wall of ice": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It travels to one creature."
+    },
+    "wall of stone": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "wall of thorns": {
+      "motion": "conjure",
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it. It travels to one creature."
+    },
+    "warding bond": {
+      "motion": "ward",
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles. It travels to one creature."
+    },
+    "water breathing": {
+      "motion": "transform",
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles. It travels to one creature."
+    },
+    "water walk": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "web": {
+      "motion": "web",
+      "sound": "web.mp3",
+      "seconds": 1.4,
+      "sheet": "Web",
+      "animation": "Strands spray out and stick across the target. It travels to one creature."
+    },
+    "weird": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It fills the burst."
+    },
+    "wind walk": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "wind wall": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "wish": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It stays on the creature who used it."
+    },
+    "word of recall": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It travels to one creature."
+    },
+    "zone of truth": {
+      "motion": "charm",
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs. It fills the burst."
+    },
+    "tentacle": {
+      "motion": "tentacle",
+      "sound": "tentacle.mp3",
+      "seconds": 1.4,
+      "sheet": "Tentacle",
+      "animation": "A tentacle lashes out and curls on the target. It travels to one creature."
+    },
+    "tail": {
+      "motion": "tail",
+      "sound": "tail.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A tail sweeps through the target."
+    },
+    "club": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "bite": {
+      "motion": "bite",
+      "sound": "bite.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Jaws snap shut on the target."
+    },
+    "claw": {
+      "motion": "claw",
+      "sound": "claw.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Claws rake across the target."
+    },
+    "acid breath|acid": {
+      "motion": "acid",
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips. It fills the burst."
+    },
+    "lightning breath|lightning": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It fills the burst."
+    },
+    "breath weapons|fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "breath weapons|lightning": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It fills the burst."
+    },
+    "breath weapons|acid": {
+      "motion": "acid",
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips. It fills the burst."
+    },
+    "poison breath|poison": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It fills the burst."
+    },
+    "fire breath|fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "breath weapons|cold": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the burst."
+    },
+    "cold breath|cold": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It fills the burst."
+    },
+    "slam": {
+      "motion": "slam",
+      "sound": "slam.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A heavy body blow slams the target and a ring of dust jumps."
+    },
+    "acid spray|acid": {
+      "motion": "acid",
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips. It fills the burst."
+    },
+    "fist": {
+      "motion": "unarmed",
+      "sound": "unarmed.mp3",
+      "seconds": 1.2,
+      "sheet": "Unarmed",
+      "animation": "A short jab lands."
+    },
+    "rock": {
+      "motion": "sling",
+      "sound": "sling.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A stone hums along the path and cracks on arrival."
+    },
+    "dagger": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "shortsword": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "light crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "rake": {
+      "motion": "claw",
+      "sound": "claw.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Claws rake across the target."
+    },
+    "beak": {
+      "motion": "bite",
+      "sound": "bite.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Jaws snap shut on the target."
+    },
+    "warhammer": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "longsword": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "whip": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "scimitar": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "hurl flame|fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "beard": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "glaive": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "constrict": {
+      "motion": "constrict",
+      "sound": "constrict.mp3",
+      "seconds": 1.5,
+      "sheet": "Tentacle",
+      "animation": "Coils wrap the creature and squeeze. It travels to one creature."
+    },
+    "swallow": {
+      "motion": "swallow",
+      "sound": "swallow.mp3",
+      "seconds": 1.5,
+      "sheet": "Swallow",
+      "animation": "The maw opens and the creature is pulled in. It travels to one creature."
+    },
+    "greataxe": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "pseudopod": {
+      "motion": "tentacle",
+      "sound": "tentacle.mp3",
+      "seconds": 1.4,
+      "sheet": "Tentacle",
+      "animation": "A tentacle lashes out and curls on the target. It travels to one creature."
+    },
+    "tusk": {
+      "motion": "gore",
+      "sound": "gore.mp3",
+      "seconds": 1.3,
+      "sheet": "Gore and horns",
+      "animation": "Horns drive into the target."
+    },
+    "sting": {
+      "motion": "sting",
+      "sound": "sting.mp3",
+      "seconds": 1.2,
+      "sheet": "Sting",
+      "animation": "A stinger punches in and flicks back."
+    },
+    "morningstar": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "javelin": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "pike": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "hoof": {
+      "motion": "slam",
+      "sound": "slam.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A heavy body blow slams the target and a ring of dust jumps."
+    },
+    "longbow": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "chain": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "horn": {
+      "motion": "gore",
+      "sound": "gore.mp3",
+      "seconds": 1.3,
+      "sheet": "Gore and horns",
+      "animation": "Horns drive into the target."
+    },
+    "pincer": {
+      "motion": "claw",
+      "sound": "claw.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Claws rake across the target."
+    },
+    "crush": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "war pick": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "poisoned dart": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "mace": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "steam breath|fire": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
+    },
+    "hand crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "quarterstaff": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "talon": {
+      "motion": "claw",
+      "sound": "claw.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Claws rake across the target."
+    },
+    "gore": {
+      "motion": "gore",
+      "sound": "gore.mp3",
+      "seconds": 1.3,
+      "sheet": "Gore and horns",
+      "animation": "Horns drive into the target."
+    },
+    "stomp": {
+      "motion": "slam",
+      "sound": "slam.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A heavy body blow slams the target and a ring of dust jumps."
+    },
+    "ram": {
+      "motion": "slam",
+      "sound": "slam.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A heavy body blow slams the target and a ring of dust jumps."
+    },
+    "variant: web garrote": {
+      "motion": "web",
+      "sound": "web.mp3",
+      "seconds": 1.4,
+      "sheet": "Web",
+      "animation": "Strands spray out and stick across the target. It travels to one creature."
+    },
+    "battleaxe": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "touch": {
+      "motion": "fire",
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
+    },
+    "greatsword": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "strike": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "withering touch": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "spear": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "shield bash": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "shortbow": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "spiked bone club": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "spit poison": {
+      "motion": "poison",
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor. It travels to one creature."
+    },
+    "heavy crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "greatclub": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "fork": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "sword": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "sling": {
+      "motion": "sling",
+      "sound": "sling.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A stone hums along the path and cracks on arrival."
+    },
+    "lightning storm": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "intoxicating touch": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "paralyzing touch": {
+      "motion": "cold",
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost. It travels to one creature."
+    },
+    "heavy club": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "spiked shield": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "tail spike": {
+      "motion": "tail",
+      "sound": "tail.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A tail sweeps through the target."
+    },
+    "snake hair": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "harpoon": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "rotting fist": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "rapier": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "tail stinger": {
+      "motion": "tail",
+      "sound": "tail.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A tail sweeps through the target."
+    },
+    "tendril": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "smother": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "strength drain": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "slaying longbow": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "life drain": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "blood drain": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "lightning strike": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "draining kiss": {
+      "motion": "psychic",
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature. It travels to one creature."
+    },
+    "beaks": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "unarmed strike": {
+      "motion": "unarmed",
+      "sound": "unarmed.mp3",
+      "seconds": 1.2,
+      "sheet": "Unarmed",
+      "animation": "A short jab lands."
+    },
+    "rotting touch": {
+      "motion": "necrotic",
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "maul": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "bite .": {
+      "motion": "bite",
+      "sound": "bite.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Jaws snap shut on the target."
+    },
+    "shock": {
+      "motion": "lightning",
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target. It travels to one creature."
+    },
+    "stinger": {
+      "motion": "sting",
+      "sound": "sting.mp3",
+      "seconds": 1.2,
+      "sheet": "Sting",
+      "animation": "A stinger punches in and flicks back."
+    },
+    "dagger|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "handaxe|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "handaxe": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "javelin|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "light hammer|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "light hammer": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "sickle": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "spear|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "dart|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "dart": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "flail": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "halberd": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "lance": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "trident|thrown": {
+      "motion": "thrown",
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "trident": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "blowgun": {
+      "motion": "blowgun",
+      "sound": "blowgun.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A thin dart whispers along the path."
+    },
+    "net": {
+      "motion": "net",
+      "sound": "net.mp3",
+      "seconds": 1.4,
+      "sheet": "Thrown",
+      "animation": "A net spreads in the air and drops over the creature."
+    },
+    "second wind": {
+      "motion": "heal",
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward. It stays on the creature who used it."
+    },
+    "dash": {
+      "motion": "dash",
+      "sound": "dash.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "Speed lines burst ahead of the creature. It stays on the creature who used it."
+    },
+    "disengage": {
+      "motion": "movement",
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it. It stays on the creature who used it."
+    },
+    "dodge": {
+      "motion": "dodge",
+      "sound": "dodge.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "The creature braces and a short guard ring spins. It stays on the creature who used it."
+    },
+    "hide": {
+      "motion": "hide",
+      "sound": "hide.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "The figure fades toward the background. It stays on the creature who used it."
+    },
+    "search": {
+      "motion": "search",
+      "sound": "search.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "A thin scan sweeps the nearby squares. It stays on the creature who used it."
+    },
+    "help": {
+      "motion": "help",
+      "sound": "help.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "A gold-green mote passes from one creature to the other. It travels to one creature."
+    },
+    "grapple": {
+      "motion": "grapple",
+      "sound": "grapple.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "Hands close and hold the other creature."
+    },
+    "shove": {
+      "motion": "shove",
+      "sound": "shove.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "A hard push shoves the other creature back."
+    },
+    "persuade": {
+      "motion": "social",
+      "sound": "social.mp3",
+      "seconds": 1.3,
+      "sheet": "Social",
+      "animation": "A spoken ripple reaches the other creature. It travels to one creature."
+    },
+    "intimidate": {
+      "motion": "social",
+      "sound": "social.mp3",
+      "seconds": 1.3,
+      "sheet": "Social",
+      "animation": "A spoken ripple reaches the other creature. It travels to one creature."
+    },
+    "deceive": {
+      "motion": "social",
+      "sound": "social.mp3",
+      "seconds": 1.3,
+      "sheet": "Social",
+      "animation": "A spoken ripple reaches the other creature. It travels to one creature."
+    }
+  },
+  "motions": {
+    "slash": {
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "blunt": {
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "stab": {
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "reach": {
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "bow": {
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "crossbow": {
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "sling": {
+      "sound": "sling.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A stone hums along the path and cracks on arrival."
+    },
+    "blowgun": {
+      "sound": "blowgun.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A thin dart whispers along the path."
+    },
+    "thrown": {
+      "sound": "thrown.mp3",
+      "seconds": 1.3,
+      "sheet": "Thrown",
+      "animation": "The weapon tumbles along the path and hits."
+    },
+    "net": {
+      "sound": "net.mp3",
+      "seconds": 1.4,
+      "sheet": "Thrown",
+      "animation": "A net spreads in the air and drops over the creature."
+    },
+    "bite": {
+      "sound": "bite.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Jaws snap shut on the target."
+    },
+    "claw": {
+      "sound": "claw.mp3",
+      "seconds": 1.2,
+      "sheet": "Bite and claw",
+      "animation": "Claws rake across the target."
+    },
+    "tail": {
+      "sound": "tail.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A tail sweeps through the target."
+    },
+    "slam": {
+      "sound": "slam.mp3",
+      "seconds": 1.3,
+      "sheet": "Tail and slam",
+      "animation": "A heavy body blow slams the target and a ring of dust jumps."
+    },
+    "gore": {
+      "sound": "gore.mp3",
+      "seconds": 1.3,
+      "sheet": "Gore and horns",
+      "animation": "Horns drive into the target."
+    },
+    "sting": {
+      "sound": "sting.mp3",
+      "seconds": 1.2,
+      "sheet": "Sting",
+      "animation": "A stinger punches in and flicks back."
+    },
+    "tentacle": {
+      "sound": "tentacle.mp3",
+      "seconds": 1.4,
+      "sheet": "Tentacle",
+      "animation": "A tentacle lashes out and curls on the target."
+    },
+    "constrict": {
+      "sound": "constrict.mp3",
+      "seconds": 1.5,
+      "sheet": "Tentacle",
+      "animation": "Coils wrap the creature and squeeze."
+    },
+    "web": {
+      "sound": "web.mp3",
+      "seconds": 1.4,
+      "sheet": "Web",
+      "animation": "Strands spray out and stick across the target."
+    },
+    "swallow": {
+      "sound": "swallow.mp3",
+      "seconds": 1.5,
+      "sheet": "Swallow",
+      "animation": "The maw opens and the creature is pulled in."
+    },
+    "unarmed": {
+      "sound": "unarmed.mp3",
+      "seconds": 1.2,
+      "sheet": "Unarmed",
+      "animation": "A short jab lands."
+    },
+    "fire": {
+      "sound": "fire.mp3",
+      "seconds": 1.8,
+      "sheet": "Fire",
+      "animation": "A fireball is shot along the path and bursts where it lands."
+    },
+    "cold": {
+      "sound": "cold.mp3",
+      "seconds": 1.7,
+      "sheet": "Cold",
+      "animation": "A shard of water is shot and shatters into frost."
+    },
+    "lightning": {
+      "sound": "lightning.mp3",
+      "seconds": 1.4,
+      "sheet": "Lightning",
+      "animation": "A bolt is shot from the attacker and cracks on the target."
+    },
+    "thunder": {
+      "sound": "thunder.mp3",
+      "seconds": 1.6,
+      "sheet": "Thunder",
+      "animation": "A shock ring is shot along the path and breaks open."
+    },
+    "acid": {
+      "sound": "acid.mp3",
+      "seconds": 1.8,
+      "sheet": "Acid",
+      "animation": "A yellow-green glob is shot, splashes, and drips."
+    },
+    "poison": {
+      "sound": "poison.mp3",
+      "seconds": 1.7,
+      "sheet": "Poison",
+      "animation": "A sickly glob is shot and bursts into vapor."
+    },
+    "radiant": {
+      "sound": "radiant.mp3",
+      "seconds": 1.6,
+      "sheet": "Radiant",
+      "animation": "A gold dart is shot and flares on the target."
+    },
+    "necrotic": {
+      "sound": "necrotic.mp3",
+      "seconds": 1.7,
+      "sheet": "Necrotic",
+      "animation": "A dark mote is shot, then wisps pull inward."
+    },
+    "force": {
+      "sound": "force.mp3",
+      "seconds": 1.3,
+      "sheet": "Force",
+      "animation": "A force dart is shot along the path and pops."
+    },
+    "psychic": {
+      "sound": "psychic.mp3",
+      "seconds": 1.4,
+      "sheet": "Psychic",
+      "animation": "A violet dart is shot and ripples on the creature."
+    },
+    "heal": {
+      "sound": "heal.mp3",
+      "seconds": 1.6,
+      "sheet": "Healing",
+      "animation": "A gold-green mote is shot and blooms upward."
+    },
+    "charm": {
+      "sound": "charm.mp3",
+      "seconds": 1.4,
+      "sheet": "Charm and fear",
+      "animation": "A violet thread reaches the creature and tugs."
+    },
+    "illusion": {
+      "sound": "illusion.mp3",
+      "seconds": 1.5,
+      "sheet": "Illusion",
+      "animation": "A shimmer folds around the target and then thins."
+    },
+    "ward": {
+      "sound": "ward.mp3",
+      "seconds": 1.4,
+      "sheet": "Warding",
+      "animation": "A pale shell flashes into place and settles."
+    },
+    "movement": {
+      "sound": "movement.mp3",
+      "seconds": 1.3,
+      "sheet": "Movement",
+      "animation": "The figure streaks and the air closes behind it."
+    },
+    "conjure": {
+      "sound": "conjure.mp3",
+      "seconds": 1.6,
+      "sheet": "Conjuration",
+      "animation": "A ring opens and the called shape gathers inside it."
+    },
+    "light": {
+      "sound": "light.mp3",
+      "seconds": 1.5,
+      "sheet": "Light and darkness",
+      "animation": "A pale mote is shot and swells into light, or a pocket of dark."
+    },
+    "divination": {
+      "sound": "divination.mp3",
+      "seconds": 1.4,
+      "sheet": "Divination",
+      "animation": "A thin eye of light opens and looks where the spell points."
+    },
+    "transform": {
+      "sound": "transform.mp3",
+      "seconds": 1.6,
+      "sheet": "Transformation",
+      "animation": "The creature's outline bends into the new shape and settles."
+    },
+    "other": {
+      "sound": "other.mp3",
+      "seconds": 1.4,
+      "sheet": "Other spells",
+      "animation": "A soft arcane mote is shot to the target and fades."
+    },
+    "dash": {
+      "sound": "dash.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "Speed lines burst ahead of the creature."
+    },
+    "dodge": {
+      "sound": "dodge.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "The creature braces and a short guard ring spins."
+    },
+    "hide": {
+      "sound": "hide.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "The figure fades toward the background."
+    },
+    "search": {
+      "sound": "search.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "A thin scan sweeps the nearby squares."
+    },
+    "help": {
+      "sound": "help.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "A gold-green mote passes from one creature to the other."
+    },
+    "grapple": {
+      "sound": "grapple.mp3",
+      "seconds": 1.3,
+      "sheet": "Field",
+      "animation": "Hands close and hold the other creature."
+    },
+    "shove": {
+      "sound": "shove.mp3",
+      "seconds": 1.2,
+      "sheet": "Field",
+      "animation": "A hard push shoves the other creature back."
+    },
+    "social": {
+      "sound": "social.mp3",
+      "seconds": 1.3,
+      "sheet": "Social",
+      "animation": "A spoken ripple reaches the other creature."
+    }
+  }
+}

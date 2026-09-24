@@ -549,6 +549,30 @@ def _skill_howto(
     )
 
 
+# First words that show up on many creatures. "Adult" must not pull in every adult dragon.
+_GENERIC_LEAD = {
+    "adult",
+    "young",
+    "ancient",
+    "wyrmling",
+    "black",
+    "blue",
+    "green",
+    "white",
+    "red",
+    "gold",
+    "silver",
+    "brass",
+    "bronze",
+    "copper",
+    "dragon",
+    "giant",
+    "the",
+    "a",
+    "an",
+}
+
+
 def _named_in_text(label: str, text: str) -> bool:
     name = (label or "").strip()
     if len(name) < 3:
@@ -556,7 +580,7 @@ def _named_in_text(label: str, text: str) -> bool:
     if re.search(rf"\b{re.escape(name)}\b", text, re.I):
         return True
     first = name.split()[0]
-    if len(first) < 3:
+    if len(first) < 3 or first.lower() in _GENERIC_LEAD:
         return False
     return re.search(rf"\b{re.escape(first)}\b", text, re.I) is not None
 
@@ -1024,6 +1048,8 @@ def _roll_line(
         )
         ability_abbr = (ability or "")[:3].upper()
         label = f"{skill_name}" + (f" ({ability_abbr.title()})" if ability_abbr else "")
+    elif check_type == "save" and weapon and not ability:
+        label = str(weapon.get("name") or "Save")
     elif check_type == "save" and ability:
         label = f"{ability.title()} save"
     elif check_type == "initiative":
@@ -1198,6 +1224,19 @@ def _creature_attack_rows(actor: dict[str, Any]) -> list[dict[str, Any]]:
         return rows
     template = actor.get("template") or {}
     return list(template.get("attacks") or [])
+
+
+def _area_breath(weapon: dict[str, Any] | None) -> bool:
+    """A printed breath with no attack bonus. It is not a roll against Armor Class."""
+    if not weapon:
+        return False
+    name = str(weapon.get("name") or "")
+    if not re.search(r"\bbreath\b", name, re.I):
+        return False
+    try:
+        return int(weapon.get("attack_bonus") or 0) == 0
+    except (TypeError, ValueError):
+        return True
 
 
 def _pick_creature_weapon(text: str, actor: dict[str, Any]) -> dict[str, Any] | None:
@@ -1506,6 +1545,23 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
     else:
         modifier = _modifier_for(character, check_type, ability, skill, None)
 
+    area_breath = _area_breath(weapon)
+    if area_breath:
+        check_type = "save"
+        ability = None
+        skill = None
+        modifier = None
+        to_hit_needed = None
+        suggested_dc = None
+        dmg = str((weapon or {}).get("damage") or "").strip()
+        dtype = str((weapon or {}).get("damage_type") or "").strip()
+        printed = " ".join(part for part in (dmg, dtype) if part)
+        notes = (
+            f"{weapon.get('name')}. "
+            + (f"Damage {printed}. " if printed else "")
+            + "No save DC is printed on this card. Type the damage."
+        )
+
     factors = roll_factors.assess(
         text=text,
         character=character,
@@ -1542,6 +1598,9 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         check_type == "save" or (skill == "stealth" and target)
     ):
         suggested_dc = None
+    if area_breath:
+        suggested_dc = None
+        to_hit_needed = None
 
     dice = ruleset.get("dice_defaults", {}).get(
         "ability_check" if check_type in {"skill", "ability"} else check_type,
@@ -1577,7 +1636,7 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
             suggested_dc = adjusted
 
     roller = character
-    if incoming_actor and check_type == "attack":
+    if incoming_actor and (check_type == "attack" or area_breath):
         roller = {"name": incoming_actor.get("label") or incoming_actor.get("name") or "Creature"}
     roll_line = _roll_line(
         roller,
@@ -1594,7 +1653,9 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
     if factors.get("extra_dice"):
         roll_line = f"{roll_line} {factors['extra_dice']}"
 
-    if check_type == "attack":
+    if area_breath:
+        howto = notes
+    elif check_type == "attack":
         howto = _attack_howto(
             character=roller if incoming_actor else character,
             weapon=weapon,
@@ -1668,7 +1729,7 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         character,
         target,
         check_type,
-        incoming_actor if check_type == "attack" else None,
+        incoming_actor if check_type == "attack" or area_breath else None,
     )
 
     result = {

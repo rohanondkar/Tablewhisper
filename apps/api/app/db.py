@@ -312,18 +312,21 @@ def pop_event_origin(previous: str) -> None:
 def add_event(query: str, result: dict[str, Any], origin: str | None = None) -> dict[str, Any]:
     sid = active_session_id()
     source = origin if origin in ("console", "map") else _event_origin
+    stored = dict(result)
+    event_id = str(uuid.uuid4())
+    stored["event_id"] = event_id
     event = {
-        "id": str(uuid.uuid4()),
+        "id": event_id,
         "session_id": sid,
         "created_at": utcnow(),
         "query": query,
-        "result": result,
+        "result": stored,
         "source": source,
     }
     with db() as conn:
         conn.execute(
             "INSERT INTO events(id, session_id, created_at, query, result_json, source) VALUES (?, ?, ?, ?, ?, ?)",
-            (event["id"], sid, event["created_at"], query, json.dumps(result), source),
+            (event["id"], sid, event["created_at"], query, json.dumps(stored), source),
         )
     return event
 
@@ -351,3 +354,24 @@ def list_events(limit: int = 40, session_id: str | None = None) -> list[dict[str
             }
             for r in rows
         ]
+
+
+def set_event_outcome(event_id: str, outcome: str) -> dict[str, Any] | None:
+    with db() as conn:
+        row = conn.execute(
+            "SELECT id, session_id, created_at, query, result_json, source FROM events WHERE id = ?",
+            (event_id,),
+        ).fetchone()
+        if not row:
+            return None
+        result = json.loads(row["result_json"])
+        result["outcome"] = outcome
+        conn.execute("UPDATE events SET result_json = ? WHERE id = ?", (json.dumps(result), event_id))
+        return {
+            "id": row["id"],
+            "session_id": row["session_id"],
+            "created_at": row["created_at"],
+            "query": row["query"],
+            "source": row["source"] or "console",
+            "result": result,
+        }

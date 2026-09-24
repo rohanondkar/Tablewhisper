@@ -63,6 +63,11 @@ export type Strike =
   | { kind: "damage"; amount: number };
 
 export function strikeOutcome(result: CheckResult, roll: string, info: string): Strike {
+  const typedEarly = amountIn(info);
+  if (result.check_type === "save" && result.suggested_dc == null && faceOf(roll) == null) {
+    if (typedEarly == null) return { kind: "pending" };
+    return typedEarly <= 0 ? { kind: "stay" } : { kind: "damage", amount: typedEarly };
+  }
   const face = faceOf(roll);
   if (face == null) return { kind: "pending" };
   const typed = amountIn(info);
@@ -103,6 +108,11 @@ function damagePreview(result: CheckResult, typed: number | null): string {
 }
 
 export function rowOutcome(result: CheckResult, heal: boolean, row: ResolveRow): string {
+  if (result.check_type === "save" && result.suggested_dc == null && faceOf(row.roll) == null) {
+    const amount = amountIn(row.info);
+    if (amount == null) return `${row.label}: type the damage. No save DC is printed on this card.`;
+    return `${row.label}: ${amount} shows on ${row.label}.`;
+  }
   const face = faceOf(row.roll);
   if (face == null) return "Enter the d20.";
   const amount = amountIn(row.info);
@@ -190,7 +200,10 @@ export default function ResolveModal({
   }
 
   const quiet = result.check_type === "spell" || result.check_type === "contest";
-  const ready = blocked ? false : quiet || rows.every((row) => faceOf(row.roll) != null);
+  const typedDamage = result.check_type === "save" && result.suggested_dc == null;
+  const ready = blocked
+    ? false
+    : quiet || rows.every((row) => (typedDamage ? amountIn(row.info) != null : faceOf(row.roll) != null));
 
   return (
     <div
@@ -217,26 +230,38 @@ export default function ResolveModal({
               <div key={row.key} className="resolve-row">
                 <strong>{row.label}</strong>
                 <label>
-                  {heal ? "Healing" : result.check_type === "save" ? "Saving throw" : "Attack roll"}
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    inputMode="numeric"
-                    placeholder="d20"
-                    value={row.roll}
-                    onChange={(event) => patch(row.key, "roll", event.target.value)}
-                  />
+                  {heal ? "Healing" : typedDamage ? "Damage" : result.check_type === "save" ? "Saving throw" : "Attack roll"}
+                  {!typedDamage && (
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      inputMode="numeric"
+                      placeholder="d20"
+                      value={row.roll}
+                      onChange={(event) => patch(row.key, "roll", event.target.value)}
+                    />
+                  )}
+                  {typedDamage && (
+                    <input
+                      type="text"
+                      placeholder="Damage"
+                      value={row.info}
+                      onChange={(event) => patch(row.key, "info", event.target.value)}
+                    />
+                  )}
                 </label>
-                <label>
-                  Additional info
-                  <input
-                    type="text"
-                    placeholder={heal ? "Healing, or a note" : "Damage, half, or a note"}
-                    value={row.info}
-                    onChange={(event) => patch(row.key, "info", event.target.value)}
-                  />
-                </label>
+                {!typedDamage && (
+                  <label>
+                    Additional info
+                    <input
+                      type="text"
+                      placeholder={heal ? "Healing, or a note" : "Damage, half, or a note"}
+                      value={row.info}
+                      onChange={(event) => patch(row.key, "info", event.target.value)}
+                    />
+                  </label>
+                )}
                 <p className="muted small">{rowOutcome(result, heal, row)}</p>
               </div>
             ))}

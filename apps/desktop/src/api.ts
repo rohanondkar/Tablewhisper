@@ -140,6 +140,8 @@ export interface CheckResult {
   dc_label: string | null;
   notes: string;
   roll_line: string;
+  event_id?: string;
+  outcome?: string;
   confidence: number;
   source: "rules" | "ollama" | "hybrid";
   reasoning: string;
@@ -473,6 +475,12 @@ export const api = {
   setRuleset: (id: string) =>
     request<{ ok: boolean; active: string }>(`/rulesets/${id}/activate`, { method: "POST" }),
   sessionEvents: () => request<SessionEvent[]>("/sessions/active/events?limit=200"),
+  noteOutcome: (eventId: string, outcome: string) =>
+    request<SessionEvent>(`/sessions/active/events/${eventId}/outcome`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outcome }),
+    }),
   storyNote: (text: string, outcome: string, source: "console" | "map") =>
     request<SessionEvent>("/sessions/active/notes", {
       method: "POST",

@@ -16,6 +16,8 @@ import {
   type NpcTemplate,
   type SceneNpc,
 } from "../api";
+import { playAttackSound } from "./attackSounds";
+import { titleTheme, type ThemeChrome } from "../titleThemes";
 import { CREATURE_SIZES, sizeToSquares } from "./sizes";
 import { boundsSegments, feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
 import {
@@ -26,6 +28,8 @@ import {
   TravelEffect,
   actionFromQuery,
   actionsFor,
+  castTravel,
+  spellFxMode,
   aimTiles,
   effectTiles,
   footprint,
@@ -72,16 +76,23 @@ type VisionArea = {
   dim?: boolean;
 };
 
-function visionFill(dim?: boolean) {
-  return dim ? "rgba(255,220,120,0.16)" : "rgba(255,220,120,0.35)";
+function withAlpha(hex: string, alpha: number) {
+  const raw = hex.replace("#", "");
+  const full = raw.length === 3 ? raw.split("").map((ch) => ch + ch).join("") : raw;
+  const value = Number.parseInt(full, 16);
+  const red = (value >> 16) & 255;
+  const green = (value >> 8) & 255;
+  const blue = value & 255;
+  return `rgba(${red},${green},${blue},${alpha})`;
 }
 
-function visionStroke(dim?: boolean) {
-  return dim ? "rgba(255,220,120,0.35)" : "rgba(255,210,80,0.85)";
+function genericToken(path: string | null): boolean {
+  if (!path) return true;
+  return /token-humanoid|token-npc-generic|\/monsters\/srd\/generic|\/npcs\/srd\/generic/i.test(path);
 }
 
 /** Fan of triangles from the token so a folded outline cannot punch a hole. */
-function VisionFan({ area }: { area: VisionArea }) {
+function VisionFan({ area, color }: { area: VisionArea; color: string }) {
   return (
     <Shape
       listening={false}
@@ -97,13 +108,13 @@ function VisionFan({ area }: { area: VisionArea }) {
           ctx.lineTo(pts[j], pts[j + 1]);
           ctx.closePath();
         }
-        ctx.fillStyle = visionFill(area.dim);
+        ctx.fillStyle = withAlpha(color, area.dim ? 0.16 : 0.35);
         ctx.fill("nonzero");
         ctx.beginPath();
         ctx.moveTo(pts[0], pts[1]);
         for (let i = 2; i < n; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
         ctx.closePath();
-        ctx.strokeStyle = visionStroke(area.dim);
+        ctx.strokeStyle = withAlpha(color, area.dim ? 0.35 : 0.85);
         ctx.lineWidth = 1;
         ctx.stroke();
       }}
@@ -162,6 +173,16 @@ function useHtmlImage(url: string | null | undefined) {
   return img;
 }
 
+function mapColumnWidth(kind: "tray" | "inspect"): number {
+  const key = kind === "tray" ? "map-tray-w" : "map-inspect-w";
+  const saved = Number(localStorage.getItem(key));
+  if (saved > 0) return saved;
+  const width = window.innerWidth;
+  if (width < 1400) return kind === "tray" ? 168 : 210;
+  if (width >= 1800) return kind === "tray" ? 260 : 340;
+  return kind === "tray" ? 240 : 300;
+}
+
 export default function MapPanel({
   characters,
   encounter,
@@ -202,8 +223,8 @@ export default function MapPanel({
     creatures: RulingCreature[];
     travel: Travel | null;
   } | null>(null);
-  const [trayW, setTrayW] = useState(() => Number(localStorage.getItem("map-tray-w")) || 240);
-  const [inspectW, setInspectW] = useState(() => Number(localStorage.getItem("map-inspect-w")) || 300);
+  const [trayW, setTrayW] = useState(() => mapColumnWidth("tray"));
+  const [inspectW, setInspectW] = useState(() => mapColumnWidth("inspect"));
   const mapBodyRef = useRef<HTMLDivElement | null>(null);
   const [travelProgress, setTravelProgress] = useState(0);
   const [marks, setMarks] = useState<Mark[]>([]);
@@ -211,6 +232,12 @@ export default function MapPanel({
   const [grabbing, setGrabbing] = useState(false);
   const [portalSwirl, setPortalSwirl] = useState<{ x: number; y: number } | null>(null);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
+  const [chrome, setChrome] = useState<ThemeChrome>(() => titleTheme().chrome);
+  useEffect(() => {
+    const sync = () => setChrome(titleTheme().chrome);
+    window.addEventListener("tablewhisper-theme", sync);
+    return () => window.removeEventListener("tablewhisper-theme", sync);
+  }, []);
   const [turns, setTurns] = useState<TurnSlot[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [round, setRound] = useState(1);
@@ -563,10 +590,17 @@ export default function MapPanel({
 
   useEffect(() => {
     if (!travel) return;
+    playAttackSound(travel.id, travel.sound);
     const start = performance.now();
+    const mode = travel.magical ? spellFxMode() : "full";
+    if (mode === "off") {
+      setTravel(null);
+      return;
+    }
+    const ms = mode === "reduced" ? 280 : Math.max(1200, (travel.seconds || 1.2) * 1000);
     let frame = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / 520);
+      const t = Math.min(1, (now - start) / ms);
       setTravelProgress(t);
       if (t < 1) frame = requestAnimationFrame(tick);
       else setTravel(null);
@@ -777,22 +811,16 @@ export default function MapPanel({
       }
       const travel = blocked
         ? null
-        : {
-            id: Date.now(),
-            family: action.family,
-            damageType: action.damageType,
-            from: tileCenter(fromTiles[0], map),
-            to: tileCenter(tile, map),
-            tiles,
-          };
+        : castTravel(action, tileCenter(fromTiles[0], map), tileCenter(tile, map), tiles);
       publishRuling(result, action, blocked, tiles, tile, creatures);
+      if (travel?.look) beginTravel(travel);
       setPendingResolve({
         result,
         blocked,
         notice: null,
         heal: Boolean(action.family === "heal" || action.damageType === "healing"),
         creatures: blocked ? [] : creatures,
-        travel,
+        travel: travel?.look ? null : travel,
       });
     } catch (err) {
       onErrorRef.current(err instanceof Error ? err.message : String(err));
@@ -872,14 +900,7 @@ export default function MapPanel({
     if (action.shape === "heal" && (action.rangeFt || 0) <= 0) {
       const self = actor ? tokenCreature(actor, footprint(actor.x, actor.y, actor.size_sq, map)[0]) : pcFromResult(result);
       if (self?.tile) {
-        beginTravel({
-          id: Date.now(),
-          family: action.family,
-          damageType: action.damageType,
-          from: tileCenter(self.tile, map),
-          to: tileCenter(self.tile, map),
-          tiles: [self.tile],
-        });
+        beginTravel(castTravel(action, tileCenter(self.tile, map), tileCenter(self.tile, map), [self.tile]));
       }
       publishRuling(result, action, null, self?.tile ? [self.tile] : [], self?.tile || null, self ? [self] : []);
       openResolve(result, action, null, null, self ? [self] : [], null);
@@ -921,14 +942,7 @@ export default function MapPanel({
     if (!shaped && !creatures.some((item) => item.tokenId === targetToken.id)) {
       creatures = [tokenCreature(targetToken, to), ...creatures];
     }
-    beginTravel({
-      id: Date.now(),
-      family: action.family,
-      damageType: action.damageType,
-      from: tileCenter(fromTiles[0], map),
-      to: tileCenter(to, map),
-      tiles,
-    });
+    beginTravel(castTravel(action, tileCenter(fromTiles[0], map), tileCenter(to, map), tiles));
     publishRuling(next, action, null, tiles, to, creatures);
     openResolve(next, action, null, null, creatures, null);
   }
@@ -1919,7 +1933,7 @@ export default function MapPanel({
                   key={`g-${i}`}
                   name="grid"
                   points={pts}
-                  stroke="rgba(255,255,255,0.18)"
+                  stroke={chrome.grid}
                   strokeWidth={1}
                   listening={false}
                 />
@@ -1937,21 +1951,21 @@ export default function MapPanel({
                 >
                   {visionPolys.map((v) =>
                     v.points.length >= 6 ? (
-                      <VisionFan key={v.key} area={v} />
+                      <VisionFan key={v.key} area={v} color={chrome.vision} />
                     ) : v.radius > 0 ? (
                       <Circle
                         key={v.key}
                         x={v.cx}
                         y={v.cy}
                         radius={v.radius}
-                        fill={visionFill(v.dim)}
-                        stroke={visionStroke(v.dim)}
+                        fill={withAlpha(chrome.vision, v.dim ? 0.16 : 0.35)}
+                        stroke={withAlpha(chrome.vision, v.dim ? 0.35 : 0.85)}
                         strokeWidth={1}
                         listening={false}
                       />
                     ) : null
                   )}
-                  {showVision && fogCanvasImage && (
+                  {showVision && playerPreview && fogCanvasImage && (
                     <KonvaImage
                       image={fogCanvasImage}
                       width={map.width}
@@ -2077,6 +2091,7 @@ export default function MapPanel({
                     key={t.id}
                     token={t}
                     side={side}
+                    chrome={chrome}
                     selected={selectedTokenId === t.id}
                     acting={t.id === activeTokenId}
                     faded={tokenFaded(t)}
@@ -2444,6 +2459,7 @@ function TrayRow({
 function TokenNode({
   token,
   side,
+  chrome,
   selected,
   acting,
   faded,
@@ -2453,6 +2469,7 @@ function TokenNode({
 }: {
   token: MapToken;
   side: number;
+  chrome: ThemeChrome;
   selected: boolean;
   acting?: boolean;
   faded?: boolean;
@@ -2481,13 +2498,12 @@ function TokenNode({
   if (isPc && path && path.includes("/media/tokens/token-humanoid")) {
     path = null;
   }
-  if (!isPc && !path) {
-    path = fallback;
-  }
+  if (!isPc && !path) path = fallback;
+  if (genericToken(path)) path = null;
   const url = path ? mediaUrlSync(path, API_BASE) : null;
   const img = useHtmlImage(url);
-  const fill =
-    token.kind === "pc" ? "#2d6a4f" : token.kind === "enemy" ? "#9b2226" : "#1d3557";
+  const fill = chrome.panel;
+  const radius = side * chrome.radius;
   const initials = (token.label || "?")
     .split(/\s+/)
     .map((p) => p[0])
@@ -2530,9 +2546,9 @@ function TokenNode({
           y={-5}
           width={side + 10}
           height={side + 10}
-          stroke="#e6c15a"
+          stroke={chrome.accent}
           strokeWidth={3}
-          cornerRadius={side * 0.2}
+          cornerRadius={radius}
           listening={false}
         />
       )}
@@ -2541,9 +2557,9 @@ function TokenNode({
           image={img}
           width={side}
           height={side}
-          cornerRadius={side * 0.15}
-          stroke={selected ? "#fff" : "#000"}
-          strokeWidth={selected ? 3 : 1}
+          cornerRadius={radius}
+          stroke={selected ? chrome.tokenOn : chrome.token}
+          strokeWidth={selected ? 3 : 2}
         />
       ) : (
         <>
@@ -2551,22 +2567,20 @@ function TokenNode({
             width={side}
             height={side}
             fill={fill}
-            cornerRadius={side * 0.15}
-            stroke={selected ? "#fff" : "#000"}
-            strokeWidth={selected ? 3 : 1}
+            cornerRadius={radius}
+            stroke={selected ? chrome.tokenOn : chrome.token}
+            strokeWidth={selected ? 3 : 2}
           />
-          {isPc && (
-            <Text
-              text={initials}
-              width={side}
-              height={side}
-              align="center"
-              verticalAlign="middle"
-              fontSize={Math.max(12, side * 0.35)}
-              fill="#fff"
-              fontStyle="bold"
-            />
-          )}
+          <Text
+            text={initials}
+            width={side}
+            height={side}
+            align="center"
+            verticalAlign="middle"
+            fontSize={Math.max(12, side * 0.35)}
+            fill={chrome.nameInk}
+            fontStyle="bold"
+          />
         </>
       )}
       {hovered && (
@@ -2576,8 +2590,8 @@ function TokenNode({
             y={-nameSize - 16}
             width={nameWidth + 20}
             height={nameSize + 12}
-            fill="rgba(16, 14, 12, 0.92)"
-            stroke="rgba(203, 180, 134, 0.7)"
+            fill={chrome.nameFill}
+            stroke={chrome.token}
             strokeWidth={1}
             cornerRadius={8}
             listening={false}
@@ -2589,7 +2603,7 @@ function TokenNode({
             width={nameWidth}
             fontSize={nameSize}
             fontFamily="Cinzel, Palatino Linotype, serif"
-            fill="#f6efe2"
+            fill={chrome.nameInk}
             align="center"
             wrap="none"
             listening={false}

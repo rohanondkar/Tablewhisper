@@ -70,12 +70,14 @@ def image_url_for(monster: dict[str, Any]) -> str:
             return f"{MEDIA_MONSTERS}/custom/{path.name}"
 
     # 2) Built-in circular creature portraits (packages/token-portraits).
+    # Unique art lives in token-portraits/monsters/{id}.png, so the check has to
+    # keep that subfolder. The last path segment alone is not a file.
     try:
-        from .token_art import TOKEN_DIR, monster_portrait
+        from .token_art import MEDIA_TOKENS, TOKEN_DIR, monster_portrait
 
         url = monster_portrait(monster)
-        fname = url.rsplit("/", 1)[-1]
-        if (TOKEN_DIR / fname).is_file():
+        rel = url[len(MEDIA_TOKENS) + 1 :] if url.startswith(MEDIA_TOKENS + "/") else url.rsplit("/", 1)[-1]
+        if rel and (TOKEN_DIR / rel).is_file():
             return url
     except Exception:
         pass
