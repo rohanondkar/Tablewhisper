@@ -304,6 +304,7 @@ export interface BattleMap {
   show_grid_overlay: boolean;
   active: boolean;
   created_at: string;
+  ground_url?: string | null;
 }
 
 export interface MapToken {
@@ -349,6 +350,18 @@ export interface MapLight {
   kind?: "torch" | "lamp" | string;
 }
 
+export type PoolKind = "water" | "lava" | "acid" | "slime" | "blood" | "mana";
+
+export interface MapPool {
+  id: string;
+  map_id: string;
+  kind: PoolKind | string;
+  depth_ft: number;
+  current_ft: number;
+  current_deg: number;
+  mask_url?: string | null;
+}
+
 export interface MapSetupBody {
   name?: string;
   width?: number;
@@ -383,6 +396,14 @@ export interface MapSetupBody {
     target_y: number;
     label: string;
   }>;
+  pools?: Array<{
+    kind: string;
+    depth_ft: number;
+    current_ft: number;
+    current_deg: number;
+    mask_png: string;
+  }>;
+  ground_png?: string;
 }
 
 export interface MapPortal {
@@ -403,6 +424,7 @@ export interface MapState {
   walls: MapWall[];
   lights: MapLight[];
   portals: MapPortal[];
+  pools: MapPool[];
 }
 
 export interface SessionEvent {
@@ -825,6 +847,28 @@ export const api = {
     }),
   deleteMapLight: (lightId: string) =>
     request<{ ok: boolean }>(`/maps/lights/${lightId}`, { method: "DELETE" }),
+  createMapPool: (mapId: string, body: { kind: string; depth_ft: number; current_ft: number; current_deg: number }) =>
+    request<MapPool>(`/maps/${mapId}/pools`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapPool: (poolId: string, patch: Partial<Pick<MapPool, "kind" | "depth_ft" | "current_ft" | "current_deg">>) =>
+    request<MapPool>(`/maps/pools/${poolId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapPool: (poolId: string) =>
+    request<{ ok: boolean }>(`/maps/pools/${poolId}`, { method: "DELETE" }),
+  uploadPoolMask: async (poolId: string, blob: Blob) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", blob, "pool.png");
+    const res = await fetch(`${base}/maps/pools/${poolId}/mask`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<MapPool>;
+  },
   uploadFog: async (mapId: string, blob: Blob) => {
     const base = await apiBase();
     const form = new FormData();
@@ -861,18 +905,36 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token_ids: tokenIds }),
     }),
-  suggestMapMarks: async (file: File, width: number, height: number, gridSizePx: number) => {
+  suggestMapMarks: async (
+    file: File,
+    width: number,
+    height: number,
+    gridSizePx: number,
+    offsetX: number,
+    offsetY: number
+  ) => {
     const base = await apiBase();
     const form = new FormData();
     form.append("file", file);
     form.append("width", String(width));
     form.append("height", String(height));
     form.append("grid_size_px", String(gridSizePx));
+    form.append("grid_offset_x", String(offsetX));
+    form.append("grid_offset_y", String(offsetY));
     const res = await fetch(`${base}/maps/suggest`, { method: "POST", body: form });
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<{
-      walls: Array<{ points: number[]; door: boolean }>;
-      lights: Array<{ x: number; y: number; bright_ft: number; dim_ft: number; kind: "torch" | "lamp" }>;
+      walls: Array<{ c: number; r: number }>;
+      doors: Array<{ c: number; r: number }>;
+      ground: Array<{ c: number; r: number }>;
+      lights: Array<{ c: number; r: number; bright_ft: number; dim_ft: number; kind: "torch" | "lamp" }>;
+      liquids: Array<{
+        kind: string;
+        depth_ft: number;
+        current_ft: number;
+        current_deg: number;
+        cells: Array<{ c: number; r: number }>;
+      }>;
     }>;
   },
   applyMapSetup: (mapId: string, body: MapSetupBody) =>

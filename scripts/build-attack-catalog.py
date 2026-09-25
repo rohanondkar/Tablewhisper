@@ -22,7 +22,48 @@ MONSTERS = ROOT / "packages" / "monsters-srd" / "monsters.json"
 XLSX = ROOT / "docs" / "map-attack-catalog.xlsx"
 JSON_OUT = ROOT / "apps" / "desktop" / "src" / "map" / "attackPresentation.json"
 
-COLUMNS = ["Action", "Kind", "Shape", "Animation", "Sound effect", "On screen"]
+COLUMNS = ["Action", "Kind", "Shape", "Animation", "Sound effect", "On screen", "To hit", "Damage roll"]
+SPELL_DAMAGE = ROOT / "packages" / "rules-dnd5e" / "spell_damage.json"
+
+WEAPON_DICE = {
+    "club": ("1d4", None, "bludgeoning"),
+    "dagger": ("1d4", None, "piercing"),
+    "greatclub": ("1d8", None, "bludgeoning"),
+    "handaxe": ("1d6", None, "slashing"),
+    "javelin": ("1d6", None, "piercing"),
+    "light hammer": ("1d4", None, "bludgeoning"),
+    "mace": ("1d6", None, "bludgeoning"),
+    "quarterstaff": ("1d6", "1d8", "bludgeoning"),
+    "sickle": ("1d4", None, "slashing"),
+    "spear": ("1d6", "1d8", "piercing"),
+    "light crossbow": ("1d8", None, "piercing"),
+    "dart": ("1d4", None, "piercing"),
+    "shortbow": ("1d6", None, "piercing"),
+    "sling": ("1d4", None, "bludgeoning"),
+    "battleaxe": ("1d8", "1d10", "slashing"),
+    "flail": ("1d8", None, "bludgeoning"),
+    "glaive": ("1d10", None, "slashing"),
+    "greataxe": ("1d12", None, "slashing"),
+    "greatsword": ("2d6", None, "slashing"),
+    "halberd": ("1d10", None, "slashing"),
+    "lance": ("1d12", None, "piercing"),
+    "longsword": ("1d8", "1d10", "slashing"),
+    "maul": ("2d6", None, "bludgeoning"),
+    "morningstar": ("1d8", None, "piercing"),
+    "pike": ("1d10", None, "piercing"),
+    "rapier": ("1d8", None, "piercing"),
+    "scimitar": ("1d6", None, "slashing"),
+    "shortsword": ("1d6", None, "piercing"),
+    "trident": ("1d6", "1d8", "piercing"),
+    "war pick": ("1d8", None, "piercing"),
+    "warhammer": ("1d8", "1d10", "bludgeoning"),
+    "whip": ("1d4", None, "slashing"),
+    "blowgun": ("1", None, "piercing"),
+    "hand crossbow": ("1d6", None, "piercing"),
+    "heavy crossbow": ("1d10", None, "piercing"),
+    "longbow": ("1d8", None, "piercing"),
+    "net": (None, None, None),
+}
 
 WEAPONS = [
     ("club", "bludgeoning", False),
@@ -433,7 +474,81 @@ def animation_line(motion: str, shape: str) -> str:
     return text
 
 
-def add_row(rows: list[dict], seen: set[str], *, action: str, kind: str, key: str, motion: str, shape: str) -> None:
+def _crit_note(formula: str) -> str:
+    if re.search(r"\d+\s*d\s*\d+", formula, re.I):
+        return f"{formula}. A natural 20 doubles the dice and adds the modifier once."
+    return formula
+
+
+def weapon_damage_roll(name: str) -> str:
+    die, two_hand, kind = WEAPON_DICE.get(name, (None, None, None))
+    if not die:
+        return "none"
+    if die == "1":
+        return f"1 + ability modifier {kind}. A natural 20 has no die to double."
+    if two_hand:
+        return _crit_note(f"{die} {kind}, or {two_hand} {kind} in two hands, plus the ability modifier once")
+    return _crit_note(f"{die} + ability modifier {kind}")
+
+
+def spell_rolls(spell: dict, rules: dict) -> tuple[str, str]:
+    resolution = str(spell.get("resolution") or "none")
+    if resolution == "attack":
+        to_hit = "1d20 + attack bonus"
+    elif resolution == "save":
+        to_hit = "1d20 + save modifier"
+    else:
+        to_hit = "none"
+    rule = rules.get(str(spell.get("name") or "").lower())
+    if not isinstance(rule, dict) or not rule.get("damage"):
+        return to_hit, "none"
+    dice = str(rule["damage"])
+    kind = str(rule.get("type") or "").strip()
+    if rule.get("ability"):
+        dice = f"{dice} + spellcasting ability modifier"
+    if rule.get("scale"):
+        dice = f"{dice}, more dice at levels 5, 11, and 17"
+    formula = f"{dice} {kind}".strip()
+    if rule.get("half"):
+        formula += ". A successful save deals half"
+    if resolution == "attack" and re.search(r"\d+\s*d\s*\d+", str(rule["damage"])):
+        formula += ". A natural 20 doubles the dice and adds the modifier once"
+    return to_hit, formula
+
+
+def attack_rolls(attack: dict, breath: bool) -> tuple[str, str]:
+    try:
+        bonus = int(attack.get("attack_bonus") or 0)
+    except (TypeError, ValueError):
+        bonus = 0
+    if breath and bonus == 0:
+        to_hit = "1d20 + save modifier"
+    elif bonus or attack.get("attack_bonus") == 0:
+        to_hit = f"1d20 + {bonus}" if bonus else "1d20 + attack bonus"
+    else:
+        to_hit = "none"
+    dice = str(attack.get("damage") or "").strip()
+    kind = str(attack.get("damage_type") or "").strip()
+    if not dice:
+        return to_hit, "none"
+    formula = f"{dice} {kind}".strip()
+    if breath and bonus == 0:
+        return to_hit, formula
+    return to_hit, _crit_note(formula)
+
+
+def add_row(
+    rows: list[dict],
+    seen: set[str],
+    *,
+    action: str,
+    kind: str,
+    key: str,
+    motion: str,
+    shape: str,
+    to_hit: str = "none",
+    damage_roll: str = "none",
+) -> None:
     if key in seen:
         return
     seen.add(key)
@@ -449,6 +564,8 @@ def add_row(rows: list[dict], seen: set[str], *, action: str, kind: str, key: st
             "animation": animation_line(motion, shape),
             "sound": info["sound"],
             "seconds": info["seconds"],
+            "to_hit": to_hit,
+            "damage_roll": damage_roll,
         }
     )
 
@@ -457,12 +574,14 @@ def collect() -> list[dict]:
     rows: list[dict] = []
     seen: set[str] = set()
     spells = json.loads(SPELLS.read_text(encoding="utf-8"))
+    spell_rules = json.loads(SPELL_DAMAGE.read_text(encoding="utf-8")) if SPELL_DAMAGE.is_file() else {}
     for spell in spells:
         motion = spell_motion(spell["name"], spell["resolution"])
         # "light" as a whole word was easy to miss. Catch the cantrip after the fallthrough.
         if motion == "other" and re.search(r"(^|\b)light(\b|$)", spell["name"], re.I):
             motion = "light"
         shape = shape_word(spell["shape"], spell["aim"], motion)
+        to_hit, damage_roll = spell_rolls(spell, spell_rules)
         add_row(
             rows,
             seen,
@@ -471,6 +590,8 @@ def collect() -> list[dict]:
             key=fold(spell["name"]),
             motion=motion,
             shape=shape,
+            to_hit=to_hit,
+            damage_roll=damage_roll,
         )
     data = json.loads(MONSTERS.read_text(encoding="utf-8"))
     for monster in data["monsters"]:
@@ -485,6 +606,10 @@ def collect() -> list[dict]:
             breath = has(folded, r"breath|spray|hurl flame|steam")
             label = name
             key = folded
+            weapon_names = {w[0] for w in WEAPONS}
+            if not breath and (folded in weapon_names or folded == "unarmed strike"):
+                printed = re.sub(r"\s+", "", str(attack.get("damage") or "printed")).lower()
+                key = f"{folded}|{printed}"
             if breath:
                 label = f"{re.sub(r'\\s*\\([^)]*\\)', '', name).strip()} ({damage or 'fire'})"
                 key = f"{folded}|{(damage or 'fire').lower()}"
@@ -493,7 +618,18 @@ def collect() -> list[dict]:
             shape = shape_word("burst" if breath else "ray", "point", motion)
             if breath:
                 shape = "ball"
-            add_row(rows, seen, action=label, kind=kind, key=key, motion=motion, shape=shape)
+            to_hit, damage_roll = attack_rolls(attack, breath)
+            add_row(
+                rows,
+                seen,
+                action=label,
+                kind=kind,
+                key=key,
+                motion=motion,
+                shape=shape,
+                to_hit=to_hit,
+                damage_roll=damage_roll,
+            )
     for name, damage, thrown in WEAPONS:
         if thrown and name not in {"net"}:
             add_row(
@@ -504,12 +640,34 @@ def collect() -> list[dict]:
                 key=f"{name}|thrown",
                 motion="net" if name == "net" else "thrown",
                 shape="spread" if name == "net" else "thrown",
+                to_hit="1d20 + attack bonus",
+                damage_roll=weapon_damage_roll(name),
             )
         if name == "net":
-            add_row(rows, seen, action="Net", kind="weapon", key="net", motion="net", shape="spread")
+            add_row(
+                rows,
+                seen,
+                action="Net",
+                kind="weapon",
+                key="net",
+                motion="net",
+                shape="spread",
+                to_hit="1d20 + attack bonus",
+                damage_roll="none",
+            )
             continue
         if thrown and name == "dart":
-            add_row(rows, seen, action="Dart", kind="weapon", key="dart", motion="thrown", shape="thrown")
+            add_row(
+                rows,
+                seen,
+                action="Dart",
+                kind="weapon",
+                key="dart",
+                motion="thrown",
+                shape="thrown",
+                to_hit="1d20 + attack bonus",
+                damage_roll=weapon_damage_roll(name),
+            )
             continue
         motion = attack_motion(name, damage, False)
         add_row(
@@ -520,6 +678,8 @@ def collect() -> list[dict]:
             key=name,
             motion=motion,
             shape=shape_word("ray", "point", motion),
+            to_hit="1d20 + attack bonus",
+            damage_roll=weapon_damage_roll(name),
         )
     features = [
         ("Second Wind", "feature", "heal", "self"),
@@ -536,7 +696,34 @@ def collect() -> list[dict]:
         ("Deceive", "feature", "social", "ray"),
     ]
     for name, kind, motion, shape in features:
-        add_row(rows, seen, action=name, kind=kind, key=fold(name), motion=motion, shape=shape)
+        if name in {"Grapple", "Shove"}:
+            to_hit, damage_roll = "1d20 + attack bonus", "none"
+        elif name in {"Persuade", "Intimidate", "Deceive"}:
+            to_hit, damage_roll = "1d20 + ability modifier", "none"
+        else:
+            to_hit, damage_roll = "none", "none"
+        add_row(
+            rows,
+            seen,
+            action=name,
+            kind=kind,
+            key=fold(name),
+            motion=motion,
+            shape=shape,
+            to_hit=to_hit,
+            damage_roll=damage_roll,
+        )
+    add_row(
+        rows,
+        seen,
+        action="Unarmed strike",
+        kind="weapon",
+        key="unarmed strike",
+        motion="blunt",
+        shape="jab",
+        to_hit="1d20 + attack bonus",
+        damage_roll="1 + Strength modifier bludgeoning. A natural 20 has no die to double.",
+    )
     return rows
 
 
@@ -619,19 +806,30 @@ def write_xlsx(rows: list[dict]) -> None:
             cell.alignment = Alignment(vertical="center")
         items = sorted(grouped.get(sheet_name, []), key=lambda item: (item["kind"], item["action"].lower()))
         for item in items:
-            sheet.append([item["action"], item["kind"], item["shape"], item["animation"], item["sound"], item["seconds"]])
-        for row in sheet.iter_rows(min_row=2, max_col=6):
+            sheet.append(
+                [
+                    item["action"],
+                    item["kind"],
+                    item["shape"],
+                    item["animation"],
+                    item["sound"],
+                    item["seconds"],
+                    item.get("to_hit") or "none",
+                    item.get("damage_roll") or "none",
+                ]
+            )
+        for row in sheet.iter_rows(min_row=2, max_col=8):
             for cell in row:
                 cell.font = body
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
         last = max(2, sheet.max_row)
         sheet.freeze_panes = "A2"
-        widths = [36, 12, 12, 78, 18, 12]
+        widths = [36, 12, 12, 78, 18, 12, 28, 64]
         for index_col, width in enumerate(widths, start=1):
             sheet.column_dimensions[get_column_letter(index_col)].width = width
         sheet.row_dimensions[1].height = 22
         if last >= 2:
-            table = Table(displayName="T" + re.sub(r"[^A-Za-z0-9]", "", title_name), ref=f"A1:F{last}")
+            table = Table(displayName="T" + re.sub(r"[^A-Za-z0-9]", "", title_name), ref=f"A1:H{last}")
             table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium2", showRowStripes=True)
             sheet.add_table(table)
     XLSX.parent.mkdir(parents=True, exist_ok=True)

@@ -11,42 +11,42 @@ from typing import Any
 # name, hands, weight, flags
 # flags: light, heavy, finesse, versatile, loading, ammo, two_handed (hands==2)
 _WEAPONS: list[tuple[str, dict[str, Any]]] = [
-    ("club", {"hands": 1, "weight": 2, "light": True}),
-    ("dagger", {"hands": 1, "weight": 1, "light": True, "finesse": True}),
-    ("greatclub", {"hands": 2, "weight": 10}),
-    ("handaxe", {"hands": 1, "weight": 2, "light": True}),
-    ("javelin", {"hands": 1, "weight": 2}),
-    ("light hammer", {"hands": 1, "weight": 2, "light": True}),
-    ("mace", {"hands": 1, "weight": 4}),
-    ("quarterstaff", {"hands": 1, "weight": 4, "versatile": True}),
-    ("sickle", {"hands": 1, "weight": 2, "light": True}),
-    ("spear", {"hands": 1, "weight": 3, "versatile": True}),
-    ("light crossbow", {"hands": 2, "weight": 5, "ammo": "bolts", "loading": True}),
-    ("dart", {"hands": 1, "weight": 0.25, "finesse": True}),
-    ("shortbow", {"hands": 2, "weight": 2, "ammo": "arrows"}),
-    ("sling", {"hands": 1, "weight": 0, "ammo": "bullets"}),
-    ("battleaxe", {"hands": 1, "weight": 4, "versatile": True}),
-    ("flail", {"hands": 1, "weight": 2}),
-    ("glaive", {"hands": 2, "weight": 6, "heavy": True}),
-    ("greataxe", {"hands": 2, "weight": 7, "heavy": True}),
-    ("greatsword", {"hands": 2, "weight": 6, "heavy": True}),
-    ("halberd", {"hands": 2, "weight": 6, "heavy": True}),
-    ("lance", {"hands": 2, "weight": 6}),
-    ("longsword", {"hands": 1, "weight": 3, "versatile": True}),
-    ("maul", {"hands": 2, "weight": 10, "heavy": True}),
-    ("morningstar", {"hands": 1, "weight": 4}),
-    ("pike", {"hands": 2, "weight": 18, "heavy": True}),
-    ("rapier", {"hands": 1, "weight": 2, "finesse": True}),
-    ("scimitar", {"hands": 1, "weight": 3, "light": True, "finesse": True}),
-    ("shortsword", {"hands": 1, "weight": 2, "light": True, "finesse": True}),
-    ("trident", {"hands": 1, "weight": 4, "versatile": True}),
-    ("war pick", {"hands": 1, "weight": 2}),
-    ("warhammer", {"hands": 1, "weight": 2, "versatile": True}),
-    ("whip", {"hands": 1, "weight": 3, "finesse": True}),
-    ("blowgun", {"hands": 1, "weight": 1, "ammo": "needles", "loading": True}),
-    ("hand crossbow", {"hands": 1, "weight": 3, "light": True, "ammo": "bolts", "loading": True}),
-    ("heavy crossbow", {"hands": 2, "weight": 18, "heavy": True, "ammo": "bolts", "loading": True}),
-    ("longbow", {"hands": 2, "weight": 2, "heavy": True, "ammo": "arrows"}),
+    ("club", {"hands": 1, "weight": 2, "light": True, "damage_die": "1d4", "damage_type": "bludgeoning"}),
+    ("dagger", {"hands": 1, "weight": 1, "light": True, "finesse": True, "damage_die": "1d4", "damage_type": "piercing"}),
+    ("greatclub", {"hands": 2, "weight": 10, "damage_die": "1d8", "damage_type": "bludgeoning"}),
+    ("handaxe", {"hands": 1, "weight": 2, "light": True, "damage_die": "1d6", "damage_type": "slashing"}),
+    ("javelin", {"hands": 1, "weight": 2, "damage_die": "1d6", "damage_type": "piercing"}),
+    ("light hammer", {"hands": 1, "weight": 2, "light": True, "damage_die": "1d4", "damage_type": "bludgeoning"}),
+    ("mace", {"hands": 1, "weight": 4, "damage_die": "1d6", "damage_type": "bludgeoning"}),
+    ("quarterstaff", {"hands": 1, "weight": 4, "versatile": True, "damage_die": "1d6", "versatile_die": "1d8", "damage_type": "bludgeoning"}),
+    ("sickle", {"hands": 1, "weight": 2, "light": True, "damage_die": "1d4", "damage_type": "slashing"}),
+    ("spear", {"hands": 1, "weight": 3, "versatile": True, "damage_die": "1d6", "versatile_die": "1d8", "damage_type": "piercing"}),
+    ("light crossbow", {"hands": 2, "weight": 5, "ammo": "bolts", "loading": True, "damage_die": "1d8", "damage_type": "piercing"}),
+    ("dart", {"hands": 1, "weight": 0.25, "finesse": True, "damage_die": "1d4", "damage_type": "piercing"}),
+    ("shortbow", {"hands": 2, "weight": 2, "ammo": "arrows", "damage_die": "1d6", "damage_type": "piercing"}),
+    ("sling", {"hands": 1, "weight": 0, "ammo": "bullets", "damage_die": "1d4", "damage_type": "bludgeoning"}),
+    ("battleaxe", {"hands": 1, "weight": 4, "versatile": True, "damage_die": "1d8", "versatile_die": "1d10", "damage_type": "slashing"}),
+    ("flail", {"hands": 1, "weight": 2, "damage_die": "1d8", "damage_type": "bludgeoning"}),
+    ("glaive", {"hands": 2, "weight": 6, "heavy": True, "damage_die": "1d10", "damage_type": "slashing"}),
+    ("greataxe", {"hands": 2, "weight": 7, "heavy": True, "damage_die": "1d12", "damage_type": "slashing"}),
+    ("greatsword", {"hands": 2, "weight": 6, "heavy": True, "damage_die": "2d6", "damage_type": "slashing"}),
+    ("halberd", {"hands": 2, "weight": 6, "heavy": True, "damage_die": "1d10", "damage_type": "slashing"}),
+    ("lance", {"hands": 2, "weight": 6, "damage_die": "1d12", "damage_type": "piercing"}),
+    ("longsword", {"hands": 1, "weight": 3, "versatile": True, "damage_die": "1d8", "versatile_die": "1d10", "damage_type": "slashing"}),
+    ("maul", {"hands": 2, "weight": 10, "heavy": True, "damage_die": "2d6", "damage_type": "bludgeoning"}),
+    ("morningstar", {"hands": 1, "weight": 4, "damage_die": "1d8", "damage_type": "piercing"}),
+    ("pike", {"hands": 2, "weight": 18, "heavy": True, "damage_die": "1d10", "damage_type": "piercing"}),
+    ("rapier", {"hands": 1, "weight": 2, "finesse": True, "damage_die": "1d8", "damage_type": "piercing"}),
+    ("scimitar", {"hands": 1, "weight": 3, "light": True, "finesse": True, "damage_die": "1d6", "damage_type": "slashing"}),
+    ("shortsword", {"hands": 1, "weight": 2, "light": True, "finesse": True, "damage_die": "1d6", "damage_type": "piercing"}),
+    ("trident", {"hands": 1, "weight": 4, "versatile": True, "damage_die": "1d6", "versatile_die": "1d8", "damage_type": "piercing"}),
+    ("war pick", {"hands": 1, "weight": 2, "damage_die": "1d8", "damage_type": "piercing"}),
+    ("warhammer", {"hands": 1, "weight": 2, "versatile": True, "damage_die": "1d8", "versatile_die": "1d10", "damage_type": "bludgeoning"}),
+    ("whip", {"hands": 1, "weight": 3, "finesse": True, "damage_die": "1d4", "damage_type": "slashing"}),
+    ("blowgun", {"hands": 1, "weight": 1, "ammo": "needles", "loading": True, "damage_die": "1", "damage_type": "piercing"}),
+    ("hand crossbow", {"hands": 1, "weight": 3, "light": True, "ammo": "bolts", "loading": True, "damage_die": "1d6", "damage_type": "piercing"}),
+    ("heavy crossbow", {"hands": 2, "weight": 18, "heavy": True, "ammo": "bolts", "loading": True, "damage_die": "1d10", "damage_type": "piercing"}),
+    ("longbow", {"hands": 2, "weight": 2, "heavy": True, "ammo": "arrows", "damage_die": "1d8", "damage_type": "piercing"}),
     ("net", {"hands": 1, "weight": 3}),
 ]
 
@@ -133,6 +133,9 @@ def _spec_weapon(raw: dict[str, Any]) -> dict[str, Any]:
         "long_ft": int(raw.get("long_ft") or 0),
         "thrown_ft": int(raw.get("thrown_ft") or 0),
         "thrown_long_ft": int(raw.get("thrown_long_ft") or 0),
+        "damage_die": raw.get("damage_die"),
+        "versatile_die": raw.get("versatile_die"),
+        "damage_type": raw.get("damage_type"),
         "assumed": False,
     }
     return out
@@ -259,7 +262,7 @@ def equipped_attack(character: dict[str, Any], text: str) -> dict[str, Any] | No
     """Attack row for a weapon in hand when the attack table does not list it.
 
     The bonus is the ability modifier on the sheet, plus proficiency when the class is proficient.
-    The damage die stays off this row when the attack table never printed one.
+    The damage die is the weapon table die plus that same ability modifier.
     """
     low = (text or "").lower()
     best_name = ""
@@ -289,12 +292,62 @@ def equipped_attack(character: dict[str, Any], text: str) -> dict[str, Any] | No
         ability = ability_mod(character, "strength")
     prof = int(character.get("proficiency_bonus") or 0) if _weapon_proficient(character, best_key) else 0
     bonus = ability + prof
+    two_hands = bool(best_spec.get("versatile_die")) and _primary_hands_used(character.get("equipment") or [], character) <= 1
+    formula = damage_formula(best_spec, ability, two_hands)
     return {
         "name": best_name,
         "attack_bonus": f"+{bonus}" if bonus >= 0 else str(bonus),
-        "damage": "the weapon's damage die",
-        "notes": "Equipped. The attack table does not list this weapon's damage die.",
+        "damage": formula,
+        "notes": "Equipped. Damage uses the weapon table die.",
     }
+
+
+def _signed(value: int) -> str:
+    return f"+{value}" if value >= 0 else str(value)
+
+
+def damage_formula(spec: dict[str, Any], ability: int, two_handed: bool) -> str | None:
+    """Weapon-table damage: the die, then the ability modifier once. A net has no damage die."""
+    die = spec.get("versatile_die") if two_handed and spec.get("versatile_die") else spec.get("damage_die")
+    if not die:
+        return None
+    kind = str(spec.get("damage_type") or "").strip()
+    if re.fullmatch(r"\d+", str(die)):
+        total = max(0, int(die) + ability)
+        return f"{total} {kind}".strip()
+    return f"{die}{_signed(ability)} {kind}".strip()
+
+
+def ensure_damage(character: dict[str, Any], weapon: dict[str, Any]) -> dict[str, Any]:
+    """Fill a real damage formula when the attack row never printed a die."""
+    name = str(weapon.get("name") or "")
+    damage = str(weapon.get("damage") or "").strip()
+    has_die = bool(re.search(r"\d+\s*d\s*\d+", damage, re.I))
+    if re.search(r"\bunarmed\b", name, re.I) and not has_die:
+        ability = ability_mod(character, "strength")
+        updated = dict(weapon)
+        updated["damage"] = f"1{_signed(ability)} bludgeoning"
+        return updated
+    if has_die and "damage die" not in damage.lower():
+        return weapon
+    found = _match_key(name)
+    if not found:
+        return weapon
+    _key, spec = found
+    ranged = bool(spec.get("ammo")) or int(spec.get("range_ft") or 0) > 0
+    if ranged:
+        ability = ability_mod(character, "dexterity")
+    elif spec.get("finesse"):
+        ability = max(ability_mod(character, "strength"), ability_mod(character, "dexterity"))
+    else:
+        ability = ability_mod(character, "strength")
+    two_hands = bool(spec.get("versatile_die")) and _primary_hands_used(character.get("equipment") or [], character) <= 1
+    formula = damage_formula(spec, ability, two_hands)
+    if not formula:
+        return weapon
+    updated = dict(weapon)
+    updated["damage"] = formula
+    return updated
 
 
 def lookup(name: str) -> dict[str, Any]:

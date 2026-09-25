@@ -27,6 +27,7 @@ import { PortraitFileButton } from "./PortraitEditor";
 import { SpawnDialog } from "./SpawnDialog";
 import { sfxVolume } from "./map/attackSounds";
 import { applyThemeChrome, setTitleTheme, TitleAtmosphere, TITLE_THEMES, titleTheme, titleThemeId, type LogDevice, type TitleThemeId } from "./titleThemes";
+import { WindowFrame } from "./WindowFrame";
 
 const API_BASE = "http://127.0.0.1:8766";
 
@@ -1533,12 +1534,18 @@ export default function App() {
   }
 
   if (gameMode === null) {
-    return <div className="title-screen" />;
+    return (
+      <>
+        <WindowFrame />
+        <div className="title-screen" />
+      </>
+    );
   }
 
   if (gameMode && optionsOpen) {
     return (
       <>
+        <WindowFrame />
         {atTitle ? <TitleMusic /> : null}
         <OptionsScreen onBack={() => setOptionsOpen(false)} />
       </>
@@ -1547,6 +1554,7 @@ export default function App() {
   if (gameMode && atTitle) {
     return (
       <>
+        <WindowFrame />
         <TitleMusic />
         <TitleScreen onEnter={() => setAtTitle(false)} onOptions={() => setOptionsOpen(true)} />
       </>
@@ -1554,6 +1562,8 @@ export default function App() {
   }
 
   return (
+    <>
+    <WindowFrame />
     <div className={`app theme-live theme-${themeId}`}>
       <header className="topbar">
         <div className="brand">
@@ -2761,5 +2771,6 @@ export default function App() {
         />
       )}
     </div>
+    </>
   );
 }

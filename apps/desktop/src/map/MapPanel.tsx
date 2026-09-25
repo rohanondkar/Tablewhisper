@@ -11,14 +11,20 @@ import {
   type MapLight,
   type MapPortal,
   type MapToken,
+  type MapSetupBody,
+  type MapPool,
   type MapWall,
+  type PoolKind,
   type MonsterTemplate,
   type NpcTemplate,
   type SceneNpc,
 } from "../api";
-import { playAttackSound } from "./attackSounds";
+import { missSound, playAttackSound } from "./attackSounds";
 import { titleTheme, type ThemeChrome } from "../titleThemes";
 import { CREATURE_SIZES, sizeToSquares } from "./sizes";
+import { LightMarks } from "./LightMarks";
+import { MapSetup } from "./MapSetup";
+import { LiquidOverlay, POOL_KINDS, maskCovers, poolNote } from "./pools";
 import { boundsSegments, feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
 import {
   AimOverlay,
@@ -48,7 +54,7 @@ import {
   type Tile,
   type Travel,
 } from "./effects";
-import ResolveModal, { amountIn, strikeOutcome, type ResolveRow } from "./ResolveModal";
+import ResolveModal, { amountIn, effortFailed, mapLine, playFate, printedSaveBonus, rollPrintedDamage, strikeOutcome, type ResolveRow } from "./ResolveModal";
 import TurnOrder, { sortTurns, type TurnSlot } from "./TurnOrder";
 
 const API_BASE = "http://127.0.0.1:8766";
@@ -130,7 +136,8 @@ type Tool =
   | "wall"
   | "door"
   | "light"
-  | "portal";
+  | "portal"
+  | "liquid";
 
 type Props = {
   characters: Character[];
@@ -144,8 +151,9 @@ type Props = {
   markPulse: MarkPulse | null;
   ruling: MapRuling | null;
   onRuling: (ruling: MapRuling) => void;
-  onApply: (creature: RulingCreature, amount: number) => void;
+  onApply: (creature: RulingCreature, amount: number) => void | Promise<void>;
   onMiss: (creature: RulingCreature) => void;
+  onFate: (line: string) => void;
   damageShown?: Record<string, number>;
   applyBusy?: boolean;
   onError: (msg: string) => void;
@@ -183,6 +191,25 @@ function mapColumnWidth(kind: "tray" | "inspect"): number {
   return kind === "tray" ? 240 : 300;
 }
 
+function copyCanvas(source: HTMLCanvasElement) {
+  const copy = document.createElement("canvas");
+  copy.width = source.width;
+  copy.height = source.height;
+  const ctx = copy.getContext("2d");
+  if (ctx) {
+    ctx.drawImage(source, 0, 0);
+  }
+  return copy;
+}
+
+function pasteCanvas(target: HTMLCanvasElement, source: HTMLCanvasElement) {
+  const ctx = target.getContext("2d");
+  if (!ctx) return;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(source, 0, 0);
+}
+
 export default function MapPanel({
   characters,
   encounter,
@@ -197,6 +224,7 @@ export default function MapPanel({
   onRuling,
   onApply,
   onMiss,
+  onFate,
   damageShown,
   applyBusy,
   onError,
@@ -205,11 +233,22 @@ export default function MapPanel({
   onCharactersChange,
 }: Props) {
   const [mapsList, setMapsList] = useState<BattleMap[]>([]);
+  const [setupFile, setSetupFile] = useState<File | null>(null);
+  const [linkChoices, setLinkChoices] = useState<MapWall[]>([]);
+  const [linkSceneId, setLinkSceneId] = useState("");
   const [map, setMap] = useState<BattleMap | null>(null);
   const [tokens, setTokens] = useState<MapToken[]>([]);
   const [walls, setWalls] = useState<MapWall[]>([]);
   const [lights, setLights] = useState<MapLight[]>([]);
   const [portals, setPortals] = useState<MapPortal[]>([]);
+  const [pools, setPools] = useState<MapPool[]>([]);
+  const [poolKind, setPoolKind] = useState<PoolKind>("water");
+  const [poolDepth, setPoolDepth] = useState(5);
+  const [poolCurrent, setPoolCurrent] = useState(0);
+  const [poolDeg, setPoolDeg] = useState(0);
+  const [poolErase, setPoolErase] = useState(false);
+  const [activePoolId, setActivePoolId] = useState<string | null>(null);
+  const [poolRev, setPoolRev] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [armed, setArmed] = useState<MapAction | null>(null);
   const [hoverTile, setHoverTile] = useState<Tile | null>(null);
@@ -238,6 +277,13 @@ export default function MapPanel({
     window.addEventListener("tablewhisper-theme", sync);
     return () => window.removeEventListener("tablewhisper-theme", sync);
   }, []);
+  useEffect(() => {
+    if (grabbing) document.documentElement.dataset.dragging = "1";
+    else delete document.documentElement.dataset.dragging;
+    return () => {
+      delete document.documentElement.dataset.dragging;
+    };
+  }, [grabbing]);
   const [turns, setTurns] = useState<TurnSlot[]>([]);
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [round, setRound] = useState(1);
@@ -262,6 +308,17 @@ export default function MapPanel({
   const stageWrapRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ w: 900, h: 600 });
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const poolMasks = useRef(new Map<string, HTMLCanvasElement>());
+  const poolsReady = useRef(new Set<string>());
+  const groundCanvas = useRef<HTMLCanvasElement | null>(null);
+  const paintingPool = useRef(false);
+  const activePoolRef = useRef<string | null>(null);
+  const poolsRef = useRef(pools);
+  poolsRef.current = pools;
+  const lastPoolPt = useRef<{ x: number; y: number } | null>(null);
+  const drawingWall = useRef(false);
+  const wallDraftRef = useRef<number[]>([]);
+  const wallDoorRef = useRef(false);
   const [fogVersion, setFogVersion] = useState(0);
   const paintingFog = useRef(false);
   const lastFogPt = useRef<{ x: number; y: number } | null>(null);
@@ -269,7 +326,17 @@ export default function MapPanel({
   const panOrigin = useRef({ mx: 0, my: 0, sx: 0, sy: 0 });
   const selectPan = useRef<{ mx: number; my: number; sx: number; sy: number; moved: boolean } | null>(null);
   const spaceHeld = useRef(false);
+  const undoStack = useRef<Array<() => Promise<void>>>([]);
+  const undoing = useRef(false);
+  const setupOpenRef = useRef(false);
+  const fogBefore = useRef<HTMLCanvasElement | null>(null);
+  const poolStroke = useRef<{ created: boolean; before: HTMLCanvasElement | null; poolId: string | null }>({
+    created: false,
+    before: null,
+    poolId: null,
+  });
   const onErrorRef = useRef(onError);
+  setupOpenRef.current = setupFile != null;
   const seenPulse = useRef(0);
   const seenMark = useRef(0);
   onErrorRef.current = onError;
@@ -345,18 +412,24 @@ export default function MapPanel({
         setWalls(state.walls);
         setLights(state.lights);
         setPortals(state.portals);
+        poolMasks.current.clear();
+        poolsReady.current.clear();
+        groundCanvas.current = null;
+        setPools(state.pools || []);
         setMarks([]);
         setArmed(null);
         setDowned([]);
         await refreshList();
         ensureFogCanvas(m, !m.fog_url);
         setFogVersion((v) => v + 1);
+        undoStack.current = [];
       } catch (e) {
         setMap(null);
         setTokens([]);
         setWalls([]);
         setLights([]);
         setPortals([]);
+        setPools([]);
         onErrorRef.current(e instanceof Error ? e.message : String(e));
       }
     },
@@ -401,8 +474,35 @@ export default function MapPanel({
     return () => ro.disconnect();
   }, []);
 
+  function remember(undo: () => Promise<void>) {
+    undoStack.current.push(undo);
+    if (undoStack.current.length > 40) undoStack.current.shift();
+  }
+
+  async function undoMap() {
+    if (undoing.current || drawingWall.current || paintingPool.current || paintingFog.current) return;
+    const job = undoStack.current.pop();
+    if (!job) return;
+    undoing.current = true;
+    try {
+      await job();
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err.message : String(err));
+    } finally {
+      undoing.current = false;
+    }
+  }
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("input, textarea, [contenteditable='true']")) return;
+        if (setupOpenRef.current) return;
+        e.preventDefault();
+        void undoMap();
+        return;
+      }
       if (e.code === "Space") spaceHeld.current = true;
     };
     const up = (e: KeyboardEvent) => {
@@ -428,6 +528,58 @@ export default function MapPanel({
     setFogVersion((v) => v + 1);
   }, [fogImg, map?.id]);
 
+  useEffect(() => {
+    if (!map) return;
+    let cancel = false;
+    for (const pool of pools) {
+      if (poolMasks.current.has(pool.id)) continue;
+      const canvas = blankPoolCanvas(map);
+      poolMasks.current.set(pool.id, canvas);
+      if (!pool.mask_url) {
+        setPoolRev((v) => v + 1);
+        continue;
+      }
+      const img = new Image();
+      img.onload = () => {
+        if (cancel) return;
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        poolsReady.current.add(pool.id);
+        setPoolRev((v) => v + 1);
+      };
+      img.src = mediaUrlSync(pool.mask_url, API_BASE);
+    }
+    return () => {
+      cancel = true;
+    };
+  }, [pools, map]);
+
+  useEffect(() => {
+    groundCanvas.current = null;
+    if (!map?.ground_url) return;
+    let cancel = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancel) return;
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth || 1;
+      canvas.height = img.naturalHeight || 1;
+      canvas.getContext("2d")?.drawImage(img, 0, 0);
+      groundCanvas.current = canvas;
+    };
+    img.src = mediaUrlSync(map.ground_url, API_BASE);
+    return () => {
+      cancel = true;
+    };
+  }, [map?.id, map?.ground_url]);
+
+  useEffect(() => {
+    const id = activePoolRef.current;
+    if (!id) return;
+    void api.patchMapPool(id, { depth_ft: poolDepth, current_ft: poolCurrent, current_deg: poolDeg }).then((updated) => {
+      setPools((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+    });
+  }, [poolDepth, poolCurrent, poolDeg]);
+
   const segs = useMemo(() => wallsToSegments(walls), [walls]);
   const selectedToken = tokens.find((t) => t.id === selectedTokenId) || null;
   const tokenActions = useMemo(() => {
@@ -446,6 +598,31 @@ export default function MapPanel({
     const npc = scene.find((row) => row.id === selectedToken.ref_id);
     return actionsFor(npc?.template?.attacks || [], { text: npc?.template?.notes, social: true });
   }, [selectedToken, characters, encounter, scene]);
+
+  const poolLines = useMemo(() => {
+    if (!selectedToken || !map) return [] as string[];
+    const side = map.grid_size_px * (selectedToken.size_sq || 1);
+    const x = selectedToken.x + side / 2;
+    const y = selectedToken.y + side / 2;
+    let speed = "";
+    if (selectedToken.kind === "pc") {
+      speed = characters.find((c) => c.id === selectedToken.ref_id)?.speed || "";
+    } else if (selectedToken.kind === "enemy") {
+      const foe = encounter.find((row) => row.id === selectedToken.ref_id);
+      const notes = foe?.template?.notes || "";
+      const extra = (foe?.template as { speed?: string } | undefined)?.speed || "";
+      speed = `${extra} ${notes}`;
+    } else {
+      const npc = scene.find((row) => row.id === selectedToken.ref_id);
+      speed = npc?.template?.notes || "";
+    }
+    return pools
+      .filter((pool) => {
+        const mask = poolMasks.current.get(pool.id);
+        return Boolean(mask && maskCovers(mask, x, y, map.width, map.height));
+      })
+      .map((pool) => poolNote(pool, selectedToken.size, speed));
+  }, [selectedToken, map, pools, poolRev, characters, encounter, scene]);
 
   const rosterSig = useMemo(
     () =>
@@ -644,28 +821,68 @@ export default function MapPanel({
     if (!pending || pending.blocked) return;
     if (pending.result.check_type === "spell" || pending.result.check_type === "contest") {
       setPendingResolve(null);
+      if (pending.travel) beginTravel(pending.travel);
+      const note = (pending.result.notes || pending.result.roll_line || "").trim();
+      const amount = pending.result.check_type === "spell" ? rollPrintedDamage(pending.result.damage) : null;
+      if (amount != null) {
+        for (const row of rows) {
+          if (row.creature) await Promise.resolve(onApply(row.creature, amount));
+        }
+        onFate([note, `They take ${amount}.`].filter(Boolean).join(" "));
+        showOnMap(rows.map((row) => mapLine(pending.result, row, { strike: { kind: "damage", amount } })));
+      } else if (note) onFate(note);
       return;
     }
-    if (pending.travel) beginTravel(pending.travel);
+    if (pending.result.check_type === "skill" || pending.result.check_type === "ability") {
+      setPendingResolve(null);
+      playResolved(pending.travel, effortFailed(pending.result, rows, null), pending.result);
+      const lines: string[] = [];
+      for (const row of rows) {
+        const line = playFate(pending.result, row);
+        if (line) onFate(line);
+        const brief = mapLine(pending.result, row);
+        if (brief) lines.push(brief);
+      }
+      showOnMap(lines);
+      return;
+    }
     let hold = false;
+    const planned: { row: ResolveRow; strike: ReturnType<typeof strikeOutcome> | null; healing: number | null }[] = [];
     for (const row of rows) {
       if (!row.creature) continue;
       const face = Number(row.roll);
       const typed = amountIn(row.info);
       if (pending.heal) {
         const healing = typed ?? (Number.isInteger(face) ? face : null);
-        if (healing) await Promise.resolve(onApply(row.creature, healing));
+        planned.push({ row, strike: null, healing });
         continue;
       }
-      const strike = strikeOutcome(pending.result, row.roll, row.info);
-      if (strike.kind === "pending") {
-        hold = true;
-        continue;
-      }
-      if (strike.kind === "damage") await Promise.resolve(onApply(row.creature, strike.amount));
-      else if (strike.kind === "miss") onMiss(row.creature);
+      const strike = strikeOutcome(
+        pending.result,
+        row.roll,
+        row.info,
+        row.save,
+        printedSaveBonus(pending.result, row.creature),
+      );
+      if (strike.kind === "pending") hold = true;
+      planned.push({ row, strike, healing: null });
     }
-    if (!hold) setPendingResolve(null);
+    if (hold) return;
+    setPendingResolve(null);
+    playResolved(
+      pending.travel,
+      !pending.heal && effortFailed(pending.result, rows, planned.map((item) => item.strike)),
+      pending.result,
+    );
+    showOnMap(planned.map((item) => mapLine(pending.result, item.row, { heal: item.healing, strike: item.strike })));
+    for (const item of planned) {
+      if (!item.row.creature) continue;
+      const line = playFate(pending.result, item.row, { heal: item.healing, strike: item.strike });
+      if (line) onFate(line);
+      if (item.healing) await Promise.resolve(onApply(item.row.creature, item.healing));
+      else if (item.strike?.kind === "damage") await Promise.resolve(onApply(item.row.creature, item.strike.amount));
+      else if (item.strike?.kind === "miss") onMiss(item.row.creature);
+    }
   }
 
   function beginTravel(next: Travel) {
@@ -677,6 +894,12 @@ export default function MapPanel({
     setQueuedTravel(next);
   }
 
+  function playResolved(travel: Travel | null, failed: boolean, result: CheckResult) {
+    const sound = travel ? (failed ? missSound(travel.sound, result) : travel.sound) : null;
+    if (!travel || !sound) return;
+    beginTravel(sound === travel.sound ? travel : { ...travel, sound });
+  }
+
   useEffect(() => {
     if (!active || !queuedTravel) return;
     setTravel(queuedTravel);
@@ -685,7 +908,7 @@ export default function MapPanel({
   }, [active, queuedTravel]);
 
   function tokenCreature(token: MapToken, tile: Tile): RulingCreature {
-    return {
+    const creature: RulingCreature = {
       key: token.id,
       tokenId: token.id,
       refId: token.ref_id,
@@ -693,6 +916,20 @@ export default function MapPanel({
       label: token.label,
       tile,
     };
+    if (token.kind === "npc") {
+      const row = scene.find((item) => item.id === token.ref_id);
+      const tmpl = row?.template;
+      if (tmpl?.abilities) creature.abilities = tmpl.abilities;
+      if (tmpl?.saves) creature.saves = tmpl.saves;
+    }
+    if (token.kind === "pc") {
+      const row = characters.find((item) => item.id === token.ref_id);
+      if (row) {
+        creature.abilities = row.abilities;
+        creature.saves = row.saves;
+      }
+    }
+    return creature;
   }
 
   function tokenFaded(token: MapToken): boolean {
@@ -790,7 +1027,15 @@ export default function MapPanel({
       tiles,
       anchor,
       heal,
+      line: blocked,
     });
+  }
+
+  function showOnMap(lines: Array<string | null | undefined>) {
+    if (!ruling) return;
+    const text = lines.filter((item): item is string => Boolean(item)).join(" ");
+    if (!text) return;
+    onRuling({ ...ruling, line: text });
   }
 
   async function fireAction(action: MapAction, tile: Tile, target: MapToken | null, far: boolean) {
@@ -813,14 +1058,13 @@ export default function MapPanel({
         ? null
         : castTravel(action, tileCenter(fromTiles[0], map), tileCenter(tile, map), tiles);
       publishRuling(result, action, blocked, tiles, tile, creatures);
-      if (travel?.look) beginTravel(travel);
       setPendingResolve({
         result,
         blocked,
         notice: null,
         heal: Boolean(action.family === "heal" || action.damageType === "healing"),
         creatures: blocked ? [] : creatures,
-        travel: travel?.look ? null : travel,
+        travel,
       });
     } catch (err) {
       onErrorRef.current(err instanceof Error ? err.message : String(err));
@@ -942,9 +1186,9 @@ export default function MapPanel({
     if (!shaped && !creatures.some((item) => item.tokenId === targetToken.id)) {
       creatures = [tokenCreature(targetToken, to), ...creatures];
     }
-    beginTravel(castTravel(action, tileCenter(fromTiles[0], map), tileCenter(to, map), tiles));
+    const travel = castTravel(action, tileCenter(fromTiles[0], map), tileCenter(to, map), tiles);
     publishRuling(next, action, null, tiles, to, creatures);
-    openResolve(next, action, null, null, creatures, null);
+    openResolve(next, action, null, null, creatures, travel);
   }
 
   useEffect(() => {
@@ -987,16 +1231,20 @@ export default function MapPanel({
     return state.map;
   }
 
-  async function onUploadBackground(file: File) {
+  function onUploadBackground(file: File) {
+    setSetupFile(file);
+  }
+
+  async function confirmSetup(file: File, body: MapSetupBody) {
     setBusy(true);
     try {
-      const m = await ensureMap();
-      const updated = await api.uploadMapBackground(m.id, file);
+      const existing = map ?? (await api.createMap(body.name || "Map"));
+      if (!map) await api.activateMap(existing.id);
+      await api.uploadMapBackground(existing.id, file, { width: body.width, height: body.height });
+      await api.applyMapSetup(existing.id, body);
+      setSetupFile(null);
       setBgVersion((v) => v + 1);
-      setMap(updated);
-      ensureFogCanvas(updated, true);
-      setFogVersion((v) => v + 1);
-      await refreshList();
+      await loadState(existing.id);
     } catch (e) {
       onErrorRef.current(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1103,12 +1351,24 @@ export default function MapPanel({
       return;
     }
     const gs = map.grid_size_px;
+    const squares = sizeToSquares(size);
+    let placeX = map.grid_offset_x + gs * 2;
+    let placeY = map.grid_offset_y + gs * 2;
+    if (map.ground_url && !footprintOpen(placeX, placeY, squares)) {
+      const found = firstOpenSquare(squares);
+      if (!found) {
+        onErrorRef.current("No solid ground to set that on.");
+        return;
+      }
+      placeX = found.x;
+      placeY = found.y;
+    }
     const t = await api.addMapToken(map.id, {
       kind,
       ref_id: refId,
       label,
-      x: map.grid_offset_x + gs * 2,
-      y: map.grid_offset_y + gs * 2,
+      x: placeX,
+      y: placeY,
       size,
       size_sq: sizeToSquares(size),
       vision_ft: 60,
@@ -1118,7 +1378,7 @@ export default function MapPanel({
         ? { image_url: imageUrl || null }
         : { image_url: imageUrl || defaultTokenImage(kind) }),
     });
-    setTokens((prev) => [...prev, t]);
+    setTokens((prev) => [...prev.filter((item) => item.id !== t.id), t]);
     setSelectedTokenId(t.id);
   }
 
@@ -1250,6 +1510,85 @@ export default function MapPanel({
     setFogVersion((v) => v + 1);
   }
 
+  function poolCanvasSize(m: BattleMap) {
+    return {
+      w: Math.max(1, Math.min(1024, Math.round(m.width))),
+      h: Math.max(1, Math.min(1024, Math.round(m.height))),
+    };
+  }
+
+  function blankPoolCanvas(m: BattleMap) {
+    const c = document.createElement("canvas");
+    const size = poolCanvasSize(m);
+    c.width = size.w;
+    c.height = size.h;
+    return c;
+  }
+
+  function paintPoolStroke(mapX: number, mapY: number, erase: boolean, poolId: string) {
+    const c = poolMasks.current.get(poolId);
+    if (!c || !map) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+    const x = (mapX / map.width) * c.width;
+    const y = (mapY / map.height) * c.height;
+    const scale = c.width / Math.max(1, map.width);
+    const r = Math.max(4, fogBrush * scale);
+    ctx.globalCompositeOperation = erase ? "destination-out" : "source-over";
+    ctx.strokeStyle = "#000";
+    ctx.fillStyle = "#000";
+    ctx.lineWidth = r * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    const prev = lastPoolPt.current;
+    if (prev) {
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    lastPoolPt.current = { x, y };
+    setPoolRev((v) => v + 1);
+  }
+
+  async function persistPool(poolId: string) {
+    const c = poolMasks.current.get(poolId);
+    if (!c) return;
+    const blob = await new Promise<Blob | null>((resolve) => c.toBlob((b) => resolve(b), "image/png"));
+    if (!blob) return;
+    const updated = await api.uploadPoolMask(poolId, blob);
+    setPools((prev) => prev.map((pool) => (pool.id === updated.id ? updated : pool)));
+  }
+
+  async function ensureActivePool(erase: boolean) {
+    if (!map) return null;
+    if (erase) {
+      if (activePoolRef.current) return activePoolRef.current;
+      const last = [...poolsRef.current].reverse().find((pool) => pool.kind === poolKind);
+      if (!last) return null;
+      activePoolRef.current = last.id;
+      setActivePoolId(last.id);
+      return last.id;
+    }
+    if (activePoolRef.current) return activePoolRef.current;
+    const created = await api.createMapPool(map.id, {
+      kind: poolKind,
+      depth_ft: poolDepth,
+      current_ft: poolCurrent,
+      current_deg: poolDeg,
+    });
+    poolMasks.current.set(created.id, blankPoolCanvas(map));
+    activePoolRef.current = created.id;
+    setActivePoolId(created.id);
+    setPools((prev) => [...prev, created]);
+    setPoolRev((v) => v + 1);
+    return created.id;
+  }
+
   async function onStageMouseDown(e: Konva.KonvaEventObject<MouseEvent>) {
     const stage = e.target.getStage();
     if (!stage || !map) return;
@@ -1281,22 +1620,54 @@ export default function MapPanel({
     if (tool === "fog" || tool === "fog-erase") {
       paintingFog.current = true;
       lastFogPt.current = null;
+      fogBefore.current = fogCanvasRef.current ? copyCanvas(fogCanvasRef.current) : null;
       paintFogStroke(p.x, p.y, tool === "fog-erase");
       return;
     }
 
     if (tool === "wall" || tool === "door") {
       const s = snap(p.x, p.y);
-      setWallDraft((d) => [...d, s.x, s.y]);
+      drawingWall.current = true;
+      wallDoorRef.current = tool === "door";
+      wallDraftRef.current = [s.x, s.y];
+      setWallDraft([s.x, s.y]);
+      return;
+    }
+
+    if (tool === "liquid") {
+      paintingPool.current = true;
+      lastPoolPt.current = null;
+      const existingId = poolErase
+        ? activePoolRef.current || [...poolsRef.current].reverse().find((pool) => pool.kind === poolKind)?.id || null
+        : activePoolRef.current;
+      const existing = existingId ? poolMasks.current.get(existingId) : null;
+      poolStroke.current = {
+        created: !poolErase && !activePoolRef.current,
+        before: existing ? copyCanvas(existing) : null,
+        poolId: existingId,
+      };
+      try {
+        const poolId = await ensureActivePool(poolErase);
+        poolStroke.current.poolId = poolId;
+        if (poolId) paintPoolStroke(p.x, p.y, poolErase, poolId);
+      } catch (err) {
+        paintingPool.current = false;
+        onErrorRef.current(err instanceof Error ? err.message : String(err));
+      }
       return;
     }
 
     if (tool === "light") {
       const s = snap(p.x, p.y);
-      const L = await api.addMapLight(map.id, { x: s.x, y: s.y, bright_ft: 20, dim_ft: 20 });
+      const L = await api.addMapLight(map.id, { x: s.x, y: s.y, bright_ft: 20, dim_ft: 20, kind: "torch" });
       setLights((prev) => [...prev, L]);
       setSelectedLightId(L.id);
       setTool("select");
+      remember(async () => {
+        await api.deleteMapLight(L.id);
+        setLights((prev) => prev.filter((item) => item.id !== L.id));
+        setSelectedLightId((cur) => (cur === L.id ? null : cur));
+      });
       return;
     }
 
@@ -1353,6 +1724,20 @@ export default function MapPanel({
     if ((tool === "fog" || tool === "fog-erase") && paintingFog.current) {
       paintFogStroke(p.x, p.y, tool === "fog-erase");
     }
+    if (drawingWall.current && (tool === "wall" || tool === "door")) {
+      const s = snap(p.x, p.y);
+      const pts = wallDraftRef.current;
+      const lx = pts[pts.length - 2];
+      const ly = pts[pts.length - 1];
+      if (lx !== s.x || ly !== s.y) {
+        const next = [...pts, s.x, s.y];
+        wallDraftRef.current = next;
+        setWallDraft(next);
+      }
+    }
+    if (paintingPool.current && tool === "liquid" && activePoolRef.current) {
+      paintPoolStroke(p.x, p.y, poolErase, activePoolRef.current);
+    }
   }
 
   async function onStageMouseUp(e?: Konva.KonvaEventObject<MouseEvent>) {
@@ -1390,36 +1775,204 @@ export default function MapPanel({
     if ((tool === "fog" || tool === "fog-erase") && paintingFog.current) {
       paintingFog.current = false;
       lastFogPt.current = null;
+      const before = fogBefore.current;
+      fogBefore.current = null;
       try {
         await persistFog();
+        if (before && fogCanvasRef.current && map) {
+          const mapId = map.id;
+          remember(async () => {
+            const canvas = fogCanvasRef.current;
+            if (!canvas) return;
+            pasteCanvas(canvas, before);
+            setFogVersion((v) => v + 1);
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+            if (!blob) return;
+            const updated = await api.uploadFog(mapId, blob);
+            setMap(updated);
+          });
+        }
       } catch (err) {
         onErrorRef.current(err instanceof Error ? err.message : String(err));
       }
     }
+    if (drawingWall.current) {
+      drawingWall.current = false;
+      const pts = wallDraftRef.current;
+      wallDraftRef.current = [];
+      setWallDraft([]);
+      if (map && pts.length >= 4) {
+        try {
+          const w = await api.addMapWall(map.id, {
+            points: pts,
+            door: wallDoorRef.current,
+            door_open: false,
+            block_movement: true,
+            block_sight: true,
+          });
+          setWalls((prev) => [...prev, w]);
+          remember(async () => {
+            await api.deleteMapWall(w.id);
+            setWalls((prev) => prev.filter((item) => item.id !== w.id));
+            setSelectedWallId((cur) => (cur === w.id ? null : cur));
+          });
+        } catch (err) {
+          onErrorRef.current(err instanceof Error ? err.message : String(err));
+        }
+      }
+    }
+    if (paintingPool.current) {
+      paintingPool.current = false;
+      lastPoolPt.current = null;
+      const poolId = activePoolRef.current;
+      const stroke = poolStroke.current;
+      poolStroke.current = { created: false, before: null, poolId: null };
+      if (poolId) {
+        try {
+          await persistPool(poolId);
+          if (stroke.created) {
+            remember(async () => {
+              await api.deleteMapPool(poolId);
+              poolMasks.current.delete(poolId);
+              poolsReady.current.delete(poolId);
+              if (activePoolRef.current === poolId) {
+                activePoolRef.current = null;
+                setActivePoolId(null);
+              }
+              setPools((prev) => prev.filter((pool) => pool.id !== poolId));
+              setPoolRev((v) => v + 1);
+            });
+          } else if (stroke.before) {
+            const before = stroke.before;
+            remember(async () => {
+              const canvas = poolMasks.current.get(poolId);
+              if (!canvas) return;
+              pasteCanvas(canvas, before);
+              setPoolRev((v) => v + 1);
+              await persistPool(poolId);
+            });
+          }
+        } catch (err) {
+          onErrorRef.current(err instanceof Error ? err.message : String(err));
+        }
+      }
+    }
   }
 
-  async function finishWall() {
-    if (!map || wallDraft.length < 4) {
-      setWallDraft([]);
-      return;
+  function squareOpen(x: number, y: number) {
+    if (!map?.ground_url) return true;
+    const ground = groundCanvas.current;
+    if (!ground) return true;
+    if (maskCovers(ground, x, y, map.width, map.height)) return true;
+    for (const item of portals) {
+      if (Math.hypot(x - item.x, y - item.y) <= item.radius) return true;
     }
-    const w = await api.addMapWall(map.id, {
-      points: wallDraft,
-      door: tool === "door",
-      door_open: false,
-      block_movement: true,
-      block_sight: true,
-    });
-    setWalls((prev) => [...prev, w]);
-    setWallDraft([]);
-    setTool("select");
+    for (const pool of pools) {
+      const mask = poolMasks.current.get(pool.id);
+      if (mask && poolsReady.current.has(pool.id) && maskCovers(mask, x, y, map.width, map.height)) return true;
+    }
+    if (pools.some((pool) => pool.mask_url && !poolsReady.current.has(pool.id))) return true;
+    return false;
+  }
+
+  function footprintOpen(x: number, y: number, sizeSq: number) {
+    if (!map) return true;
+    const gs = map.grid_size_px;
+    const count = Math.max(1, Math.ceil(sizeSq || 1));
+    for (let col = 0; col < count; col += 1) {
+      for (let row = 0; row < count; row += 1) {
+        if (!squareOpen(x + (col + 0.5) * gs, y + (row + 0.5) * gs)) return false;
+      }
+    }
+    return true;
+  }
+
+  function firstOpenSquare(sizeSq: number) {
+    if (!map) return null;
+    const gs = Math.max(1, map.grid_size_px);
+    const cols = Math.ceil(map.width / gs) + 2;
+    const rows = Math.ceil(map.height / gs) + 2;
+    for (let row = 0; row < rows; row += 1) {
+      for (let col = 0; col < cols; col += 1) {
+        const x = map.grid_offset_x + col * gs;
+        const y = map.grid_offset_y + row * gs;
+        if (footprintOpen(x, y, sizeSq)) return { x, y };
+      }
+    }
+    return null;
   }
 
   async function onTokenDragEnd(token: MapToken, x: number, y: number) {
     if (!map) return;
     const s = snap(x, y);
+    if (!footprintOpen(s.x, s.y, token.size_sq || 1)) {
+      setTokens((prev) => prev.map((item) => (item.id === token.id ? { ...item } : item)));
+      onErrorRef.current("That square is empty.");
+      return;
+    }
+    const side = map.grid_size_px * (token.size_sq || 1);
+    const cx = s.x + side / 2;
+    const cy = s.y + side / 2;
+    const slack = map.grid_size_px * 0.55;
+    const door = walls.find(
+      (wall) => wall.door && wall.target_map_id && nearPolyline(cx, cy, wall.points, slack)
+    );
+    if (door?.target_map_id) {
+      await api.traverseWall(door.id, [token.id]);
+      await loadState(door.target_map_id);
+      return;
+    }
+    const portal = portals.find((item) => Math.hypot(cx - item.x, cy - item.y) <= item.radius);
+    if (portal?.target_map_id) {
+      await sendThroughPortal(portal.id, token.id, portal.target_map_id);
+      return;
+    }
+    const previous = { x: token.x, y: token.y };
     const updated = await api.patchMapToken(token.id, { x: s.x, y: s.y });
     setTokens((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    remember(async () => {
+      const restored = await api.patchMapToken(token.id, previous);
+      setTokens((prev) => prev.map((t) => (t.id === restored.id ? restored : t)));
+    });
+  }
+
+  async function linkLiveDoor(door: MapWall, scene: BattleMap, other: MapWall | null) {
+    const beforeDoor = { ...door };
+    const beforeOther = other ? { ...other } : null;
+    const landing = other ? midpoint(other.points) : { x: scene.width / 2, y: scene.height / 2 };
+    const updated = await api.patchMapWall(door.id, {
+      target_map_id: scene.id,
+      target_x: landing.x,
+      target_y: landing.y,
+      link_wall_id: other?.id ?? null,
+    });
+    if (other) {
+      const here = midpoint(door.points);
+      await api.patchMapWall(other.id, {
+        target_map_id: door.map_id,
+        target_x: here.x,
+        target_y: here.y,
+        link_wall_id: door.id,
+      });
+    }
+    setWalls((prev) => prev.map((wall) => (wall.id === updated.id ? updated : wall)));
+    remember(async () => {
+      const restored = await api.patchMapWall(beforeDoor.id, {
+        target_map_id: beforeDoor.target_map_id ?? null,
+        target_x: beforeDoor.target_x ?? null,
+        target_y: beforeDoor.target_y ?? null,
+        link_wall_id: beforeDoor.link_wall_id ?? null,
+      });
+      setWalls((prev) => prev.map((wall) => (wall.id === restored.id ? restored : wall)));
+      if (!beforeOther) return;
+      const restoredOther = await api.patchMapWall(beforeOther.id, {
+        target_map_id: beforeOther.target_map_id ?? null,
+        target_x: beforeOther.target_x ?? null,
+        target_y: beforeOther.target_y ?? null,
+        link_wall_id: beforeOther.link_wall_id ?? null,
+      });
+      setWalls((prev) => prev.map((wall) => (wall.id === restoredOther.id ? restoredOther : wall)));
+    });
   }
 
   async function createPortalTo(target: { id: string; name: string; width: number; height: number }) {
@@ -1437,6 +1990,11 @@ export default function MapPanel({
     setPortalDraft(null);
     setSelectedPortalId(portal.id);
     setTool("select");
+    remember(async () => {
+      await api.deleteMapPortal(portal.id);
+      setPortals((prev) => prev.filter((item) => item.id !== portal.id));
+      setSelectedPortalId((cur) => (cur === portal.id ? null : cur));
+    });
   }
 
   async function sendThroughPortal(portalId: string, tokenId: string, targetMapId: string) {
@@ -1511,12 +2069,7 @@ export default function MapPanel({
     (n) => !filterLower || n.name.toLowerCase().includes(filterLower)
   );
 
-    const cursor =
-    grabbing
-      ? "grab"
-      : tool === "fog" || tool === "fog-erase"
-        ? "crosshair"
-        : "default";
+    const aiming = tool === "fog" || tool === "fog-erase";
 
   return (
     <div className="map-workspace">
@@ -1824,7 +2377,19 @@ export default function MapPanel({
           onDoubleClick={() => setTrayW((width) => (width < 48 ? 240 : 0))}
         />
 
-        <div className="map-stage-wrap" ref={stageWrapRef} style={{ cursor }}>
+        <div className={`map-stage-wrap${aiming ? " aim" : ""}`} ref={stageWrapRef}>
+          {setupFile ? (
+            <MapSetup
+              file={setupFile}
+              maps={mapsList}
+              currentMapId={map?.id ?? null}
+              initialName={map?.name || setupFile.name.replace(/\.[^.]+$/, "")}
+              onCancel={() => setSetupFile(null)}
+              onError={(message) => onErrorRef.current(message)}
+              onConfirm={(body) => void confirmSetup(setupFile, body)}
+            />
+          ) : (
+          <>
           <div className="map-tools">
             {(
               [
@@ -1834,6 +2399,7 @@ export default function MapPanel({
                 ["fog-erase", "Reveal"],
                 ["wall", "Wall"],
                 ["door", "Door"],
+                ["liquid", "Liquid"],
                 ["light", "Light"],
                 ["portal", "Portal"],
               ] as const
@@ -1865,9 +2431,71 @@ export default function MapPanel({
               </label>
             )}
             {(tool === "wall" || tool === "door") && (
-              <button type="button" className="btn" onClick={() => void finishWall()}>
-                Finish {tool}
-              </button>
+              <span className="muted small">Drag, then let go. Ctrl+Z undoes.</span>
+            )}
+            {tool === "liquid" && (
+              <>
+                <select
+                  value={poolKind}
+                  onChange={(event) => {
+                    setPoolKind(event.target.value as PoolKind);
+                    activePoolRef.current = null;
+                    setActivePoolId(null);
+                  }}
+                >
+                  {POOL_KINDS.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kind}
+                    </option>
+                  ))}
+                </select>
+                <label className="fog-brush-label">
+                  Depth ft
+                  <input
+                    type="number"
+                    min={0}
+                    value={poolDepth}
+                    onChange={(event) => setPoolDepth(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                </label>
+                <label className="fog-brush-label">
+                  Current ft
+                  <input
+                    type="number"
+                    min={0}
+                    value={poolCurrent}
+                    onChange={(event) => setPoolCurrent(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                </label>
+                <label className="fog-brush-label">
+                  Direction
+                  <input
+                    type="number"
+                    min={0}
+                    max={359}
+                    value={poolDeg}
+                    onChange={(event) => setPoolDeg(((Number(event.target.value) || 0) % 360 + 360) % 360)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className={`btn ghost ${poolErase ? "active-tab" : ""}`}
+                  onClick={() => setPoolErase((on) => !on)}
+                >
+                  {poolErase ? "Erasing" : "Erase"}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    activePoolRef.current = null;
+                    setActivePoolId(null);
+                    setPoolErase(false);
+                  }}
+                >
+                  New pool
+                </button>
+              </>
             )}
             {map && (
               <>
@@ -1875,11 +2503,23 @@ export default function MapPanel({
                   type="button"
                   className="btn ghost"
                   onClick={async () => {
+                    const before = fogCanvasRef.current ? copyCanvas(fogCanvasRef.current) : null;
+                    const mapId = map.id;
                     ensureFogCanvas(map, true);
                     await api.resetFog(map.id);
                     setFogVersion((v) => v + 1);
                     const updated = await api.getMapState(map.id);
                     setMap(updated.map);
+                    if (!before) return;
+                    remember(async () => {
+                      const canvas = fogCanvasRef.current;
+                      if (!canvas) return;
+                      pasteCanvas(canvas, before);
+                      setFogVersion((v) => v + 1);
+                      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+                      if (!blob) return;
+                      setMap(await api.uploadFog(mapId, blob));
+                    });
                   }}
                 >
                   Reset fog
@@ -1889,12 +2529,24 @@ export default function MapPanel({
                   className="btn ghost"
                   onClick={() => {
                     const c = fogCanvasRef.current;
-                    if (!c) return;
+                    if (!c || !map) return;
+                    const before = copyCanvas(c);
+                    const mapId = map.id;
                     const ctx = c.getContext("2d");
                     if (!ctx) return;
                     ctx.clearRect(0, 0, c.width, c.height);
                     setFogVersion((v) => v + 1);
-                    void persistFog();
+                    void persistFog().then(() => {
+                      remember(async () => {
+                        const canvas = fogCanvasRef.current;
+                        if (!canvas) return;
+                        pasteCanvas(canvas, before);
+                        setFogVersion((v) => v + 1);
+                        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+                        if (!blob) return;
+                        setMap(await api.uploadFog(mapId, blob));
+                      });
+                    });
                   }}
                 >
                   Reveal all
@@ -1939,6 +2591,11 @@ export default function MapPanel({
                 />
               ))}
             </Layer>
+            {map && (
+              <Layer listening={false}>
+                <LiquidOverlay pools={pools} masks={poolMasks.current} width={map.width} height={map.height} />
+              </Layer>
+            )}
 
             <Layer listening={false}>
               {map && (
@@ -1979,32 +2636,26 @@ export default function MapPanel({
             </Layer>
 
             <Layer>
-              {lights.map((L) => (
-                <Circle
-                  key={L.id}
-                  x={L.x}
-                  y={L.y}
-                  radius={8}
-                  fill="#f5c542"
-                  stroke={selectedLightId === L.id ? "#fff" : "#a67c00"}
-                  onClick={() => {
-                    setSelectedLightId(L.id);
-                    setSelectedTokenId(null);
-                  }}
-                  draggable={tool === "select"}
-                  onDragStart={(ev) => {
-                    ev.cancelBubble = true;
-                  }}
-                  onDragEnd={async (ev) => {
-                    ev.cancelBubble = true;
-                    const updated = await api.patchMapLight(L.id, {
-                      x: ev.target.x(),
-                      y: ev.target.y(),
+              <LightMarks
+                lights={lights}
+                selectedId={selectedLightId}
+                draggable={tool === "select"}
+                onSelect={(id) => {
+                  setSelectedLightId(id);
+                  setSelectedTokenId(null);
+                }}
+                onDragEnd={(id, x, y) => {
+                  const before = lights.find((item) => item.id === id);
+                  void api.patchMapLight(id, { x, y }).then((updated) => {
+                    setLights((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                    if (!before || (before.x === x && before.y === y)) return;
+                    remember(async () => {
+                      const restored = await api.patchMapLight(id, { x: before.x, y: before.y });
+                      setLights((prev) => prev.map((item) => (item.id === restored.id ? restored : item)));
                     });
-                    setLights((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
-                  }}
-                />
-              ))}
+                  });
+                }}
+              />
               {walls.map((w) => (
                 <Line
                   key={w.id}
@@ -2024,10 +2675,15 @@ export default function MapPanel({
                   onClick={async () => {
                     setSelectedWallId(w.id);
                     if (w.door && tool === "select") {
+                      const wasOpen = w.door_open;
                       const updated = await api.patchMapWall(w.id, {
-                        door_open: !w.door_open,
+                        door_open: !wasOpen,
                       });
                       setWalls((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                      remember(async () => {
+                        const restored = await api.patchMapWall(w.id, { door_open: wasOpen });
+                        setWalls((prev) => prev.map((x) => (x.id === restored.id ? restored : x)));
+                      });
                     }
                   }}
                 />
@@ -2058,11 +2714,19 @@ export default function MapPanel({
                   }}
                   onDragEnd={async (ev) => {
                     ev.cancelBubble = true;
+                    const previous = { x: p.x, y: p.y };
+                    const nextX = ev.target.x();
+                    const nextY = ev.target.y();
                     const updated = await api.patchMapPortal(p.id, {
-                      x: ev.target.x(),
-                      y: ev.target.y(),
+                      x: nextX,
+                      y: nextY,
                     });
                     setPortals((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+                    if (previous.x === nextX && previous.y === nextY) return;
+                    remember(async () => {
+                      const restored = await api.patchMapPortal(p.id, previous);
+                      setPortals((prev) => prev.map((x) => (x.id === restored.id ? restored : x)));
+                    });
                   }}
                 >
                   <PortalRing radius={p.radius} />
@@ -2124,11 +2788,11 @@ export default function MapPanel({
               {map && <AimOverlay tiles={highlighted} grid={map} />}
               {map && travel && <TravelEffect travel={travel} progress={travelProgress} grid={map} />}
               <MarkLayer marks={marks} />
-              {map && ruling?.anchor && !pendingResolve && (
+              {map && ruling?.anchor && ruling.line && !pendingResolve && (
                 <RulingChip
                   x={tileCenter(ruling.anchor, map).x}
                   y={tileCenter(ruling.anchor, map).y}
-                  text={ruling.blocked || ruling.result.roll_line || ""}
+                  text={ruling.line}
                 />
               )}
               {portalSwirl && (
@@ -2167,6 +2831,8 @@ export default function MapPanel({
               </Layer>
             )}
           </Stage>
+          </>
+          )}
         </div>
 
         <div
@@ -2210,6 +2876,15 @@ export default function MapPanel({
                 </select>
               </label>
               <p className="muted small">Drag an empty part of the map to slide it. Drag a token to move it.</p>
+              {poolLines.length > 0 && (
+                <div className="map-inspector-block">
+                  {poolLines.map((line, index) => (
+                    <p key={`${index}-${line}`} className="muted small">
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="map-action-list">
                 {tokenActions.map((action) => (
                   <button
@@ -2275,9 +2950,32 @@ export default function MapPanel({
                 type="button"
                 className="btn ghost"
                 onClick={async () => {
-                  await api.deleteMapToken(selectedToken.id);
-                  setTokens((prev) => prev.filter((t) => t.id !== selectedToken.id));
+                  const token = selectedToken;
+                  const mapId = map?.id;
+                  if (!mapId) return;
+                  await api.deleteMapToken(token.id);
+                  setTokens((prev) => prev.filter((t) => t.id !== token.id));
                   setSelectedTokenId(null);
+                  remember(async () => {
+                    const created = await api.addMapToken(mapId, {
+                      kind: token.kind,
+                      ref_id: token.ref_id,
+                      label: token.label,
+                      x: token.x,
+                      y: token.y,
+                      rotation: token.rotation,
+                      size: token.size,
+                      size_sq: token.size_sq,
+                      vision_ft: token.vision_ft,
+                      light_bright_ft: token.light_bright_ft,
+                      light_dim_ft: token.light_dim_ft,
+                      show_vision: token.show_vision,
+                      image_url: token.image_url,
+                      data: token.data,
+                    });
+                    setTokens((prev) => [...prev, created]);
+                    setSelectedTokenId(created.id);
+                  });
                 }}
               >
                 Remove from map
@@ -2287,13 +2985,111 @@ export default function MapPanel({
           {selectedWallId && (
             <div className="map-inspector-block">
               <strong>Wall / door</strong>
+              {walls.find((wall) => wall.id === selectedWallId)?.door && map && (
+                <>
+                  <p className="muted small">
+                    {walls.find((wall) => wall.id === selectedWallId)?.target_map_id
+                      ? "Linked. Drag a token onto it to travel."
+                      : "No destination yet. Pick a scene, then a door or the middle."}
+                  </p>
+                  <label>
+                    Scene
+                    <select
+                      value={linkSceneId}
+                      onChange={async (event) => {
+                        const targetId = event.target.value;
+                        setLinkSceneId(targetId);
+                        if (!targetId) {
+                          const before = walls.find((wall) => wall.id === selectedWallId);
+                          const updated = await api.patchMapWall(selectedWallId, {
+                            target_map_id: null,
+                            target_x: null,
+                            target_y: null,
+                            link_wall_id: null,
+                          });
+                          setWalls((prev) => prev.map((wall) => (wall.id === updated.id ? updated : wall)));
+                          setLinkChoices([]);
+                          if (before) {
+                            remember(async () => {
+                              const restored = await api.patchMapWall(before.id, {
+                                target_map_id: before.target_map_id ?? null,
+                                target_x: before.target_x ?? null,
+                                target_y: before.target_y ?? null,
+                                link_wall_id: before.link_wall_id ?? null,
+                              });
+                              setWalls((prev) => prev.map((wall) => (wall.id === restored.id ? restored : wall)));
+                            });
+                          }
+                          return;
+                        }
+                        const state = await api.getMapState(targetId);
+                        setLinkChoices(state.walls.filter((wall) => wall.door));
+                      }}
+                    >
+                      <option value="">No link</option>
+                      {mapsList
+                        .filter((scene) => scene.id !== map.id)
+                        .map((scene) => (
+                          <option key={scene.id} value={scene.id}>
+                            {scene.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => {
+                      const scene = mapsList.find((item) => item.id === linkSceneId);
+                      const door = walls.find((wall) => wall.id === selectedWallId);
+                      if (!scene || !door) return;
+                      void linkLiveDoor(door, scene, null);
+                    }}
+                  >
+                    Land in the middle
+                  </button>
+                  {linkChoices.map((choice, index) => (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => {
+                        const scene = mapsList.find((item) => item.id === choice.map_id);
+                        const door = walls.find((wall) => wall.id === selectedWallId);
+                        if (!scene || !door) return;
+                        void linkLiveDoor(door, scene, choice);
+                      }}
+                    >
+                      Both ways to door {index + 1}
+                    </button>
+                  ))}
+                </>
+              )}
               <button
                 type="button"
                 className="btn ghost"
                 onClick={async () => {
-                  await api.deleteMapWall(selectedWallId);
-                  setWalls((prev) => prev.filter((w) => w.id !== selectedWallId));
+                  const wall = walls.find((item) => item.id === selectedWallId);
+                  const mapId = map?.id;
+                  if (!wall || !mapId) return;
+                  await api.deleteMapWall(wall.id);
+                  setWalls((prev) => prev.filter((w) => w.id !== wall.id));
                   setSelectedWallId(null);
+                  remember(async () => {
+                    const created = await api.addMapWall(mapId, {
+                      points: wall.points,
+                      door: wall.door,
+                      door_open: wall.door_open,
+                      block_movement: wall.block_movement,
+                      block_sight: wall.block_sight,
+                      target_map_id: wall.target_map_id ?? null,
+                      target_x: wall.target_x ?? null,
+                      target_y: wall.target_y ?? null,
+                      link_wall_id: wall.link_wall_id ?? null,
+                    });
+                    setWalls((prev) => [...prev, created]);
+                    setSelectedWallId(created.id);
+                  });
                 }}
               >
                 Delete
@@ -2303,13 +3099,61 @@ export default function MapPanel({
           {selectedLightId && (
             <div className="map-inspector-block">
               <strong>Light</strong>
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={async () => {
+                    const before = lights.find((item) => item.id === selectedLightId);
+                    const updated = await api.patchMapLight(selectedLightId, { kind: "torch" });
+                    setLights((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                    if (!before || before.kind === "torch") return;
+                    remember(async () => {
+                      const restored = await api.patchMapLight(before.id, { kind: before.kind === "lamp" ? "lamp" : "torch" });
+                      setLights((prev) => prev.map((item) => (item.id === restored.id ? restored : item)));
+                    });
+                  }}
+                >
+                  Torch
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={async () => {
+                    const before = lights.find((item) => item.id === selectedLightId);
+                    const updated = await api.patchMapLight(selectedLightId, { kind: "lamp" });
+                    setLights((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                    if (!before || before.kind === "lamp") return;
+                    remember(async () => {
+                      const restored = await api.patchMapLight(before.id, { kind: before.kind === "lamp" ? "lamp" : "torch" });
+                      setLights((prev) => prev.map((item) => (item.id === restored.id ? restored : item)));
+                    });
+                  }}
+                >
+                  Lamp
+                </button>
+              </div>
               <button
                 type="button"
                 className="btn ghost"
                 onClick={async () => {
-                  await api.deleteMapLight(selectedLightId);
-                  setLights((prev) => prev.filter((L) => L.id !== selectedLightId));
+                  const light = lights.find((item) => item.id === selectedLightId);
+                  const mapId = map?.id;
+                  if (!light || !mapId) return;
+                  await api.deleteMapLight(light.id);
+                  setLights((prev) => prev.filter((L) => L.id !== light.id));
                   setSelectedLightId(null);
+                  remember(async () => {
+                    const created = await api.addMapLight(mapId, {
+                      x: light.x,
+                      y: light.y,
+                      bright_ft: light.bright_ft,
+                      dim_ft: light.dim_ft,
+                      kind: light.kind === "lamp" ? "lamp" : "torch",
+                    });
+                    setLights((prev) => [...prev, created]);
+                    setSelectedLightId(created.id);
+                  });
                 }}
               >
                 Delete light
@@ -2373,9 +3217,25 @@ export default function MapPanel({
                 type="button"
                 className="btn ghost"
                 onClick={async () => {
-                  await api.deleteMapPortal(selectedPortalId);
-                  setPortals((prev) => prev.filter((p) => p.id !== selectedPortalId));
+                  const portal = portals.find((item) => item.id === selectedPortalId);
+                  const mapId = map?.id;
+                  if (!portal || !mapId) return;
+                  await api.deleteMapPortal(portal.id);
+                  setPortals((prev) => prev.filter((p) => p.id !== portal.id));
                   setSelectedPortalId(null);
+                  remember(async () => {
+                    const created = await api.addMapPortal(mapId, {
+                      x: portal.x,
+                      y: portal.y,
+                      radius: portal.radius,
+                      target_map_id: portal.target_map_id,
+                      target_x: portal.target_x,
+                      target_y: portal.target_y,
+                      label: portal.label,
+                    });
+                    setPortals((prev) => [...prev, created]);
+                    setSelectedPortalId(created.id);
+                  });
                 }}
               >
                 Delete portal
@@ -2445,7 +3305,7 @@ function TrayRow({
           <span className="tray-hp-num">
             {current}/{max}
             {temp ? ` +${temp}` : ""}
-            {loss ? <span className="hp-loss"> −{loss}</span> : null}
+            {loss != null ? <span className="hp-loss"> −{loss}</span> : null}
           </span>
           <span className="tray-hp-track">
             <span style={{ width: `${pct}%` }} />
@@ -2618,6 +3478,32 @@ function formatRuling(result: CheckResult): string {
   return [result.roll_line, result.notes, result.damage ? `Damage: ${result.damage}` : "", result.howto]
     .filter(Boolean)
     .join("\n");
+}
+
+function midpoint(points: number[]) {
+  const xs = points.filter((_, index) => index % 2 === 0);
+  const ys = points.filter((_, index) => index % 2 === 1);
+  if (!xs.length || !ys.length) return { x: 0, y: 0 };
+  return {
+    x: xs.reduce((sum, value) => sum + value, 0) / xs.length,
+    y: ys.reduce((sum, value) => sum + value, 0) / ys.length,
+  };
+}
+
+function nearPolyline(px: number, py: number, points: number[], slack: number) {
+  for (let i = 0; i + 3 < points.length; i += 2) {
+    const x1 = points[i];
+    const y1 = points[i + 1];
+    const x2 = points[i + 2];
+    const y2 = points[i + 3];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / len2));
+    const dist = Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    if (dist <= slack) return true;
+  }
+  return false;
 }
 
 function defaultTokenImage(kind: string): string {

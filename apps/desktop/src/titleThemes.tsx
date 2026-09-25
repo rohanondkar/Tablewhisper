@@ -1,3 +1,18 @@
+import hearthPointer from "../public/cursors/hearth.png?inline";
+import hearthGrab from "../public/cursors/hearth-grab.png?inline";
+import atlaPointer from "../public/cursors/atla.png?inline";
+import atlaGrab from "../public/cursors/atla-grab.png?inline";
+import starwarsPointer from "../public/cursors/starwars.png?inline";
+import starwarsGrab from "../public/cursors/starwars-grab.png?inline";
+import cyberpunkPointer from "../public/cursors/cyberpunk.png?inline";
+import cyberpunkGrab from "../public/cursors/cyberpunk-grab.png?inline";
+import shadowrunPointer from "../public/cursors/shadowrun.png?inline";
+import shadowrunGrab from "../public/cursors/shadowrun-grab.png?inline";
+import cthulhuPointer from "../public/cursors/cthulhu.png?inline";
+import cthulhuGrab from "../public/cursors/cthulhu-grab.png?inline";
+import savagePointer from "../public/cursors/savage.png?inline";
+import savageGrab from "../public/cursors/savage-grab.png?inline";
+
 export type TitleThemeId = "hearth" | "atla" | "starwars" | "cyberpunk" | "shadowrun" | "cthulhu" | "savage";
 
 export type LogDevice = "book" | "scroll" | "hologram" | "terminal" | "commlink" | "dossier" | "dispatch";
@@ -267,6 +282,62 @@ export function setTitleTheme(id: TitleThemeId) {
   window.dispatchEvent(new Event("tablewhisper-theme"));
 }
 
+const CURSOR_HOTSPOT: Record<TitleThemeId, [number, number]> = {
+  hearth: [12, 1],
+  atla: [16, 16],
+  starwars: [16, 3],
+  cyberpunk: [11, 5],
+  shadowrun: [3, 3],
+  cthulhu: [7, 5],
+  savage: [16, 1],
+};
+
+const CURSOR_ART: Record<TitleThemeId, { pointer: string; grab: string }> = {
+  hearth: { pointer: hearthPointer, grab: hearthGrab },
+  atla: { pointer: atlaPointer, grab: atlaGrab },
+  starwars: { pointer: starwarsPointer, grab: starwarsGrab },
+  cyberpunk: { pointer: cyberpunkPointer, grab: cyberpunkGrab },
+  shadowrun: { pointer: shadowrunPointer, grab: shadowrunGrab },
+  cthulhu: { pointer: cthulhuPointer, grab: cthulhuGrab },
+  savage: { pointer: savagePointer, grab: savageGrab },
+};
+
+function installCursors(id: TitleThemeId) {
+  const art = CURSOR_ART[id];
+  const [hotX, hotY] = CURSOR_HOTSPOT[id];
+  const pointer = `url("${art.pointer}") ${hotX} ${hotY}, auto`;
+  const closed = `url("${art.grab}") 16 16, auto`;
+  let node = document.getElementById("theme-cursors");
+  if (!node) {
+    node = document.createElement("style");
+    node.id = "theme-cursors";
+    document.head.appendChild(node);
+  }
+  node.textContent = `
+    html, html * {
+      cursor: ${pointer} !important;
+    }
+    html input, html textarea, html [contenteditable="true"] {
+      cursor: text !important;
+    }
+    html button:disabled, html .btn:disabled {
+      cursor: not-allowed !important;
+    }
+    html .map-split {
+      cursor: col-resize !important;
+    }
+    html .map-stage-wrap.aim, html .map-stage-wrap.aim * {
+      cursor: crosshair !important;
+    }
+    html .portrait-stage, html .portrait-stage *,
+    html .hand-pad.gripping, html .hand-pad.gripping *,
+    html .map-builder-chip,
+    html[data-dragging="1"], html[data-dragging="1"] * {
+      cursor: ${closed} !important;
+    }
+  `;
+}
+
 export function applyThemeChrome(id: TitleThemeId = titleThemeId()) {
   const theme = TITLE_THEMES.find((item) => item.id === id) || TITLE_THEMES[0];
   const root = document.documentElement;
@@ -290,6 +361,7 @@ export function applyThemeChrome(id: TitleThemeId = titleThemeId()) {
     "--line-strong": chrome.accent2,
   };
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
+  installCursors(theme.id);
   root.style.background = chrome.bg;
   root.style.color = chrome.ink;
 }

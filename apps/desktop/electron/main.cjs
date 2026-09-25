@@ -156,6 +156,22 @@ function lockPreset(width, height) {
   mainWindow.setMaximumSize(width, height);
 }
 
+function windowChromeState() {
+  if (!mainWindow) return { maximized: false, canMaximize: false, fullscreen: false };
+  const locked = Boolean(displayChoice && displayChoice.mode === "window");
+  const fullscreen = mainWindow.isFullScreen();
+  return {
+    maximized: mainWindow.isMaximized(),
+    canMaximize: !locked && !fullscreen,
+    fullscreen,
+  };
+}
+
+function publishWindowState() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("window:state", windowChromeState());
+}
+
 function applyDisplay(choice) {
   if (!mainWindow) return;
   displayChoice = choice;
@@ -171,6 +187,7 @@ function applyDisplay(choice) {
       height: target.bounds.height,
     });
     mainWindow.setFullScreen(true);
+    publishWindowState();
     return;
   }
   const width = Math.max(980, Math.min(choice.width, area.width));
@@ -183,6 +200,7 @@ function applyDisplay(choice) {
     width,
     height,
   });
+  publishWindowState();
 }
 
 function rememberFreeSize() {
@@ -285,6 +303,7 @@ function createWindow() {
     minWidth: locked ? width : 980,
     minHeight: locked ? height : 680,
     backgroundColor: "#14110e",
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -310,6 +329,11 @@ function createWindow() {
     return { action: "deny" };
   });
   mainWindow.on("resize", rememberFreeSize);
+  mainWindow.on("maximize", publishWindowState);
+  mainWindow.on("unmaximize", publishWindowState);
+  mainWindow.on("enter-full-screen", publishWindowState);
+  mainWindow.on("leave-full-screen", publishWindowState);
+  mainWindow.webContents.on("did-finish-load", publishWindowState);
 }
 
 function registerHotkeys() {
@@ -451,6 +475,19 @@ ipcMain.handle("api:base", () => API_BASE);
 ipcMain.handle("app:isGame", () => app.isPackaged);
 ipcMain.handle("app:quitAll", () => quitEverything());
 ipcMain.handle("display:get", () => displayState());
+ipcMain.handle("window:minimize", () => {
+  mainWindow?.minimize();
+});
+ipcMain.handle("window:maximize", () => {
+  if (!mainWindow || !windowChromeState().canMaximize) return windowChromeState();
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  else mainWindow.maximize();
+  return windowChromeState();
+});
+ipcMain.handle("window:close", () => {
+  mainWindow?.close();
+});
+ipcMain.handle("window:state", () => windowChromeState());
 ipcMain.handle("display:set", (_event, choice) => {
   if (!choice || !DISPLAY_MODES.has(choice.mode)) return displayState();
   const next = {

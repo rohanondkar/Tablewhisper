@@ -439,6 +439,8 @@ export type MapRuling = {
   tiles: Tile[];
   anchor: Tile | null;
   heal: boolean;
+  /** Short result on the grid, such as "Miloiic was not intimidated." */
+  line: string | null;
 };
 
 export function rangeGate(

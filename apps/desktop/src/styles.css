@@ -40,6 +40,7 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  cursor: var(--cursor, auto);
 }
 
 body {
@@ -55,7 +56,7 @@ select {
 }
 
 button {
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .app {
@@ -430,7 +431,7 @@ button {
 
 .title-btn:disabled {
   opacity: 0.45;
-  cursor: default;
+  cursor: var(--cursor, auto);
 }
 
 .title-btn.on {
@@ -607,13 +608,13 @@ button {
   flex: 0 0 320px;
   border-radius: 12px;
   overflow: hidden;
-  cursor: grab;
+  cursor: var(--cursor-grab, grab);
   touch-action: none;
   background: #100e0c;
 }
 
 .portrait-stage:active {
-  cursor: grabbing;
+  cursor: var(--cursor-grab, grabbing);
 }
 
 .portrait-stage canvas {
@@ -828,7 +829,7 @@ button {
   border-radius: 12px;
   padding: 0.65rem 0.7rem 0.55rem;
   background: var(--bg-card);
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -1047,7 +1048,7 @@ button {
 
 .avatar-upload {
   display: block;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   border-radius: 12px;
 }
 
@@ -1210,7 +1211,7 @@ button {
   position: absolute;
   inset: 0;
   opacity: 0;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .query-box textarea {
@@ -1465,7 +1466,7 @@ button {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .modal-panel-reupload {
@@ -1671,7 +1672,7 @@ button {
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 600;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .rail-tab:hover {
@@ -1748,13 +1749,13 @@ button {
   border-radius: 4px;
   font-size: 0.68rem;
   padding: 0.25rem 0.4rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   text-align: left;
 }
 
 .bag-slot-box:disabled {
   opacity: 0.55;
-  cursor: default;
+  cursor: var(--cursor, auto);
 }
 
 .bag-slot-box.on {
@@ -1790,7 +1791,7 @@ button {
 }
 
 .hand-pad.gripping {
-  cursor: grab;
+  cursor: var(--cursor-grab, grab);
 }
 
 .hand-pad.on {
@@ -1835,7 +1836,7 @@ button {
   padding: 0;
   border-radius: 50%;
   border: 1px solid rgba(230, 184, 77, 0.45);
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .tone-swatch.natural {
@@ -1880,7 +1881,7 @@ button {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .gear-token img,
@@ -1898,7 +1899,7 @@ button {
   width: 100%;
   height: 100%;
   min-height: 1.4rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .gear-upload input {
@@ -2083,7 +2084,7 @@ button {
   font-size: 0.68rem;
   line-height: 1.15;
   padding: 0.2rem 0.35rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   text-align: left;
 }
 
@@ -2206,7 +2207,7 @@ button {
   border: 1px solid transparent;
   background: rgba(0, 0, 0, 0.22);
   color: inherit;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   text-align: center;
 }
 
@@ -2487,7 +2488,7 @@ button {
   border: 1px solid var(--line);
   background: var(--bg-card);
   color: var(--ink);
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   text-align: left;
   font: inherit;
 }
@@ -2675,7 +2676,7 @@ button {
   border: 0;
   background: transparent;
   color: inherit;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .turn-card.now {
@@ -2826,7 +2827,7 @@ button {
   border: 1px solid rgba(203, 180, 134, 0.4);
   border-radius: 999px;
   padding: 0.32rem 0.75rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
 }
 
 .book-lamp button.on {
@@ -2896,7 +2897,7 @@ button {
   padding: 0;
   border: 0;
   border-radius: 4px 14px 14px 4px;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   color: var(--ddb-gold-bright);
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 18px),
@@ -3532,7 +3533,7 @@ button {
   background: rgba(0, 0, 0, 0.35);
   color: var(--ink);
   text-align: left;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   font: 600 0.98rem var(--font-body);
 }
 
@@ -3551,7 +3552,7 @@ button {
   border: 0;
   color: var(--accent-2);
   font-size: 1.15rem;
-  cursor: pointer;
+  cursor: var(--cursor, pointer);
   padding: 0 0.15rem;
 }
 
@@ -3770,12 +3771,42 @@ button {
   overflow: auto;
 }
 
-.map-setup-bar,
+.map-setup-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+}
+
+.map-setup-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  overflow: hidden;
+}
+
+.map-setup-heading .muted {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-setup-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .map-setup-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+  min-height: 2.6rem;
 }
 
 .map-setup-fields label {
@@ -3799,21 +3830,32 @@ button {
   position: relative;
   flex: 1;
   min-height: 280px;
+  min-width: 0;
   border-radius: 10px;
   overflow: hidden;
-  cursor: grab;
   background: #050608;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
 }
 
-.map-setup-stage img,
-.map-setup-svg {
+.map-setup-frame {
+  position: relative;
+  flex: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.map-setup-frame img,
+.map-setup-frame .map-setup-svg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
 
-.map-setup-stage img {
+.map-setup-frame img {
   object-fit: fill;
   pointer-events: none;
 }
@@ -3852,7 +3894,7 @@ button {
   border-radius: 8px;
   background: #e87a3a;
   color: #1a100c;
-  cursor: grab;
+  cursor: var(--cursor-grab, grab);
 }
 
 .map-builder-chip.portal {
@@ -3886,3 +3928,279 @@ button {
   color: #1a100c;
   font-size: 0.72rem;
 }
+
+html.window-framed,
+html.window-framed body,
+html.window-framed #root {
+  height: 100%;
+}
+
+html.window-framed {
+  --frame-gutter: 52px;
+  --frame-bar: 32px;
+}
+
+html.window-framed body {
+  box-sizing: border-box;
+  padding: calc(var(--frame-gutter) + var(--frame-bar)) var(--frame-gutter) var(--frame-gutter);
+  overflow: hidden;
+}
+
+html.window-framed .app,
+html.window-framed .title-screen {
+  min-height: 0;
+  height: 100%;
+}
+
+html.window-framed .title-screen.opt-game {
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.window-bar {
+  position: fixed;
+  top: var(--frame-gutter, 52px);
+  left: var(--frame-gutter, 52px);
+  right: var(--frame-gutter, 52px);
+  z-index: 46000;
+  height: var(--frame-bar, 32px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 8px;
+  background: transparent;
+  color: var(--ink);
+  -webkit-app-region: drag;
+  border-bottom: 0;
+}
+
+.window-bar-title {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.window-controls button {
+  width: 46px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: var(--cursor, pointer);
+  display: grid;
+  place-items: center;
+}
+
+.window-controls button:hover {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.window-close:hover {
+  background: #9c2b24;
+  color: #fff;
+}
+
+.window-min i {
+  display: block;
+  width: 12px;
+  height: 2px;
+  background: currentColor;
+}
+
+.window-max b {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid currentColor;
+}
+
+.window-max b.restore {
+  box-shadow: -3px 3px 0 -1px var(--bg-elev), -3px 3px 0 0.5px currentColor;
+}
+
+.window-close span {
+  position: relative;
+  width: 12px;
+  height: 12px;
+}
+
+.window-close span::before,
+.window-close span::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 1.5px;
+  height: 12px;
+  background: currentColor;
+}
+
+.window-close span::before {
+  transform: rotate(45deg);
+}
+
+.window-close span::after {
+  transform: rotate(-45deg);
+}
+
+.window-border {
+  position: fixed;
+  inset: 10px;
+  z-index: 30000;
+  pointer-events: none;
+  border: 8px solid var(--accent);
+  background: transparent;
+}
+
+.window-border .mark,
+.window-border .tick,
+.window-border .element,
+.window-border .leather-star {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+}
+
+.window-border .tl { top: -22px; left: -22px; }
+.window-border .tr { top: -22px; right: -22px; transform: scaleX(-1); }
+.window-border .bl { bottom: -22px; left: -22px; transform: scaleY(-1); }
+.window-border .br { bottom: -22px; right: -22px; transform: scale(-1); }
+
+.frame-hearth.window-border {
+  border-color: transparent;
+  border-image: repeating-linear-gradient(90deg, #5c3018 0 6px, #e8c478 6px 9px, #8a5a24 9px 14px) 8;
+}
+
+.frame-hearth .mark {
+  fill: none;
+  stroke: #e8c478;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px #8a1c12);
+}
+
+.frame-atla.window-border {
+  border-width: 6px;
+  border-style: solid;
+  border-image: linear-gradient(90deg, #5ec8e6, #c4a15a 33%, #e85a32 66%, #f4efe4) 1;
+}
+
+.frame-atla .element {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+.frame-atla .water { top: -18px; left: -18px; background: #5ec8e6; box-shadow: 0 0 8px #5ec8e6; }
+.frame-atla .earth { top: -18px; right: -18px; left: auto; background: #8d9a4a; box-shadow: 0 0 8px #8d9a4a; border-radius: 4px; }
+.frame-atla .fire { bottom: -18px; left: -18px; top: auto; background: #e85a32; clip-path: polygon(50% 0, 100% 100%, 0 100%); border-radius: 0; }
+.frame-atla .air { bottom: -18px; right: -18px; top: auto; left: auto; background: transparent; border: 3px solid #f4efe4; box-shadow: 0 0 8px #f4efe4; }
+
+.frame-starwars.window-border {
+  border: 0;
+}
+
+.frame-starwars .saber {
+  position: absolute;
+  background: #7eb6ff;
+  box-shadow: 0 0 10px #7eb6ff, 0 0 18px #7eb6ff;
+}
+
+.frame-starwars .saber.top,
+.frame-starwars .saber.bottom {
+  left: 10px;
+  right: 10px;
+  height: 4px;
+}
+
+.frame-starwars .saber.top { top: 0; }
+.frame-starwars .saber.bottom { bottom: 0; background: #d4a84a; box-shadow: 0 0 10px #d4a84a, 0 0 18px #d4a84a; }
+.frame-starwars .saber.left,
+.frame-starwars .saber.right {
+  top: 10px;
+  bottom: 10px;
+  width: 4px;
+}
+.frame-starwars .saber.left { left: 0; }
+.frame-starwars .saber.right { right: 0; background: #d4a84a; box-shadow: 0 0 10px #d4a84a, 0 0 18px #d4a84a; }
+
+.frame-cyberpunk.window-border {
+  border: 2px solid #00f0ff;
+  box-shadow: 0 0 0 1px #ff2bd6, 0 0 12px rgba(0, 240, 255, 0.45);
+}
+
+.frame-cyberpunk .tick {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fcee0a;
+  background:
+    repeating-linear-gradient(-45deg, #111 0 4px, #fcee0a 4px 8px);
+}
+
+.frame-cyberpunk .tick.tl { border-right: 0; border-bottom: 0; }
+.frame-cyberpunk .tick.tr { border-left: 0; border-bottom: 0; }
+.frame-cyberpunk .tick.bl { border-right: 0; border-top: 0; }
+.frame-cyberpunk .tick.br { border-left: 0; border-top: 0; }
+
+.frame-shadowrun.window-border {
+  border: 2px solid #9aa8b5;
+  box-shadow: 0 0 0 2px #00ff9c, 0 0 10px rgba(0, 255, 156, 0.35);
+}
+
+.frame-shadowrun .mark {
+  fill: none;
+  stroke: #00ff9c;
+  stroke-width: 3;
+}
+
+.frame-cthulhu.window-border {
+  border: 6px solid #6b5a32;
+  box-shadow: 0 0 0 2px #1c2420;
+}
+
+.frame-cthulhu .mark {
+  fill: none;
+  stroke: #2e6b4f;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.frame-cthulhu .mark circle {
+  fill: #b8a06a;
+  stroke: none;
+}
+
+.frame-savage.window-border {
+  border: 10px solid #6b3a1f;
+  box-shadow: 0 0 0 3px #c4924a;
+}
+
+.frame-savage .leather-star {
+  top: -30px;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  background: #e2b15a;
+  clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.frame-savage .stitch {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  height: 0;
+  border-top: 2px dashed #e2b15a;
+}
+
+.frame-savage .stitch.top { top: 6px; }
+.frame-savage .stitch.bottom { bottom: 6px; }

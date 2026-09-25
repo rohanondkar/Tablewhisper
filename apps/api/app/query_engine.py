@@ -1509,6 +1509,8 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         to_hit_needed = max(1, min(20, int(gear["ac"]) - int(modifier)))
     elif check_type == "attack":
         weapon = _pick_weapon(text, character)
+        if character and weapon:
+            weapon = gear_rules.ensure_damage(character, weapon)
         modifier = _modifier_for(character, check_type, ability, skill, weapon)
         try:
             target = npcs_mod.resolve_or_spawn_npc(text) or monsters_mod.resolve_or_spawn_target(text)
@@ -1748,7 +1750,7 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         "source": source,
         "reasoning": reasoning,
         "weapon": weapon.get("name") if weapon else None,
-        "damage": (weapon or {}).get("damage") if weapon and check_type == "attack" else None,
+        "damage": (weapon or {}).get("damage") if weapon and check_type in {"attack", "save"} else None,
         "target": target_payload,
         "participants": participants,
         "target_ac": target["ac"] if target and check_type == "attack" else None,

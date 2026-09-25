@@ -16,6 +16,17 @@ _CAST = re.compile(r"^(.+?) casts (.+)$", re.I)
 _USE_ON = re.compile(r"^(.+?) uses (.+?) on (.+)$", re.I)
 _USE = re.compile(r"^(.+?) uses (.+)$", re.I)
 
+_CASTERS = (
+    ("bard", "charisma"),
+    ("paladin", "charisma"),
+    ("sorcerer", "charisma"),
+    ("warlock", "charisma"),
+    ("cleric", "wisdom"),
+    ("druid", "wisdom"),
+    ("ranger", "wisdom"),
+    ("wizard", "intelligence"),
+)
+
 _FEATURES = {
     "second wind": ("self", "heal", "Bonus action. Regain hit points. 2 uses per long rest."),
 }
@@ -55,6 +66,95 @@ def _parse(text: str) -> tuple[str, str, str] | None:
         if match:
             return match.group(1).strip(), _clean(match.group(2)), ""
     return None
+
+
+@lru_cache(maxsize=1)
+def _damage_table() -> dict[str, Any]:
+    path = RULES_DIR / "rules-dnd5e" / "spell_damage.json"
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def _shown_mod(character: dict[str, Any] | None, ability: str | None) -> int | None:
+    if not character or not ability:
+        return None
+    block = (character.get("abilities") or {}).get(ability)
+    if not isinstance(block, dict):
+        return None
+    if block.get("modifier") is not None:
+        try:
+            return int(block["modifier"])
+        except (TypeError, ValueError):
+            return None
+    if block.get("score") is not None:
+        try:
+            return (int(block["score"]) - 10) // 2
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _caster_ability(character: dict[str, Any] | None) -> str | None:
+    if not character:
+        return None
+    text = f"{character.get('class_level') or ''} {character.get('class') or ''}".lower()
+    for name, ability in _CASTERS:
+        if name in text:
+            return ability
+    return None
+
+
+def _caster_level(character: dict[str, Any] | None) -> int:
+    if not character:
+        return 1
+    try:
+        if character.get("level"):
+            return max(1, int(character["level"]))
+    except (TypeError, ValueError):
+        pass
+    nums = [int(part) for part in re.findall(r"\d+", str(character.get("class_level") or ""))]
+    return max(nums) if nums else 1
+
+
+def _scale_cantrip(dice: str, level: int) -> str:
+    match = re.fullmatch(r"(\d+)d(\d+)", dice.strip())
+    if not match:
+        return dice
+    count = int(match.group(1))
+    mult = 4 if level >= 17 else 3 if level >= 11 else 2 if level >= 5 else 1
+    return f"{count * mult}d{match.group(2)}"
+
+
+def _signed(value: int) -> str:
+    return f"+{value}" if value >= 0 else str(value)
+
+
+def _spell_formula(rule: dict[str, Any], character: dict[str, Any] | None) -> str | None:
+    dice = str(rule.get("damage") or "").strip()
+    if not dice:
+        return None
+    if rule.get("scale"):
+        dice = _scale_cantrip(dice, _caster_level(character))
+    if rule.get("ability"):
+        mod = _shown_mod(character, _caster_ability(character))
+        if mod is not None:
+            dice = f"{dice}{_signed(mod)}"
+    kind = str(rule.get("type") or "").strip()
+    return f"{dice} {kind}".strip()
+
+
+def _spell_dc(character: dict[str, Any] | None) -> int | None:
+    ability = _caster_ability(character)
+    mod = _shown_mod(character, ability)
+    if character is None or mod is None:
+        return None
+    try:
+        prof = int(character.get("proficiency_bonus") or 0)
+    except (TypeError, ValueError):
+        return None
+    return 8 + prof + mod
 
 
 def _character(character_id: str | None, actor: str) -> dict[str, Any] | None:
@@ -169,9 +269,35 @@ def cast_or_move(text: str, character_id: str | None) -> dict[str, Any] | None:
     verb = "casts" if spell is not None and move is None and feature is None else "uses"
     line = f"{who} {verb} {name}{where}. {note}"
     bonus, printed = _printed_attack(character, name)
+    rule = _damage_table().get(name.lower()) if spell else None
+    formula = _spell_formula(rule, character) if isinstance(rule, dict) else None
+    if check == "attack" and bonus is None and character:
+        mod = _shown_mod(character, _caster_ability(character))
+        if mod is not None:
+            try:
+                bonus = int(character.get("proficiency_bonus") or 0) + mod
+            except (TypeError, ValueError):
+                bonus = None
+    dc = _spell_dc(character) if check == "save" and formula else None
+    if formula and check == "attack":
+        note = f"{formula}. A natural 20 doubles the dice and adds the modifier once."
+    elif formula and check == "save":
+        note = formula
+        if rule.get("half"):
+            note += ". A successful save deals half."
+        if dc is not None:
+            note += f" Save DC {dc}."
+    elif formula and isinstance(rule, dict) and rule.get("auto"):
+        note = formula
+    line = f"{who} {verb} {name}{where}. {note}"
     needed = None
     if check == "attack" and bonus is not None and target and target.get("ac"):
         needed = max(1, min(20, int(target["ac"]) - bonus))
+    damage = None
+    if formula and (check in {"attack", "save"} or (isinstance(rule, dict) and rule.get("auto"))):
+        damage = formula
+    elif check == "attack":
+        damage = printed
     participants: list[dict[str, Any]] = []
     if character:
         participants.append(
@@ -201,15 +327,16 @@ def cast_or_move(text: str, character_id: str | None) -> dict[str, Any] | None:
         "skill": "athletics" if check == "contest" else None,
         "dice": "1d20" if check in {"attack", "save"} else "",
         "modifier": bonus if check == "attack" else None,
-        "suggested_dc": None,
-        "dc_label": None,
+        "suggested_dc": dc if check == "save" else None,
+        "save_ability": rule.get("save") if isinstance(rule, dict) and check == "save" else None,
+        "dc_label": "Spell save" if check == "save" and dc is not None else None,
         "notes": note,
         "roll_line": line,
         "confidence": 1,
         "source": "rules",
-        "reasoning": "Named spell or move. No save DC or damage was added.",
+        "reasoning": "Named spell or move. Damage and a save DC are filled only when this spell has them.",
         "weapon": name if check == "attack" else None,
-        "damage": printed if check == "attack" else None,
+        "damage": damage,
         "target": target,
         "participants": participants,
         "target_ac": target.get("ac") if target and check == "attack" else None,

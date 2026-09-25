@@ -20,7 +20,7 @@ from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
 from .npcs import CUSTOM_IMAGE_DIR as NPC_CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR as NPC_SRD_IMAGE_DIR
-from .maps import MAP_IMAGE_DIR, MAP_FOG_DIR
+from .maps import MAP_FOG_DIR, MAP_GROUND_DIR, MAP_IMAGE_DIR, MAP_POOL_DIR
 from .portraits import CHAR_IMAGE_DIR
 from . import gear_images
 from .token_art import TOKEN_DIR
@@ -100,6 +100,8 @@ app.mount(
 )
 MAP_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 MAP_FOG_DIR.mkdir(parents=True, exist_ok=True)
+MAP_POOL_DIR.mkdir(parents=True, exist_ok=True)
+MAP_GROUND_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     "/media/maps/images",
     StaticFiles(directory=str(MAP_IMAGE_DIR)),
@@ -109,6 +111,16 @@ app.mount(
     "/media/maps/fog",
     StaticFiles(directory=str(MAP_FOG_DIR)),
     name="map_fog",
+)
+app.mount(
+    "/media/maps/pools",
+    StaticFiles(directory=str(MAP_POOL_DIR)),
+    name="map_pools",
+)
+app.mount(
+    "/media/maps/ground",
+    StaticFiles(directory=str(MAP_GROUND_DIR)),
+    name="map_ground",
 )
 CHAR_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
@@ -364,13 +376,14 @@ def _place_on_active_map(kind: str, entities: list[dict[str, Any]]) -> None:
         if not m:
             return
         existing = {(t["kind"], t["ref_id"]) for t in maps.list_tokens(m["id"])}
+        session_id = m["session_id"]
         gs = float(m["grid_size_px"])
         ox = float(m["grid_offset_x"])
         oy = float(m["grid_offset_y"])
         i = 0
         for e in entities:
             key = (kind, e["id"])
-            if key in existing:
+            if key in existing or maps._creature_token_id(session_id, kind, e["id"]):
                 continue
             col = i % 8
             row = i // 8
@@ -1063,6 +1076,10 @@ class WallBody(BaseModel):
     door_open: bool = False
     block_movement: bool = True
     block_sight: bool = True
+    target_map_id: str | None = None
+    target_x: float | None = None
+    target_y: float | None = None
+    link_wall_id: str | None = None
 
 
 class WallPatch(BaseModel):
@@ -1071,6 +1088,10 @@ class WallPatch(BaseModel):
     door_open: bool | None = None
     block_movement: bool | None = None
     block_sight: bool | None = None
+    target_map_id: str | None = None
+    target_x: float | None = None
+    target_y: float | None = None
+    link_wall_id: str | None = None
 
 
 class LightBody(BaseModel):
@@ -1078,6 +1099,7 @@ class LightBody(BaseModel):
     y: float = 0
     bright_ft: float = 20
     dim_ft: float = 20
+    kind: str | None = None
 
 
 class LightPatch(BaseModel):
@@ -1085,6 +1107,75 @@ class LightPatch(BaseModel):
     y: float | None = None
     bright_ft: float | None = None
     dim_ft: float | None = None
+    kind: str | None = None
+
+
+class SetupWall(BaseModel):
+    points: list[float]
+    door: bool = False
+    door_open: bool = False
+    block_movement: bool = True
+    block_sight: bool = True
+    target_map_id: str | None = None
+    target_x: float | None = None
+    target_y: float | None = None
+    link_wall_id: str | None = None
+    both_ways: bool = False
+
+
+class SetupLight(BaseModel):
+    x: float = 0
+    y: float = 0
+    bright_ft: float = 20
+    dim_ft: float = 20
+    kind: str = "torch"
+
+
+class SetupPortal(BaseModel):
+    x: float = 0
+    y: float = 0
+    radius: float = 36
+    target_map_id: str | None = None
+    target_x: float = 0
+    target_y: float = 0
+    label: str = "Portal"
+
+
+class SetupPool(BaseModel):
+    kind: str = "water"
+    depth_ft: float = 5
+    current_ft: float = 0
+    current_deg: float = 0
+    mask_png: str = ""
+
+
+class PoolBody(BaseModel):
+    kind: str = "water"
+    depth_ft: float = 5
+    current_ft: float = 0
+    current_deg: float = 0
+
+
+class PoolPatch(BaseModel):
+    kind: str | None = None
+    depth_ft: float | None = None
+    current_ft: float | None = None
+    current_deg: float | None = None
+
+
+class SetupBody(BaseModel):
+    name: str | None = None
+    width: float | None = None
+    height: float | None = None
+    grid_size_px: float | None = None
+    grid_offset_x: float | None = None
+    grid_offset_y: float | None = None
+    feet_per_square: float | None = None
+    walls: list[SetupWall] = Field(default_factory=list)
+    lights: list[SetupLight] = Field(default_factory=list)
+    portals: list[SetupPortal] = Field(default_factory=list)
+    pools: list[SetupPool] = Field(default_factory=list)
+    ground_png: str | None = None
 
 
 class PortalBody(BaseModel):
@@ -1217,7 +1308,10 @@ def post_map_token(map_id: str, body: TokenBody) -> dict[str, Any]:
 
 @app.patch("/maps/tokens/{token_id}")
 def patch_map_token(token_id: str, body: TokenPatch) -> dict[str, Any]:
-    t = maps.patch_token(token_id, body.model_dump(exclude_none=True))
+    try:
+        t = maps.patch_token(token_id, body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
     if not t:
         raise HTTPException(404, "Token not found")
     return t
@@ -1245,7 +1339,7 @@ def post_wall(map_id: str, body: WallBody) -> dict[str, Any]:
 
 @app.patch("/maps/walls/{wall_id}")
 def patch_wall_route(wall_id: str, body: WallPatch) -> dict[str, Any]:
-    w = maps.patch_wall(wall_id, body.model_dump(exclude_none=True))
+    w = maps.patch_wall(wall_id, body.model_dump(exclude_unset=True))
     if not w:
         raise HTTPException(404, "Wall not found")
     return w
@@ -1284,6 +1378,38 @@ def delete_light_route(light_id: str) -> dict[str, bool]:
     if not maps.delete_light(light_id):
         raise HTTPException(404, "Light not found")
     return {"ok": True}
+
+
+@app.post("/maps/{map_id}/pools")
+def post_pool(map_id: str, body: PoolBody) -> dict[str, Any]:
+    try:
+        return maps.add_pool(map_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/maps/pools/{pool_id}")
+def patch_pool_route(pool_id: str, body: PoolPatch) -> dict[str, Any]:
+    pool = maps.patch_pool(pool_id, body.model_dump(exclude_unset=True))
+    if not pool:
+        raise HTTPException(404, "Pool not found")
+    return pool
+
+
+@app.delete("/maps/pools/{pool_id}")
+def delete_pool_route(pool_id: str) -> dict[str, bool]:
+    if not maps.delete_pool(pool_id):
+        raise HTTPException(404, "Pool not found")
+    return {"ok": True}
+
+
+@app.post("/maps/pools/{pool_id}/mask")
+async def upload_pool_mask(pool_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    data = await file.read()
+    try:
+        return maps.save_pool_mask(pool_id, data)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @app.post("/maps/{map_id}/fog")
@@ -1329,6 +1455,42 @@ def delete_portal_route(portal_id: str) -> dict[str, bool]:
     if not maps.delete_portal(portal_id):
         raise HTTPException(404, "Portal not found")
     return {"ok": True}
+
+
+@app.post("/maps/suggest")
+async def suggest_map_marks(
+    file: UploadFile = File(...),
+    width: float = Form(...),
+    height: float = Form(...),
+    grid_size_px: float = Form(50),
+    grid_offset_x: float = Form(0),
+    grid_offset_y: float = Form(0),
+) -> dict[str, Any]:
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty image")
+    from . import map_detect
+
+    try:
+        return map_detect.suggest_marks(data, width, height, grid_size_px, grid_offset_x, grid_offset_y)
+    except (OSError, ValueError) as exc:
+        raise HTTPException(400, "Could not read that picture") from exc
+
+
+@app.post("/maps/{map_id}/setup")
+def post_map_setup(map_id: str, body: SetupBody) -> dict[str, Any]:
+    try:
+        return maps.apply_map_setup(map_id, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/maps/walls/{wall_id}/traverse")
+def traverse_wall_route(wall_id: str, body: TraverseBody) -> dict[str, Any]:
+    try:
+        return maps.traverse_wall(wall_id, body.token_ids)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/maps/portals/{portal_id}/traverse")

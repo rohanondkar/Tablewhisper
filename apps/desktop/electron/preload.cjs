@@ -11,4 +11,13 @@ contextBridge.exposeInMainWorld("dmDesktop", {
     ipcRenderer.on("hotkey:capture", handler);
     return () => ipcRenderer.removeListener("hotkey:capture", handler);
   },
+  minimize: () => ipcRenderer.invoke("window:minimize"),
+  maximize: () => ipcRenderer.invoke("window:maximize"),
+  close: () => ipcRenderer.invoke("window:close"),
+  windowState: () => ipcRenderer.invoke("window:state"),
+  onWindowState: (cb) => {
+    const handler = (_event, state) => cb(state);
+    ipcRenderer.on("window:state", handler);
+    return () => ipcRenderer.removeListener("window:state", handler);
+  },
 });

@@ -2247,7 +2247,7 @@
       "sheet": "Tail and slam",
       "animation": "A tail sweeps through the target."
     },
-    "club": {
+    "club|1d4": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
@@ -2359,21 +2359,21 @@
       "sheet": "Bows",
       "animation": "A stone hums along the path and cracks on arrival."
     },
-    "dagger": {
+    "dagger|1d4+2": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "shortsword": {
+    "shortsword|1d6+3": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "light crossbow": {
+    "light crossbow|1d8+3": {
       "motion": "crossbow",
       "sound": "crossbow.mp3",
       "seconds": 1.2,
@@ -2394,33 +2394,54 @@
       "sheet": "Bite and claw",
       "animation": "Jaws snap shut on the target."
     },
-    "warhammer": {
+    "warhammer|1d8+1d6": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
-    "longsword": {
+    "longsword|3d8+3d8": {
       "motion": "slash",
       "sound": "slash.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A bright slash arc crosses the target."
     },
-    "whip": {
+    "whip|2d6+3d6": {
       "motion": "reach",
       "sound": "reach.mp3",
       "seconds": 1.3,
       "sheet": "Reach",
       "animation": "A long slash starts away from the body and cuts through the target."
     },
-    "scimitar": {
+    "scimitar|1d6+1": {
       "motion": "slash",
       "sound": "slash.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A bright slash arc crosses the target."
+    },
+    "light crossbow|1d8+1": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "scimitar|1d6+3": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "dagger|1d4+3": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
     },
     "hurl flame|fire": {
       "motion": "fire",
@@ -2436,7 +2457,7 @@
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "glaive": {
+    "glaive|1d10+3": {
       "motion": "reach",
       "sound": "reach.mp3",
       "seconds": 1.3,
@@ -2457,7 +2478,7 @@
       "sheet": "Swallow",
       "animation": "The maw opens and the creature is pulled in. It travels to one creature."
     },
-    "greataxe": {
+    "greataxe|1d12+3": {
       "motion": "slash",
       "sound": "slash.mp3",
       "seconds": 1.2,
@@ -2485,21 +2506,21 @@
       "sheet": "Sting",
       "animation": "A stinger punches in and flicks back."
     },
-    "morningstar": {
+    "morningstar|2d8+2": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "javelin": {
+    "javelin|2d6+2": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "pike": {
+    "pike|1d10+4": {
       "motion": "reach",
       "sound": "reach.mp3",
       "seconds": 1.3,
@@ -2513,7 +2534,7 @@
       "sheet": "Tail and slam",
       "animation": "A heavy body blow slams the target and a ring of dust jumps."
     },
-    "longbow": {
+    "longbow|1d8+2": {
       "motion": "bow",
       "sound": "bow.mp3",
       "seconds": 1.3,
@@ -2541,6 +2562,13 @@
       "sheet": "Bite and claw",
       "animation": "Claws rake across the target."
     },
+    "morningstar|3d8+8": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
     "crush": {
       "motion": "blunt",
       "sound": "blunt.mp3",
@@ -2548,7 +2576,7 @@
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
-    "war pick": {
+    "war pick|1d8+2": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
@@ -2562,12 +2590,19 @@
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "mace": {
+    "mace|1d6+4d8": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "scimitar|2d6+1d6": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "steam breath|fire": {
       "motion": "fire",
@@ -2576,19 +2611,47 @@
       "sheet": "Fire",
       "animation": "A fireball is shot along the path and bursts where it lands. It fills the burst."
     },
-    "hand crossbow": {
+    "longsword|1d8+3": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "longbow|1d8+3": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "shortsword|1d6+2": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "hand crossbow|1d6+2": {
       "motion": "crossbow",
       "sound": "crossbow.mp3",
       "seconds": 1.2,
       "sheet": "Bows",
       "animation": "A straight bolt snaps along the path."
     },
-    "quarterstaff": {
+    "quarterstaff|1d6": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "javelin|1d6+2": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
     },
     "talon": {
       "motion": "claw",
@@ -2596,6 +2659,13 @@
       "seconds": 1.2,
       "sheet": "Bite and claw",
       "animation": "Claws rake across the target."
+    },
+    "scimitar|2d6+2d6": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "gore": {
       "motion": "gore",
@@ -2618,6 +2688,20 @@
       "sheet": "Tail and slam",
       "animation": "A heavy body blow slams the target and a ring of dust jumps."
     },
+    "longsword|1d8+3d8": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "longbow|1d8+3d8": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
     "variant: web garrote": {
       "motion": "web",
       "sound": "web.mp3",
@@ -2625,12 +2709,19 @@
       "sheet": "Web",
       "animation": "Strands spray out and stick across the target. It travels to one creature."
     },
-    "battleaxe": {
+    "battleaxe|2d8+5": {
       "motion": "slash",
       "sound": "slash.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A bright slash arc crosses the target."
+    },
+    "morningstar|2d8+5": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
     },
     "touch": {
       "motion": "fire",
@@ -2639,7 +2730,14 @@
       "sheet": "Fire",
       "animation": "A fireball is shot along the path and bursts where it lands. It travels to one creature."
     },
-    "greatsword": {
+    "greatsword|6d6+7": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "longsword|1d8+1": {
       "motion": "slash",
       "sound": "slash.mp3",
       "seconds": 1.2,
@@ -2653,6 +2751,13 @@
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
+    "greataxe|3d12+6": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
     "withering touch": {
       "motion": "necrotic",
       "sound": "necrotic.mp3",
@@ -2660,7 +2765,7 @@
       "sheet": "Necrotic",
       "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
     },
-    "spear": {
+    "spear|2d6+4": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
@@ -2674,7 +2779,28 @@
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
-    "shortbow": {
+    "spear|1d6+2": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "longbow|1d8+1": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "scimitar|1d6+2": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "shortbow|1d6+2": {
       "motion": "bow",
       "sound": "bow.mp3",
       "seconds": 1.3,
@@ -2688,6 +2814,13 @@
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
+    "spear|1d6+1": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
     "spit poison": {
       "motion": "poison",
       "sound": "poison.mp3",
@@ -2695,14 +2828,21 @@
       "sheet": "Poison",
       "animation": "A sickly glob is shot and bursts into vapor. It travels to one creature."
     },
-    "heavy crossbow": {
+    "heavy crossbow|1d10+1": {
       "motion": "crossbow",
       "sound": "crossbow.mp3",
       "seconds": 1.2,
       "sheet": "Bows",
       "animation": "A straight bolt snaps along the path."
     },
-    "greatclub": {
+    "club|1d4+1": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "greatclub|3d8+5": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
@@ -2723,7 +2863,21 @@
       "sheet": "Melee",
       "animation": "A bright slash arc crosses the target."
     },
-    "sling": {
+    "greatsword|2d6+3": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "heavy crossbow|1d10": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "sling|1d4+2": {
       "motion": "sling",
       "sound": "sling.mp3",
       "seconds": 1.2,
@@ -2772,7 +2926,28 @@
       "sheet": "Tail and slam",
       "animation": "A tail sweeps through the target."
     },
+    "longsword|2d8+4": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
     "snake hair": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "longbow|2d6": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "spear|1d6": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
@@ -2786,6 +2961,13 @@
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
+    "greataxe|2d12+4": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
     "rotting fist": {
       "motion": "necrotic",
       "sound": "necrotic.mp3",
@@ -2793,12 +2975,68 @@
       "sheet": "Necrotic",
       "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
     },
-    "rapier": {
+    "rapier|1d8+1": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
+    },
+    "greatclub|2d8+4": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "javelin|2d6+4": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "morningstar|2d8+4": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "glaive|2d10+4": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "javelin|1d6+3": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "mace|2d6+8": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "greatsword|4d6+5d8": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "mace|1d6": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
     "tail stinger": {
       "motion": "tail",
@@ -2821,12 +3059,26 @@
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
+    "shortbow|1d6+3": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
     "strength drain": {
       "motion": "necrotic",
       "sound": "necrotic.mp3",
       "seconds": 1.7,
       "sheet": "Necrotic",
       "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
+    },
+    "greatsword|4d6+6d8": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "slaying longbow": {
       "motion": "stab",
@@ -2842,12 +3094,40 @@
       "sheet": "Necrotic",
       "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
     },
+    "longsword|1d4": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "shortbow|1d4": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
     "blood drain": {
       "motion": "stab",
       "sound": "stab.mp3",
       "seconds": 1.2,
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
+    },
+    "greatclub|3d8+6": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "greatsword|6d6+9": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "lightning strike": {
       "motion": "lightning",
@@ -2870,7 +3150,14 @@
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
-    "unarmed strike": {
+    "mace|1d6+2": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "unarmed strike|1d8+4": {
       "motion": "unarmed",
       "sound": "unarmed.mp3",
       "seconds": 1.2,
@@ -2884,7 +3171,14 @@
       "sheet": "Necrotic",
       "animation": "A dark mote is shot, then wisps pull inward. It travels to one creature."
     },
-    "maul": {
+    "greataxe|1d12+4": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "maul|2d6+3": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
@@ -2897,6 +3191,20 @@
       "seconds": 1.2,
       "sheet": "Bite and claw",
       "animation": "Jaws snap shut on the target."
+    },
+    "spear|1d6-2": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "longsword|1d8+2": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "shock": {
       "motion": "lightning",
@@ -2912,12 +3220,33 @@
       "sheet": "Sting",
       "animation": "A stinger punches in and flicks back."
     },
+    "club": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
     "dagger|thrown": {
       "motion": "thrown",
       "sound": "thrown.mp3",
       "seconds": 1.3,
       "sheet": "Thrown",
       "animation": "The weapon tumbles along the path and hits."
+    },
+    "dagger": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "greatclub": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
     },
     "handaxe|thrown": {
       "motion": "thrown",
@@ -2940,6 +3269,13 @@
       "sheet": "Thrown",
       "animation": "The weapon tumbles along the path and hits."
     },
+    "javelin": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
     "light hammer|thrown": {
       "motion": "thrown",
       "sound": "thrown.mp3",
@@ -2948,6 +3284,20 @@
       "animation": "The weapon tumbles along the path and hits."
     },
     "light hammer": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "mace": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "quarterstaff": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
@@ -2968,6 +3318,20 @@
       "sheet": "Thrown",
       "animation": "The weapon tumbles along the path and hits."
     },
+    "spear": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "light crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
     "dart|thrown": {
       "motion": "thrown",
       "sound": "thrown.mp3",
@@ -2982,12 +3346,54 @@
       "sheet": "Thrown",
       "animation": "The weapon tumbles along the path and hits."
     },
+    "shortbow": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
+    },
+    "sling": {
+      "motion": "sling",
+      "sound": "sling.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A stone hums along the path and cracks on arrival."
+    },
+    "battleaxe": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
     "flail": {
       "motion": "blunt",
       "sound": "blunt.mp3",
       "seconds": 1.3,
       "sheet": "Melee",
       "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "glaive": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "greataxe": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "greatsword": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
     },
     "halberd": {
       "motion": "reach",
@@ -3003,6 +3409,55 @@
       "sheet": "Reach",
       "animation": "A long slash starts away from the body and cuts through the target."
     },
+    "longsword": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "maul": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "morningstar": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "pike": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
+    "rapier": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "scimitar": {
+      "motion": "slash",
+      "sound": "slash.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A bright slash arc crosses the target."
+    },
+    "shortsword": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
     "trident|thrown": {
       "motion": "thrown",
       "sound": "thrown.mp3",
@@ -3017,12 +3472,54 @@
       "sheet": "Melee",
       "animation": "A thin stab shoots in and pulls back."
     },
+    "war pick": {
+      "motion": "stab",
+      "sound": "stab.mp3",
+      "seconds": 1.2,
+      "sheet": "Melee",
+      "animation": "A thin stab shoots in and pulls back."
+    },
+    "warhammer": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
+    },
+    "whip": {
+      "motion": "reach",
+      "sound": "reach.mp3",
+      "seconds": 1.3,
+      "sheet": "Reach",
+      "animation": "A long slash starts away from the body and cuts through the target."
+    },
     "blowgun": {
       "motion": "blowgun",
       "sound": "blowgun.mp3",
       "seconds": 1.2,
       "sheet": "Bows",
       "animation": "A thin dart whispers along the path."
+    },
+    "hand crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "heavy crossbow": {
+      "motion": "crossbow",
+      "sound": "crossbow.mp3",
+      "seconds": 1.2,
+      "sheet": "Bows",
+      "animation": "A straight bolt snaps along the path."
+    },
+    "longbow": {
+      "motion": "bow",
+      "sound": "bow.mp3",
+      "seconds": 1.3,
+      "sheet": "Bows",
+      "animation": "An arrow travels the path and sticks."
     },
     "net": {
       "motion": "net",
@@ -3114,6 +3611,13 @@
       "seconds": 1.3,
       "sheet": "Social",
       "animation": "A spoken ripple reaches the other creature. It travels to one creature."
+    },
+    "unarmed strike": {
+      "motion": "blunt",
+      "sound": "blunt.mp3",
+      "seconds": 1.3,
+      "sheet": "Melee",
+      "animation": "A heavy stroke lands and a shock ring kicks up dust."
     }
   },
   "motions": {

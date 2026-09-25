@@ -24,6 +24,12 @@ interface DisplayChoice {
   height: number;
 }
 
+interface WindowChromeState {
+  maximized: boolean;
+  canMaximize: boolean;
+  fullscreen: boolean;
+}
+
 interface DmDesktop {
   getApiBase: () => Promise<string>;
   isGame?: () => Promise<boolean>;
@@ -31,6 +37,11 @@ interface DmDesktop {
   getDisplay?: () => Promise<{ displays: DisplayPanel[]; current: DisplayChoice }>;
   setDisplay?: (choice: DisplayChoice) => Promise<{ displays: DisplayPanel[]; current: DisplayChoice }>;
   onCaptureHotkey: (cb: () => void) => () => void;
+  minimize?: () => Promise<void>;
+  maximize?: () => Promise<WindowChromeState>;
+  close?: () => Promise<void>;
+  windowState?: () => Promise<WindowChromeState>;
+  onWindowState?: (cb: (state: WindowChromeState) => void) => () => void;
 }
 
 interface Window {

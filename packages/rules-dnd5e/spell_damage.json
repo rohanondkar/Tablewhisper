@@ -1,0 +1,353 @@
+{
+  "acid arrow": {
+    "damage": "4d4+2d4",
+    "type": "acid",
+    "half": false
+  },
+  "acid splash": {
+    "damage": "1d6",
+    "type": "acid",
+    "half": false,
+    "scale": true,
+    "save": "dexterity"
+  },
+  "arcane sword": {
+    "damage": "3d10",
+    "type": "force",
+    "half": false
+  },
+  "black tentacles": {
+    "damage": "3d6",
+    "type": "bludgeoning",
+    "half": false,
+    "save": "dexterity"
+  },
+  "blade barrier": {
+    "damage": "6d10",
+    "type": "slashing",
+    "half": true,
+    "save": "dexterity"
+  },
+  "blight": {
+    "damage": "8d8",
+    "type": "necrotic",
+    "half": true,
+    "save": "constitution"
+  },
+  "burning hands": {
+    "damage": "3d6",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "call lightning": {
+    "damage": "3d10",
+    "type": "lightning",
+    "half": true,
+    "save": "dexterity"
+  },
+  "chain lightning": {
+    "damage": "10d8",
+    "type": "lightning",
+    "half": true,
+    "save": "dexterity"
+  },
+  "chill touch": {
+    "damage": "1d8",
+    "type": "necrotic",
+    "half": false,
+    "scale": true
+  },
+  "circle of death": {
+    "damage": "8d6",
+    "type": "necrotic",
+    "half": true,
+    "save": "constitution"
+  },
+  "cloudkill": {
+    "damage": "5d8",
+    "type": "poison",
+    "half": true,
+    "save": "constitution"
+  },
+  "cone of cold": {
+    "damage": "8d8",
+    "type": "cold",
+    "half": true,
+    "save": "constitution"
+  },
+  "delayed blast fireball": {
+    "damage": "12d6",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "disintegrate": {
+    "damage": "10d6+40",
+    "type": "force",
+    "half": false,
+    "save": "dexterity"
+  },
+  "eldritch blast": {
+    "damage": "1d10",
+    "type": "force",
+    "half": false,
+    "scale": true
+  },
+  "feeblemind": {
+    "damage": "4d6",
+    "type": "psychic",
+    "half": true,
+    "save": "intelligence"
+  },
+  "finger of death": {
+    "damage": "7d8+30",
+    "type": "necrotic",
+    "half": true,
+    "save": "constitution"
+  },
+  "fire bolt": {
+    "damage": "1d10",
+    "type": "fire",
+    "half": false,
+    "scale": true
+  },
+  "fire storm": {
+    "damage": "7d10",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "fireball": {
+    "damage": "8d6",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "flame blade": {
+    "damage": "3d6",
+    "type": "fire",
+    "half": false
+  },
+  "flame strike": {
+    "damage": "4d6+4d6",
+    "type": "fire and radiant",
+    "half": true,
+    "save": "dexterity"
+  },
+  "flaming sphere": {
+    "damage": "2d6",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "freezing sphere": {
+    "damage": "10d6",
+    "type": "cold",
+    "half": true,
+    "save": "constitution"
+  },
+  "glyph of warding": {
+    "damage": "5d8",
+    "type": "",
+    "half": true,
+    "save": "dexterity"
+  },
+  "guardian of faith": {
+    "damage": "20",
+    "type": "radiant",
+    "half": false,
+    "save": "dexterity"
+  },
+  "harm": {
+    "damage": "14d6",
+    "type": "necrotic",
+    "half": true,
+    "save": "constitution"
+  },
+  "heat metal": {
+    "damage": "2d8",
+    "type": "fire",
+    "half": false,
+    "save": "constitution"
+  },
+  "hellish rebuke": {
+    "damage": "2d10",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "ice storm": {
+    "damage": "2d8+4d6",
+    "type": "bludgeoning and cold",
+    "half": true,
+    "save": "dexterity"
+  },
+  "incendiary cloud": {
+    "damage": "10d8",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "inflict wounds": {
+    "damage": "3d10",
+    "type": "necrotic",
+    "half": false
+  },
+  "insect plague": {
+    "damage": "4d10",
+    "type": "piercing",
+    "half": true,
+    "save": "constitution"
+  },
+  "lightning bolt": {
+    "damage": "8d6",
+    "type": "lightning",
+    "half": true,
+    "save": "dexterity"
+  },
+  "magic missile": {
+    "damage": "3d4+3",
+    "type": "force",
+    "half": false,
+    "auto": true
+  },
+  "meteor swarm": {
+    "damage": "20d6+20d6",
+    "type": "bludgeoning and fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "moonbeam": {
+    "damage": "2d10",
+    "type": "radiant",
+    "half": true,
+    "save": "constitution"
+  },
+  "phantasmal killer": {
+    "damage": "4d10",
+    "type": "psychic",
+    "half": true,
+    "save": "wisdom"
+  },
+  "poison spray": {
+    "damage": "1d12",
+    "type": "poison",
+    "half": false,
+    "scale": true,
+    "save": "constitution"
+  },
+  "prismatic spray": {
+    "damage": "10d6",
+    "type": "",
+    "half": true,
+    "save": "dexterity"
+  },
+  "produce flame": {
+    "damage": "1d8",
+    "type": "fire",
+    "half": false,
+    "scale": true
+  },
+  "ray of frost": {
+    "damage": "1d8",
+    "type": "cold",
+    "half": false,
+    "scale": true
+  },
+  "sacred flame": {
+    "damage": "1d8",
+    "type": "radiant",
+    "half": false,
+    "scale": true,
+    "save": "dexterity"
+  },
+  "scorching ray": {
+    "damage": "2d6",
+    "type": "fire",
+    "half": false
+  },
+  "shatter": {
+    "damage": "3d8",
+    "type": "thunder",
+    "half": true,
+    "save": "constitution"
+  },
+  "shocking grasp": {
+    "damage": "1d8",
+    "type": "lightning",
+    "half": false,
+    "scale": true
+  },
+  "spirit guardians": {
+    "damage": "3d8",
+    "type": "radiant",
+    "half": true,
+    "save": "wisdom"
+  },
+  "spiritual weapon": {
+    "damage": "1d8",
+    "type": "force",
+    "half": false,
+    "ability": true
+  },
+  "storm of vengeance": {
+    "damage": "2d6",
+    "type": "thunder",
+    "half": false
+  },
+  "sunbeam": {
+    "damage": "6d8",
+    "type": "radiant",
+    "half": true,
+    "save": "constitution"
+  },
+  "sunburst": {
+    "damage": "12d6",
+    "type": "radiant",
+    "half": true,
+    "save": "constitution"
+  },
+  "thunderwave": {
+    "damage": "2d8",
+    "type": "thunder",
+    "half": true,
+    "save": "constitution"
+  },
+  "vampiric touch": {
+    "damage": "3d6",
+    "type": "necrotic",
+    "half": false
+  },
+  "vicious mockery": {
+    "damage": "1d4",
+    "type": "psychic",
+    "half": false,
+    "scale": true,
+    "save": "wisdom"
+  },
+  "wall of fire": {
+    "damage": "5d8",
+    "type": "fire",
+    "half": true,
+    "save": "dexterity"
+  },
+  "wall of ice": {
+    "damage": "10d6",
+    "type": "cold",
+    "half": true,
+    "save": "dexterity"
+  },
+  "wall of thorns": {
+    "damage": "7d8",
+    "type": "slashing",
+    "half": true,
+    "save": "dexterity"
+  },
+  "weird": {
+    "damage": "4d10",
+    "type": "psychic",
+    "half": true,
+    "save": "wisdom"
+  }
+}
