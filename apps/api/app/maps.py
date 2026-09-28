@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from . import db, monsters, npcs
+from . import db, items as catalog_items, monsters, npcs
 from .config import DATA_DIR
 from .token_art import placed_enemy_image
 from .creature_size import ensure_creature_size, normalize_size, size_to_squares
@@ -78,6 +78,8 @@ def ensure_map_tables() -> None:
               points_json TEXT NOT NULL,
               door INTEGER NOT NULL DEFAULT 0,
               door_open INTEGER NOT NULL DEFAULT 0,
+              door_secret INTEGER NOT NULL DEFAULT 0,
+              door_locked INTEGER NOT NULL DEFAULT 0,
               block_movement INTEGER NOT NULL DEFAULT 1,
               block_sight INTEGER NOT NULL DEFAULT 1,
               target_map_id TEXT,
@@ -134,6 +136,8 @@ def _ensure_map_columns(conn: Any) -> None:
         ("map_walls", "target_x", "REAL"),
         ("map_walls", "target_y", "REAL"),
         ("map_walls", "link_wall_id", "TEXT"),
+        ("map_walls", "door_secret", "INTEGER NOT NULL DEFAULT 0"),
+        ("map_walls", "door_locked", "INTEGER NOT NULL DEFAULT 0"),
         ("map_lights", "kind", "TEXT NOT NULL DEFAULT 'torch'"),
     )
     for table, column, decl in alters:
@@ -332,10 +336,383 @@ def set_background(
     return get_map(map_id)
 
 
+_NO_WALLS = "That file has no wall lines. Export UVTT when the walls should come along."
+
+
+def _xy(point: Any) -> tuple[float, float] | None:
+    if isinstance(point, dict) and "x" in point and "y" in point:
+        x, y = point["x"], point["y"]
+    elif isinstance(point, (list, tuple)) and len(point) >= 2:
+        x, y = point[0], point[1]
+    else:
+        return None
+    if isinstance(x, bool) or isinstance(y, bool):
+        return None
+    if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+        return None
+    return float(x), float(y)
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _image_bytes(raw: Any) -> bytes | None:
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    text = raw.strip()
+    if text.startswith("data:"):
+        text = text.split(",", 1)[-1]
+    try:
+        blob = base64.b64decode(text, validate=False)
+    except Exception:
+        return None
+    return blob or None
+
+
+def _image_ext(blob: bytes) -> str:
+    if blob.startswith(b"\x89PNG"):
+        return ".png"
+    if blob.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if blob.startswith(b"GIF8"):
+        return ".gif"
+    if blob.startswith(b"RIFF") and b"WEBP" in blob[:16]:
+        return ".webp"
+    return ".png"
+
+
+def _image_size(blob: bytes) -> tuple[float, float] | None:
+    try:
+        from io import BytesIO
+        from PIL import Image
+
+        with Image.open(BytesIO(blob)) as im:
+            return float(im.size[0]), float(im.size[1])
+    except Exception:
+        return None
+
+
+def _polyline(entry: Any, origin_x: float, origin_y: float) -> list[float]:
+    raw = entry
+    if isinstance(entry, dict):
+        raw = entry.get("points") or entry.get("line") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[float] = []
+    for point in raw:
+        xy = _xy(point)
+        if not xy:
+            continue
+        x, y = xy[0] - origin_x, xy[1] - origin_y
+        if len(out) >= 2 and abs(out[-2] - x) < 0.5 and abs(out[-1] - y) < 0.5:
+            continue
+        out.extend((x, y))
+    return out if len(out) >= 4 else []
+
+
+def _perp(px: float, py: float, ax: float, ay: float, bx: float, by: float) -> float:
+    length = math.hypot(bx - ax, by - ay) or 1.0
+    return abs((px - ax) * (by - ay) - (py - ay) * (bx - ax)) / length
+
+
+def _project_t(px: float, py: float, ax: float, ay: float, bx: float, by: float) -> float:
+    dx, dy = bx - ax, by - ay
+    length2 = dx * dx + dy * dy
+    if length2 < 1:
+        return 0.0
+    return ((px - ax) * dx + (py - ay) * dy) / length2
+
+
+def _span_length(points: list[float]) -> float:
+    total = 0.0
+    for i in range(2, len(points), 2):
+        total += math.hypot(points[i] - points[i - 2], points[i + 1] - points[i - 1])
+    return total
+
+
+def _keep_span(points: list[float]) -> list[float]:
+    if len(points) < 4 or _span_length(points) < 2:
+        return []
+    return points
+
+
+def _split_span(points: list[float], seg: int, t0: float, t1: float) -> tuple[list[float], list[float], list[float]]:
+    ax, ay = points[seg * 2], points[seg * 2 + 1]
+    bx, by = points[seg * 2 + 2], points[seg * 2 + 3]
+
+    def at(t: float) -> tuple[float, float]:
+        return ax + (bx - ax) * t, ay + (by - ay) * t
+
+    p0, p1 = at(t0), at(t1)
+    before = list(points[: seg * 2 + 2])
+    if t0 > 0.02:
+        before.extend(p0)
+    door = [p0[0], p0[1], p1[0], p1[1]]
+    after: list[float] = []
+    if t1 < 0.98:
+        after.extend(p1)
+    after.extend(points[(seg + 1) * 2 :])
+    return _keep_span(before), door, _keep_span(after)
+
+
+def _cut_door(walls: list[dict[str, Any]], door: dict[str, Any], reach: float) -> None:
+    """Lay a door on the nearest wall. A portal with no wall nearby stays its own segment."""
+    pts = door.get("points") or []
+    if len(pts) < 4:
+        return
+    sx, sy, ex, ey = pts[0], pts[1], pts[-2], pts[-1]
+    best: tuple[float, int, int, float, float] | None = None
+    for index, wall in enumerate(walls):
+        if wall.get("door"):
+            continue
+        wall_pts = wall["points"]
+        for i in range(0, len(wall_pts) - 2, 2):
+            ax, ay = wall_pts[i], wall_pts[i + 1]
+            bx, by = wall_pts[i + 2], wall_pts[i + 3]
+            length = math.hypot(bx - ax, by - ay)
+            if length < 2:
+                continue
+            score = max(_perp(sx, sy, ax, ay, bx, by), _perp(ex, ey, ax, ay, bx, by))
+            if score > reach:
+                continue
+            ta = min(1.0, max(0.0, _project_t(sx, sy, ax, ay, bx, by)))
+            tb = min(1.0, max(0.0, _project_t(ex, ey, ax, ay, bx, by)))
+            if abs(ta - tb) * length < 4:
+                continue
+            if best is None or score < best[0]:
+                best = (score, index, i // 2, min(ta, tb), max(ta, tb))
+    if best is None:
+        walls.append(door)
+        return
+    _, index, seg, t0, t1 = best
+    wall = walls[index]
+    before, span, after = _split_span(wall["points"], seg, t0, t1)
+    door = {**door, "points": span}
+    pieces: list[dict[str, Any]] = []
+    if before:
+        pieces.append({**wall, "points": before, "door": False, "door_open": False})
+    pieces.append(door)
+    if after:
+        pieces.append({
+            **wall,
+            "points": after,
+            "door": False,
+            "door_open": False,
+            "door_secret": False,
+            "door_locked": False,
+        })
+    walls[index : index + 1] = pieces
+
+
+def _portal_points(
+    portal: dict[str, Any],
+    origin_x: float,
+    origin_y: float,
+    cell: float,
+    width: float | None,
+    height: float | None,
+) -> list[float]:
+    bounds = portal.get("bounds") or []
+    if not isinstance(bounds, list) or len(bounds) < 2:
+        return []
+    a, b = _xy(bounds[0]), _xy(bounds[1])
+    if not a or not b:
+        return []
+    pos = _xy(portal.get("position"))
+
+    def inside(x: float, y: float) -> bool | None:
+        if width is None or height is None:
+            return None
+        pad = max(cell, 1.0)
+        return -pad <= x <= width + pad and -pad <= y <= height + pad
+
+    use_offset = False
+    if pos:
+        span = max(abs(a[0]), abs(a[1]), abs(b[0]), abs(b[1]))
+        near_origin = span <= max(cell, 1.0) * 3
+        mid_x = (a[0] + b[0]) / 2
+        mid_y = (a[1] + b[1]) / 2
+        position_is_midpoint = math.hypot(mid_x - pos[0], mid_y - pos[1]) <= max(cell, 1.0)
+        shifted = (a[0] + pos[0], a[1] + pos[1], b[0] + pos[0], b[1] + pos[1])
+        raw_in = inside(a[0], a[1]) and inside(b[0], b[1])
+        off_in = inside(shifted[0], shifted[1]) and inside(shifted[2], shifted[3])
+        if near_origin and not position_is_midpoint:
+            use_offset = True
+        elif raw_in is False and off_in:
+            use_offset = True
+    if use_offset and pos:
+        a = (a[0] + pos[0], a[1] + pos[1])
+        b = (b[0] + pos[0], b[1] + pos[1])
+    return [a[0] - origin_x, a[1] - origin_y, b[0] - origin_x, b[1] - origin_y]
+
+
+def _present_flag(portal: dict[str, Any], *names: str) -> bool | None:
+    for name in names:
+        if name in portal:
+            return bool(portal[name])
+    return None
+
+
+def _uvtt_read_error(filename: str) -> str:
+    name = (filename or "").lower()
+    if name.endswith((".ds", ".png", ".jpg", ".jpeg", ".webp", ".gif")):
+        return _NO_WALLS
+    return "That file is not a Universal VTT map."
+
+
+def plan_uvtt(payload: Any, feet_per_square: float, filename: str = "") -> dict[str, Any]:
+    """Read a Universal VTT document. Picture pixels stay the map coordinates."""
+    if not isinstance(payload, dict) or not any(
+        key in payload for key in ("line_of_sight", "portals", "resolution", "image")
+    ):
+        raise ValueError(_uvtt_read_error(filename))
+    res = payload.get("resolution") if isinstance(payload.get("resolution"), dict) else {}
+    origin = _xy(res.get("map_origin")) or (0.0, 0.0)
+    cell = _number(res.get("pixels_per_grid"))
+    size = res.get("map_size")
+    width = height = None
+    if isinstance(size, dict):
+        width = _number(size.get("x", size.get("width")))
+        height = _number(size.get("y", size.get("height")))
+    elif isinstance(size, (list, tuple)) and len(size) >= 2:
+        width, height = _number(size[0]), _number(size[1])
+    blob = _image_bytes(payload.get("image"))
+    if blob and (width is None or height is None):
+        measured = _image_size(blob)
+        if measured:
+            width = width if width is not None else measured[0]
+            height = height if height is not None else measured[1]
+    walls: list[dict[str, Any]] = []
+    sight = payload.get("line_of_sight") or []
+    if isinstance(sight, list):
+        for entry in sight:
+            points = _polyline(entry, origin[0], origin[1])
+            if points:
+                walls.append({
+                    "points": points,
+                    "door": False,
+                    "door_open": False,
+                    "block_movement": True,
+                    "block_sight": True,
+                })
+    reach = (cell if cell and cell > 0 else 70.0) * 1.25
+    portals = payload.get("portals") or []
+    if isinstance(portals, list):
+        for portal in portals:
+            if not isinstance(portal, dict):
+                continue
+            points = _portal_points(portal, origin[0], origin[1], cell or 70.0, width, height)
+            if len(points) < 4:
+                continue
+            closed = _present_flag(portal, "closed")
+            opened = _present_flag(portal, "open")
+            if closed is not None:
+                door_open = not closed
+            elif opened is not None:
+                door_open = opened
+            else:
+                door_open = False
+            door = {
+                "points": points,
+                "door": True,
+                "door_open": door_open,
+                "block_movement": True,
+                "block_sight": True,
+            }
+            if _present_flag(portal, "secret", "is_secret") is True:
+                door["door_secret"] = True
+            if _present_flag(portal, "locked", "is_locked") is True:
+                door["door_locked"] = True
+            _cut_door(walls, door, reach)
+    lights: list[dict[str, Any]] = []
+    raw_lights = payload.get("lights") or []
+    feet = feet_per_square if feet_per_square and feet_per_square > 0 else 5.0
+    if isinstance(raw_lights, list) and cell and cell > 0:
+        for entry in raw_lights:
+            if not isinstance(entry, dict):
+                continue
+            pos = _xy(entry.get("position") or entry.get("pos"))
+            bright_px = _number(entry.get("range"))
+            if bright_px is None:
+                bright_px = _number(entry.get("bright_range"))
+            if not pos or bright_px is None or bright_px <= 0:
+                continue
+            body: dict[str, Any] = {
+                "x": pos[0] - origin[0],
+                "y": pos[1] - origin[1],
+                "bright_ft": (bright_px / cell) * feet,
+                "dim_ft": 0,
+            }
+            dim_px = _number(entry.get("dim_range"))
+            if dim_px is None:
+                dim_px = _number(entry.get("dim"))
+            if dim_px is not None and dim_px > 0:
+                body["dim_ft"] = (dim_px / cell) * feet
+            kind = entry.get("kind") or entry.get("type")
+            if kind in ("torch", "lamp"):
+                body["kind"] = kind
+            lights.append(body)
+    if not blob and not walls:
+        raise ValueError(_NO_WALLS if not payload.get("image") else "That file has no map picture.")
+    note = None if walls else _NO_WALLS
+    return {
+        "image": blob,
+        "ext": _image_ext(blob) if blob else ".png",
+        "width": width,
+        "height": height,
+        "grid_size_px": cell if cell and cell > 0 else None,
+        "walls": walls,
+        "lights": lights,
+        "replace_geometry": bool(walls),
+        "note": note,
+    }
+
+
+def import_uvtt(map_id: str, payload: Any, filename: str = "") -> dict[str, Any]:
+    m = get_map(map_id)
+    if not m:
+        raise ValueError("Map not found")
+    plan = plan_uvtt(payload, float(m["feet_per_square"] or 5), filename)
+    if plan["replace_geometry"]:
+        with db.db() as conn:
+            conn.execute("DELETE FROM map_walls WHERE map_id = ?", (map_id,))
+            conn.execute("DELETE FROM map_lights WHERE map_id = ?", (map_id,))
+    image = plan["image"]
+    if image:
+        ensure_dirs()
+        tmp = MAP_IMAGE_DIR / f"_tmp_{uuid.uuid4().hex}{plan['ext']}"
+        tmp.write_bytes(image)
+        try:
+            set_background(map_id, tmp, f"map{plan['ext']}", width=plan["width"], height=plan["height"])
+        finally:
+            if tmp.exists():
+                tmp.unlink(missing_ok=True)
+    patch: dict[str, Any] = {}
+    if plan["grid_size_px"]:
+        patch["grid_size_px"] = plan["grid_size_px"]
+        patch["grid_offset_x"] = 0
+        patch["grid_offset_y"] = 0
+    if plan["width"] and plan["height"] and not image:
+        patch["width"] = plan["width"]
+        patch["height"] = plan["height"]
+    if patch:
+        patch_map(map_id, patch)
+    if plan["replace_geometry"]:
+        for wall in plan["walls"]:
+            add_wall(map_id, wall)
+        for light in plan["lights"]:
+            add_light(map_id, light)
+    return {"map_id": map_id, "note": plan["note"]}
+
+
 def delete_map(map_id: str) -> bool:
     m = get_map(map_id)
     if not m:
         return False
+    catalog_items.ensure_tables()
     _delete_map_assets(map_id, m.get("background_path"))
     with db.db() as conn:
         conn.execute("DELETE FROM map_tokens WHERE map_id = ?", (map_id,))
@@ -345,6 +722,11 @@ def delete_map(map_id: str) -> bool:
         conn.execute("DELETE FROM map_pools WHERE map_id = ?", (map_id,))
         conn.execute("DELETE FROM map_ground WHERE map_id = ?", (map_id,))
         conn.execute("DELETE FROM map_portals WHERE map_id = ?", (map_id,))
+        conn.execute(
+            "DELETE FROM chest_items WHERE chest_id IN (SELECT id FROM map_chests WHERE map_id = ?)",
+            (map_id,),
+        )
+        conn.execute("DELETE FROM map_chests WHERE map_id = ?", (map_id,))
         conn.execute("DELETE FROM maps WHERE id = ?", (map_id,))
         if m.get("active"):
             nxt = conn.execute(
@@ -623,6 +1005,10 @@ def add_token(map_id: str, body: dict[str, Any], *, move_existing: bool = True) 
                 json.dumps(body.get("data") or {}),
             ),
         )
+    try:
+        refresh_token_portraits(map_id)
+    except Exception:
+        pass
     return get_token(tid)  # type: ignore[return-value]
 
 
@@ -898,6 +1284,8 @@ def _wall_out(r: Any) -> dict[str, Any]:
         "points": json.loads(r["points_json"]),
         "door": bool(r["door"]),
         "door_open": bool(r["door_open"]),
+        "door_secret": bool(r["door_secret"]) if "door_secret" in keys else False,
+        "door_locked": bool(r["door_locked"]) if "door_locked" in keys else False,
         "block_movement": bool(r["block_movement"]),
         "block_sight": bool(r["block_sight"]),
         "target_map_id": r["target_map_id"] if "target_map_id" in keys else None,
@@ -924,9 +1312,10 @@ def add_wall(map_id: str, body: dict[str, Any]) -> dict[str, Any]:
         conn.execute(
             """
             INSERT INTO map_walls(
-              id, map_id, points_json, door, door_open, block_movement, block_sight,
+              id, map_id, points_json, door, door_open, door_secret, door_locked,
+              block_movement, block_sight,
               target_map_id, target_x, target_y, link_wall_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 wid,
@@ -934,6 +1323,8 @@ def add_wall(map_id: str, body: dict[str, Any]) -> dict[str, Any]:
                 json.dumps(points),
                 1 if body.get("door") else 0,
                 1 if body.get("door_open") else 0,
+                1 if body.get("door_secret") else 0,
+                1 if body.get("door_locked") else 0,
                 1 if body.get("block_movement", True) else 0,
                 1 if body.get("block_sight", True) else 0,
                 body.get("target_map_id"),
@@ -1697,10 +2088,6 @@ def full_map_state(map_id: str) -> dict[str, Any] | None:
     m = get_map(map_id)
     if not m:
         return None
-    try:
-        refresh_token_portraits(map_id)
-    except Exception:
-        pass
     return {
         "map": m,
         "tokens": list_tokens(map_id),
@@ -1708,4 +2095,5 @@ def full_map_state(map_id: str) -> dict[str, Any] | None:
         "lights": list_lights(map_id),
         "portals": list_portals(map_id),
         "pools": list_pools(map_id),
+        "chests": catalog_items.list_chests(map_id),
     }

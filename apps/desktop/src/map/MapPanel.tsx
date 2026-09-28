@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Image as KonvaImage, Line, Circle, Rect, Text, Group, Shape } from "react-konva";
 import type Konva from "konva";
 import {
@@ -9,8 +9,10 @@ import {
   type CheckResult,
   type EncounterEnemy,
   type MapLight,
+  type MapChest,
   type MapPortal,
   type MapToken,
+  type CatalogItem,
   type MapSetupBody,
   type MapPool,
   type MapWall,
@@ -24,7 +26,9 @@ import { titleTheme, type ThemeChrome } from "../titleThemes";
 import { CREATURE_SIZES, sizeToSquares } from "./sizes";
 import { LightMarks } from "./LightMarks";
 import { MapSetup } from "./MapSetup";
-import { LiquidOverlay, POOL_KINDS, maskCovers, poolNote } from "./pools";
+import { LiquidOverlay, maskCovers, poolNote } from "./pools";
+import { MapToolbar } from "./MapToolbar";
+import { TextAsk } from "../TextAsk";
 import { boundsSegments, feetToPx, visibilityPolygon, wallsToSegments } from "./vision";
 import {
   AimOverlay,
@@ -54,7 +58,7 @@ import {
   type Tile,
   type Travel,
 } from "./effects";
-import ResolveModal, { amountIn, effortFailed, mapLine, playFate, printedSaveBonus, rollPrintedDamage, strikeOutcome, type ResolveRow } from "./ResolveModal";
+import ResolveModal, { amountIn, effortFailed, mapLine, playFate, printedSaveBonus, strikeOutcome, sumEnteredDice, type ResolveRow } from "./ResolveModal";
 import TurnOrder, { sortTurns, type TurnSlot } from "./TurnOrder";
 
 const API_BASE = "http://127.0.0.1:8766";
@@ -137,14 +141,15 @@ type Tool =
   | "door"
   | "light"
   | "portal"
-  | "liquid";
+  | "chest"
+  | "liquid"
+  | "erase"
+  | "delete";
 
 type Props = {
   characters: Character[];
   encounter: EncounterEnemy[];
   scene: SceneNpc[];
-  monsters: MonsterTemplate[];
-  npcs: NpcTemplate[];
   active: boolean;
   selectedCharacterId: string | null;
   queryPulse: { id: number; text: string; result: CheckResult } | null;
@@ -210,12 +215,78 @@ function pasteCanvas(target: HTMLCanvasElement, source: HTMLCanvasElement) {
   ctx.drawImage(source, 0, 0);
 }
 
-export default function MapPanel({
+function spanLength(points: number[]): number {
+  let total = 0;
+  for (let i = 2; i < points.length; i += 2) {
+    total += Math.hypot(points[i] - points[i - 2], points[i + 1] - points[i - 1]);
+  }
+  return total;
+}
+
+function keepSpan(points: number[]): number[] {
+  return points.length >= 4 && spanLength(points) >= 2 ? points : [];
+}
+
+function splitSpan(points: number[], seg: number, t0: number, t1: number) {
+  const ax = points[seg * 2];
+  const ay = points[seg * 2 + 1];
+  const bx = points[seg * 2 + 2];
+  const by = points[seg * 2 + 3];
+  const at = (t: number) => [ax + (bx - ax) * t, ay + (by - ay) * t] as const;
+  const p0 = at(t0);
+  const p1 = at(t1);
+  const before = points.slice(0, seg * 2 + 2);
+  if (t0 > 0.02) before.push(p0[0], p0[1]);
+  const door = [p0[0], p0[1], p1[0], p1[1]];
+  const after: number[] = [];
+  if (t1 < 0.98) after.push(p1[0], p1[1]);
+  after.push(...points.slice((seg + 1) * 2));
+  return { before: keepSpan(before), door, after: keepSpan(after) };
+}
+
+function doorOnWall(walls: MapWall[], stroke: number[], reach: number) {
+  const sx = stroke[0];
+  const sy = stroke[1];
+  const ex = stroke[stroke.length - 2];
+  const ey = stroke[stroke.length - 1];
+  let best: { wall: MapWall; seg: number; t0: number; t1: number; score: number } | null = null;
+  for (const wall of walls) {
+    if (wall.door) continue;
+    const pts = wall.points;
+    for (let i = 0; i < pts.length - 2; i += 2) {
+      const ax = pts[i];
+      const ay = pts[i + 1];
+      const bx = pts[i + 2];
+      const by = pts[i + 3];
+      const length = Math.hypot(bx - ax, by - ay);
+      if (length < 2) continue;
+      const perp = (px: number, py: number) =>
+        Math.abs((px - ax) * (by - ay) - (py - ay) * (bx - ax)) / length;
+      const score = Math.max(perp(sx, sy), perp(ex, ey));
+      if (score > reach) continue;
+      const project = (px: number, py: number) => {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const len2 = dx * dx + dy * dy;
+        if (len2 < 1) return 0;
+        return Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / len2));
+      };
+      const ta = project(sx, sy);
+      const tb = project(ex, ey);
+      if (Math.abs(ta - tb) * length < 4) continue;
+      if (!best || score < best.score) {
+        best = { wall, seg: i / 2, t0: Math.min(ta, tb), t1: Math.max(ta, tb), score };
+      }
+    }
+  }
+  if (!best) return null;
+  return { wall: best.wall, ...splitSpan(best.wall.points, best.seg, best.t0, best.t1) };
+}
+
+function MapPanel({
   characters,
   encounter,
   scene,
-  monsters,
-  npcs,
   active,
   selectedCharacterId,
   queryPulse,
@@ -241,6 +312,13 @@ export default function MapPanel({
   const [walls, setWalls] = useState<MapWall[]>([]);
   const [lights, setLights] = useState<MapLight[]>([]);
   const [portals, setPortals] = useState<MapPortal[]>([]);
+  const [chests, setChests] = useState<MapChest[]>([]);
+  const [selectedChestId, setSelectedChestId] = useState<string | null>(null);
+  const [chestCatalog, setChestCatalog] = useState<CatalogItem[]>([]);
+  const [chestPick, setChestPick] = useState("");
+  const [chestMenu, setChestMenu] = useState<null | { id: string; name: string; x: number; y: number }>(null);
+  const [renameChest, setRenameChest] = useState<null | { id: string; name: string }>(null);
+  const [deleteChest, setDeleteChest] = useState<null | { id: string; name: string }>(null);
   const [pools, setPools] = useState<MapPool[]>([]);
   const [poolKind, setPoolKind] = useState<PoolKind>("water");
   const [poolDepth, setPoolDepth] = useState(5);
@@ -262,6 +340,9 @@ export default function MapPanel({
     creatures: RulingCreature[];
     travel: Travel | null;
   } | null>(null);
+  const [catalogMonsters, setCatalogMonsters] = useState<MonsterTemplate[]>([]);
+  const [catalogNpcs, setCatalogNpcs] = useState<NpcTemplate[]>([]);
+  const catalogOnce = useRef(false);
   const [trayW, setTrayW] = useState(() => mapColumnWidth("tray"));
   const [inspectW, setInspectW] = useState(() => mapColumnWidth("inspect"));
   const mapBodyRef = useRef<HTMLDivElement | null>(null);
@@ -298,6 +379,10 @@ export default function MapPanel({
   const [wallDraft, setWallDraft] = useState<number[]>([]);
   const [portalDraft, setPortalDraft] = useState<{ x: number; y: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sceneAsk, setSceneAsk] = useState<string | null>(null);
+  const [mapMenu, setMapMenu] = useState<null | { id: string; name: string; x: number; y: number }>(null);
+  const [renameMap, setRenameMap] = useState<null | { id: string; name: string }>(null);
+  const [deleteAsk, setDeleteAsk] = useState<null | { id: string; name: string }>(null);
   const [calibrating, setCalibrating] = useState(false);
   const [sqWide, setSqWide] = useState("24");
   const [sqTall, setSqTall] = useState("16");
@@ -305,7 +390,17 @@ export default function MapPanel({
   const [fogBrush, setFogBrush] = useState(40);
   const [catalogFilter, setCatalogFilter] = useState("");
   const [trayMode, setTrayMode] = useState<"field" | "add-foe" | "add-npc">("field");
+  useEffect(() => {
+    if (!active || catalogOnce.current) return;
+    if (trayMode === "field" && !pendingResolve) return;
+    catalogOnce.current = true;
+    void Promise.all([api.listMonsters(), api.listNpcs().catch(() => [] as NpcTemplate[])]).then(([mons, npcList]) => {
+      setCatalogMonsters(mons);
+      setCatalogNpcs(npcList);
+    });
+  }, [active, trayMode, pendingResolve]);
   const stageWrapRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
   const [stageSize, setStageSize] = useState({ w: 900, h: 600 });
   const fogCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const poolMasks = useRef(new Map<string, HTMLCanvasElement>());
@@ -315,6 +410,21 @@ export default function MapPanel({
   const activePoolRef = useRef<string | null>(null);
   const poolsRef = useRef(pools);
   poolsRef.current = pools;
+  const wallsRef = useRef(walls);
+  const lightsRef = useRef(lights);
+  const portalsRef = useRef(portals);
+  wallsRef.current = walls;
+  lightsRef.current = lights;
+  portalsRef.current = portals;
+  const erasing = useRef(false);
+  const eraseStroke = useRef<{
+    walls: MapWall[];
+    lights: MapLight[];
+    portals: MapPortal[];
+    fog: HTMLCanvasElement | null;
+    pools: Map<string, HTMLCanvasElement>;
+    last: { x: number; y: number } | null;
+  } | null>(null);
   const lastPoolPt = useRef<{ x: number; y: number } | null>(null);
   const drawingWall = useRef(false);
   const wallDraftRef = useRef<number[]>([]);
@@ -340,6 +450,22 @@ export default function MapPanel({
   const seenPulse = useRef(0);
   const seenMark = useRef(0);
   onErrorRef.current = onError;
+
+  useEffect(() => {
+    if (!selectedChestId) return;
+    let cancelled = false;
+    void api
+      .listItems()
+      .then((rows) => {
+        if (cancelled) return;
+        setChestCatalog(rows);
+        setChestPick((cur) => cur || rows[0]?.id || "");
+      })
+      .catch((err) => onErrorRef.current(err instanceof Error ? err.message : String(err)));
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChestId]);
 
   const bgUrl = map?.background_url
     ? mediaUrlSync(map.background_url, API_BASE) + `?v=${map.id}-${bgVersion}`
@@ -412,6 +538,8 @@ export default function MapPanel({
         setWalls(state.walls);
         setLights(state.lights);
         setPortals(state.portals);
+        setChests(state.chests || []);
+        setSelectedChestId(null);
         poolMasks.current.clear();
         poolsReady.current.clear();
         groundCanvas.current = null;
@@ -429,6 +557,7 @@ export default function MapPanel({
         setWalls([]);
         setLights([]);
         setPortals([]);
+        setChests([]);
         setPools([]);
         onErrorRef.current(e instanceof Error ? e.message : String(e));
       }
@@ -480,7 +609,7 @@ export default function MapPanel({
   }
 
   async function undoMap() {
-    if (undoing.current || drawingWall.current || paintingPool.current || paintingFog.current) return;
+    if (undoing.current || drawingWall.current || paintingPool.current || paintingFog.current || erasing.current) return;
     const job = undoStack.current.pop();
     if (!job) return;
     undoing.current = true;
@@ -823,13 +952,22 @@ export default function MapPanel({
       setPendingResolve(null);
       if (pending.travel) beginTravel(pending.travel);
       const note = (pending.result.notes || pending.result.roll_line || "").trim();
-      const amount = pending.result.check_type === "spell" ? rollPrintedDamage(pending.result.damage) : null;
-      if (amount != null) {
+      const shared = pending.result.check_type === "spell" ? sumEnteredDice(pending.result.damage, rows[0]?.dice || [], false) : null;
+      const lines: string[] = [];
+      const taken: number[] = [];
+      if (pending.result.check_type === "spell") {
         for (const row of rows) {
+          const amount = amountIn(row.info) ?? shared;
+          if (amount == null) continue;
           if (row.creature) await Promise.resolve(onApply(row.creature, amount));
+          taken.push(amount);
+          const brief = mapLine(pending.result, row, { strike: { kind: "damage", amount } });
+          if (brief) lines.push(brief);
         }
-        onFate([note, `They take ${amount}.`].filter(Boolean).join(" "));
-        showOnMap(rows.map((row) => mapLine(pending.result, row, { strike: { kind: "damage", amount } })));
+      }
+      if (taken.length) {
+        onFate([note, `They take ${taken.join(", ")}.`].filter(Boolean).join(" "));
+        showOnMap(lines);
       } else if (note) onFate(note);
       return;
     }
@@ -863,6 +1001,7 @@ export default function MapPanel({
         row.info,
         row.save,
         printedSaveBonus(pending.result, row.creature),
+        row.dice || [],
       );
       if (strike.kind === "pending") hold = true;
       planned.push({ row, strike, healing: null });
@@ -1235,6 +1374,26 @@ export default function MapPanel({
     setSetupFile(file);
   }
 
+  async function onImportMap(file: File) {
+    const lower = file.name.toLowerCase();
+    if (/\.(png|jpe?g|webp|gif)$/.test(lower)) {
+      onErrorRef.current("That file has no wall lines. Export UVTT when the walls should come along.");
+      onUploadBackground(file);
+      return;
+    }
+    setBusy(true);
+    try {
+      const existing = await ensureMap();
+      const result = await api.importMapFile(existing.id, file);
+      if (result.note) onErrorRef.current(result.note);
+      await loadState(existing.id);
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function confirmSetup(file: File, body: MapSetupBody) {
     setBusy(true);
     try {
@@ -1296,13 +1455,215 @@ export default function MapPanel({
   }
 
   async function createScene() {
-    const name = window.prompt("Scene name", `Map ${mapsList.length + 1}`);
-    if (!name) return;
+    setSceneAsk(`Map ${mapsList.length + 1}`);
+  }
+
+  async function submitScene(name: string) {
+    setSceneAsk(null);
+    if (!name.trim()) return;
     setBusy(true);
     try {
-      const created = await api.createMap(name);
+      const created = await api.createMap(name.trim());
       await api.activateMap(created.id);
       await loadState(created.id);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      onErrorRef.current(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function openMapMenu(event: { preventDefault: () => void; stopPropagation: () => void; clientX: number; clientY: number }, id: string, name: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    setMapMenu({ id, name, x: event.clientX, y: event.clientY });
+  }
+
+  async function submitRename(name: string) {
+    if (!renameMap) return;
+    const id = renameMap.id;
+    setRenameMap(null);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      const updated = await api.patchMap(id, { name: trimmed });
+      setMapsList((prev) => prev.map((row) => (row.id === updated.id ? { ...row, name: updated.name } : row)));
+      setMap((current) => (current && current.id === updated.id ? { ...current, name: updated.name } : current));
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function replaceChest(updated: MapChest) {
+    setChests((prev) => prev.map((row) => (row.id === updated.id ? updated : row)));
+  }
+
+  async function submitChestRename(name: string) {
+    if (!renameChest) return;
+    const id = renameChest.id;
+    setRenameChest(null);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      replaceChest(await api.patchMapChest(id, { name: trimmed }));
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function deletePiece(piece: { kind: "chest" | "portal" | "light" | "wall" | "token"; id: string }) {
+    const mapId = map?.id;
+    if (!mapId) return;
+    try {
+      if (piece.kind === "chest") {
+        const chest = chests.find((item) => item.id === piece.id);
+        if (!chest) return;
+        await api.deleteMapChest(chest.id);
+        setChests((prev) => prev.filter((item) => item.id !== chest.id));
+        setSelectedChestId(null);
+        remember(async () => {
+          let restored = await api.addMapChest(mapId, {
+            name: chest.name,
+            x: chest.x,
+            y: chest.y,
+            kind: chest.kind,
+          });
+          for (const row of chest.contents) {
+            restored = await api.addChestItem(restored.id, row.item.id, row.qty);
+          }
+          setChests((prev) => [...prev, restored]);
+          setSelectedChestId(restored.id);
+        });
+        return;
+      }
+      if (piece.kind === "portal") {
+        const portal = portals.find((item) => item.id === piece.id);
+        if (!portal) return;
+        await api.deleteMapPortal(portal.id);
+        setPortals((prev) => prev.filter((item) => item.id !== portal.id));
+        setSelectedPortalId(null);
+        remember(async () => {
+          const created = await api.addMapPortal(mapId, {
+            x: portal.x,
+            y: portal.y,
+            radius: portal.radius,
+            target_map_id: portal.target_map_id,
+            target_x: portal.target_x,
+            target_y: portal.target_y,
+            label: portal.label,
+          });
+          setPortals((prev) => [...prev, created]);
+          setSelectedPortalId(created.id);
+        });
+        return;
+      }
+      if (piece.kind === "light") {
+        const light = lights.find((item) => item.id === piece.id);
+        if (!light) return;
+        await api.deleteMapLight(light.id);
+        setLights((prev) => prev.filter((item) => item.id !== light.id));
+        setSelectedLightId(null);
+        remember(async () => {
+          const created = await api.addMapLight(mapId, {
+            x: light.x,
+            y: light.y,
+            bright_ft: light.bright_ft,
+            dim_ft: light.dim_ft,
+            kind: light.kind === "lamp" ? "lamp" : "torch",
+          });
+          setLights((prev) => [...prev, created]);
+          setSelectedLightId(created.id);
+        });
+        return;
+      }
+      if (piece.kind === "wall") {
+        const wall = walls.find((item) => item.id === piece.id);
+        if (!wall) return;
+        await api.deleteMapWall(wall.id);
+        setWalls((prev) => prev.filter((item) => item.id !== wall.id));
+        setSelectedWallId(null);
+        remember(async () => {
+          const created = await api.addMapWall(mapId, {
+            points: wall.points,
+            door: wall.door,
+            door_open: wall.door_open,
+            block_movement: wall.block_movement,
+            block_sight: wall.block_sight,
+            target_map_id: wall.target_map_id ?? null,
+            target_x: wall.target_x ?? null,
+            target_y: wall.target_y ?? null,
+            link_wall_id: wall.link_wall_id ?? null,
+          });
+          setWalls((prev) => [...prev, created]);
+          setSelectedWallId(created.id);
+        });
+        return;
+      }
+      if (piece.kind === "token") {
+        const token = tokens.find((item) => item.id === piece.id);
+        if (!token) return;
+        await api.deleteMapToken(token.id);
+        setTokens((prev) => prev.filter((item) => item.id !== token.id));
+        setSelectedTokenId(null);
+        remember(async () => {
+          const created = await api.addMapToken(mapId, {
+            kind: token.kind,
+            ref_id: token.ref_id,
+            label: token.label,
+            x: token.x,
+            y: token.y,
+            rotation: token.rotation,
+            size: token.size,
+            size_sq: token.size_sq,
+            vision_ft: token.vision_ft,
+            light_bright_ft: token.light_bright_ft,
+            light_dim_ft: token.light_dim_ft,
+            show_vision: token.show_vision,
+            image_url: token.image_url,
+            data: token.data,
+          });
+          setTokens((prev) => [...prev, created]);
+          setSelectedTokenId(created.id);
+        });
+      }
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function confirmDeleteChest() {
+    if (!deleteChest) return;
+    const id = deleteChest.id;
+    setDeleteChest(null);
+    try {
+      await api.deleteMapChest(id);
+      setChests((prev) => prev.filter((row) => row.id !== id));
+      setSelectedChestId((cur) => (cur === id ? null : cur));
+    } catch (e) {
+      onErrorRef.current(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function confirmDeleteMap() {
+    if (!deleteAsk) return;
+    const id = deleteAsk.id;
+    setDeleteAsk(null);
+    setBusy(true);
+    try {
+      await api.deleteMap(id);
+      const list = await refreshList();
+      if (list.length === 0) {
+        const created = await api.createMap("Map 1");
+        await api.activateMap(created.id);
+        await loadState(created.id);
+      } else if (!list.some((row) => row.id === map?.id)) {
+        const next = list.find((row) => row.active) || list[0];
+        await loadState(next.id);
+      }
     } catch (e) {
       onErrorRef.current(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1507,7 +1868,14 @@ export default function MapPanel({
       ctx.fill();
     }
     lastFogPt.current = { x, y };
-    setFogVersion((v) => v + 1);
+    const stage = stageRef.current;
+    const canvas = fogCanvasRef.current;
+    if (stage && canvas) {
+      stage.find(".fog").forEach((node) => {
+        (node as Konva.Image).image(canvas);
+      });
+      stage.batchDraw();
+    }
   }
 
   function poolCanvasSize(m: BattleMap) {
@@ -1552,7 +1920,157 @@ export default function MapPanel({
       ctx.fill();
     }
     lastPoolPt.current = { x, y };
-    setPoolRev((v) => v + 1);
+  }
+
+  function stampClear(canvas: HTMLCanvasElement, mapX: number, mapY: number, prev: { x: number; y: number } | null) {
+    if (!map) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const x = (mapX / map.width) * canvas.width;
+    const y = (mapY / map.height) * canvas.height;
+    const scale = canvas.width / Math.max(1, map.width);
+    const radius = Math.max(4, fogBrush * scale);
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.strokeStyle = "#000";
+    ctx.fillStyle = "#000";
+    ctx.lineWidth = radius * 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    if (prev) {
+      ctx.beginPath();
+      ctx.moveTo((prev.x / map.width) * canvas.width, (prev.y / map.height) * canvas.height);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function markHits(points: number[], x: number, y: number, reach: number) {
+    if (nearPolyline(x, y, points, reach)) return true;
+    for (let i = 0; i + 1 < points.length; i += 2) {
+      if (Math.hypot(x - points[i], y - points[i + 1]) <= reach) return true;
+    }
+    return false;
+  }
+
+  function eraseAt(x: number, y: number) {
+    const stroke = eraseStroke.current;
+    if (!stroke || !map) return;
+    const reach = Math.max(12, fogBrush);
+    const wallIds = new Set(stroke.walls.map((wall) => wall.id));
+    const hitWalls = wallsRef.current.filter((wall) => !wallIds.has(wall.id) && markHits(wall.points, x, y, reach));
+    if (hitWalls.length) stroke.walls.push(...hitWalls);
+    const lightIds = new Set(stroke.lights.map((light) => light.id));
+    const hitLights = lightsRef.current.filter(
+      (light) => !lightIds.has(light.id) && Math.hypot(x - light.x, y - light.y) <= reach
+    );
+    if (hitLights.length) stroke.lights.push(...hitLights);
+    const portalIds = new Set(stroke.portals.map((portal) => portal.id));
+    const hitPortals = portalsRef.current.filter(
+      (portal) => !portalIds.has(portal.id) && Math.hypot(x - portal.x, y - portal.y) <= Math.max(reach, portal.radius)
+    );
+    if (hitPortals.length) stroke.portals.push(...hitPortals);
+    if (fogCanvasRef.current) stampClear(fogCanvasRef.current, x, y, stroke.last);
+    for (const canvas of poolMasks.current.values()) stampClear(canvas, x, y, stroke.last);
+    stroke.last = { x, y };
+    const stage = stageRef.current;
+    const fog = fogCanvasRef.current;
+    if (stage && fog) {
+      stage.find(".fog").forEach((node) => {
+        (node as Konva.Image).image(fog);
+      });
+      stage.batchDraw();
+    }
+  }
+
+  async function finishErase() {
+    const stroke = eraseStroke.current;
+    eraseStroke.current = null;
+    erasing.current = false;
+    if (!stroke || !map) return;
+    const goneWalls = new Set(stroke.walls.map((wall) => wall.id));
+    const goneLights = new Set(stroke.lights.map((light) => light.id));
+    const gonePortals = new Set(stroke.portals.map((portal) => portal.id));
+    if (goneWalls.size) {
+      setWalls((prev) => prev.filter((wall) => !goneWalls.has(wall.id)));
+      setSelectedWallId((cur) => (cur && goneWalls.has(cur) ? null : cur));
+    }
+    if (goneLights.size) {
+      setLights((prev) => prev.filter((light) => !goneLights.has(light.id)));
+      setSelectedLightId((cur) => (cur && goneLights.has(cur) ? null : cur));
+    }
+    if (gonePortals.size) {
+      setPortals((prev) => prev.filter((portal) => !gonePortals.has(portal.id)));
+      setSelectedPortalId((cur) => (cur && gonePortals.has(cur) ? null : cur));
+    }
+    setFogVersion((v) => v + 1);
+    const mapId = map.id;
+    try {
+      for (const wall of stroke.walls) await api.deleteMapWall(wall.id);
+      for (const light of stroke.lights) await api.deleteMapLight(light.id);
+      for (const portal of stroke.portals) await api.deleteMapPortal(portal.id);
+      if (stroke.fog) await persistFog();
+      for (const poolId of stroke.pools.keys()) {
+        if (poolMasks.current.has(poolId)) await persistPool(poolId);
+      }
+      remember(async () => {
+        for (const wall of stroke.walls) {
+          const created = await api.addMapWall(mapId, {
+            points: wall.points,
+            door: wall.door,
+            door_open: wall.door_open,
+            block_movement: wall.block_movement,
+            block_sight: wall.block_sight,
+            target_map_id: wall.target_map_id ?? null,
+            target_x: wall.target_x ?? null,
+            target_y: wall.target_y ?? null,
+            link_wall_id: wall.link_wall_id ?? null,
+          });
+          setWalls((prev) => [...prev, created]);
+        }
+        for (const light of stroke.lights) {
+          const created = await api.addMapLight(mapId, {
+            x: light.x,
+            y: light.y,
+            bright_ft: light.bright_ft,
+            dim_ft: light.dim_ft,
+            kind: light.kind === "lamp" ? "lamp" : "torch",
+          });
+          setLights((prev) => [...prev, created]);
+        }
+        for (const portal of stroke.portals) {
+          const created = await api.addMapPortal(mapId, {
+            x: portal.x,
+            y: portal.y,
+            radius: portal.radius,
+            target_map_id: portal.target_map_id,
+            target_x: portal.target_x,
+            target_y: portal.target_y,
+            label: portal.label,
+          });
+          setPortals((prev) => [...prev, created]);
+        }
+        const fogCanvas = fogCanvasRef.current;
+        if (stroke.fog && fogCanvas) {
+          pasteCanvas(fogCanvas, stroke.fog);
+          setFogVersion((v) => v + 1);
+          const blob = await new Promise<Blob | null>((resolve) => fogCanvas.toBlob((b) => resolve(b), "image/png"));
+          if (blob) setMap(await api.uploadFog(mapId, blob));
+        }
+        for (const [poolId, before] of stroke.pools) {
+          const canvas = poolMasks.current.get(poolId);
+          if (!canvas) continue;
+          pasteCanvas(canvas, before);
+          setPoolRev((v) => v + 1);
+          await persistPool(poolId);
+        }
+      });
+    } catch (err) {
+      onErrorRef.current(err instanceof Error ? err.message : String(err));
+    }
   }
 
   async function persistPool(poolId: string) {
@@ -1609,6 +2127,8 @@ export default function MapPanel({
       return;
     }
 
+    if (tool === "delete") return;
+
     const p = stagePointer(stage);
     if (!p) return;
 
@@ -1631,6 +2151,22 @@ export default function MapPanel({
       wallDoorRef.current = tool === "door";
       wallDraftRef.current = [s.x, s.y];
       setWallDraft([s.x, s.y]);
+      return;
+    }
+
+    if (tool === "erase") {
+      const pools = new Map<string, HTMLCanvasElement>();
+      for (const [id, canvas] of poolMasks.current) pools.set(id, copyCanvas(canvas));
+      eraseStroke.current = {
+        walls: [],
+        lights: [],
+        portals: [],
+        fog: fogCanvasRef.current ? copyCanvas(fogCanvasRef.current) : null,
+        pools,
+        last: null,
+      };
+      erasing.current = true;
+      eraseAt(p.x, p.y);
       return;
     }
 
@@ -1675,6 +2211,24 @@ export default function MapPanel({
       const s = snap(p.x, p.y);
       setPortalDraft(s);
       setSelectedPortalId(null);
+      return;
+    }
+
+    if (tool === "chest") {
+      const s = snap(p.x, p.y);
+      try {
+        const created = await api.addMapChest(map.id, { name: "Chest", x: s.x, y: s.y, kind: "chest" });
+        setChests((prev) => [...prev, created]);
+        setSelectedChestId(created.id);
+        setTool("select");
+        remember(async () => {
+          await api.deleteMapChest(created.id);
+          setChests((prev) => prev.filter((row) => row.id !== created.id));
+          setSelectedChestId((cur) => (cur === created.id ? null : cur));
+        });
+      } catch (err) {
+        onErrorRef.current(err instanceof Error ? err.message : String(err));
+      }
       return;
     }
 
@@ -1738,6 +2292,7 @@ export default function MapPanel({
     if (paintingPool.current && tool === "liquid" && activePoolRef.current) {
       paintPoolStroke(p.x, p.y, poolErase, activePoolRef.current);
     }
+    if (erasing.current && tool === "erase") eraseAt(p.x, p.y);
   }
 
   async function onStageMouseUp(e?: Konva.KonvaEventObject<MouseEvent>) {
@@ -1746,7 +2301,11 @@ export default function MapPanel({
     if (panning.current) {
       panning.current = false;
       setGrabbing(false);
+      if (erasing.current) await finishErase();
       return;
+    }
+    if (erasing.current) {
+      await finishErase();
     }
     if (pending && !pending.moved && tool === "select") {
       const stage = e?.target?.getStage?.();
@@ -1803,19 +2362,77 @@ export default function MapPanel({
       setWallDraft([]);
       if (map && pts.length >= 4) {
         try {
-          const w = await api.addMapWall(map.id, {
-            points: pts,
-            door: wallDoorRef.current,
-            door_open: false,
-            block_movement: true,
-            block_sight: true,
-          });
-          setWalls((prev) => [...prev, w]);
-          remember(async () => {
-            await api.deleteMapWall(w.id);
-            setWalls((prev) => prev.filter((item) => item.id !== w.id));
-            setSelectedWallId((cur) => (cur === w.id ? null : cur));
-          });
+          if (wallDoorRef.current) {
+            const reach = (map.grid_size_px || 70) * 1.25;
+            const cut = doorOnWall(wallsRef.current, pts, reach);
+            if (!cut) {
+              onErrorRef.current("Draw the door along a wall.");
+            } else {
+              const created: MapWall[] = [];
+              const original = cut.wall;
+              if (cut.before.length >= 4) {
+                const updated = await api.patchMapWall(original.id, { points: cut.before });
+                setWalls((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+              } else {
+                await api.deleteMapWall(original.id);
+                setWalls((prev) => prev.filter((item) => item.id !== original.id));
+              }
+              const door = await api.addMapWall(map.id, {
+                points: cut.door,
+                door: true,
+                door_open: false,
+                block_movement: true,
+                block_sight: true,
+              });
+              created.push(door);
+              setWalls((prev) => [...prev, door]);
+              if (cut.after.length >= 4) {
+                const rest = await api.addMapWall(map.id, {
+                  points: cut.after,
+                  door: false,
+                  door_open: false,
+                  block_movement: original.block_movement,
+                  block_sight: original.block_sight,
+                });
+                created.push(rest);
+                setWalls((prev) => [...prev, rest]);
+              }
+              remember(async () => {
+                for (const piece of created) {
+                  await api.deleteMapWall(piece.id);
+                }
+                setWalls((prev) => prev.filter((item) => !created.some((piece) => piece.id === item.id)));
+                if (cut.before.length >= 4) {
+                  const restored = await api.patchMapWall(original.id, { points: original.points });
+                  setWalls((prev) => prev.map((item) => (item.id === restored.id ? restored : item)));
+                } else {
+                  const restored = await api.addMapWall(map.id, {
+                    points: original.points,
+                    door: false,
+                    door_open: false,
+                    block_movement: original.block_movement,
+                    block_sight: original.block_sight,
+                  });
+                  setWalls((prev) => [...prev, restored]);
+                }
+                setSelectedWallId(null);
+              });
+            }
+          } else {
+            const w = await api.addMapWall(map.id, {
+              points: pts,
+              door: false,
+              door_open: false,
+              block_movement: true,
+              block_sight: true,
+            });
+            setWalls((prev) => [...prev, w]);
+            remember(async () => {
+              await api.deleteMapWall(w.id);
+              setWalls((prev) => prev.filter((item) => item.id !== w.id));
+              setSelectedWallId((cur) => (cur === w.id ? null : cur));
+            });
+          }
         } catch (err) {
           onErrorRef.current(err instanceof Error ? err.message : String(err));
         }
@@ -2021,7 +2638,7 @@ export default function MapPanel({
   }, [map]);
 
   const visionPolys = useMemo(() => {
-    if (!map || !showVision) return [] as VisionArea[];
+    if (!map || !showVision || !active) return [] as VisionArea[];
     const blockers = segs.length ? [...segs, ...boundsSegments(map.width, map.height)] : segs;
     const out: VisionArea[] = [];
     const push = (key: string, cx: number, cy: number, radius: number, dim?: boolean) => {
@@ -2049,7 +2666,7 @@ export default function MapPanel({
       push(`L-${L.id}-b`, L.x, L.y, bright);
     }
     return out;
-  }, [map, tokens, lights, segs, showVision]);
+  }, [map, tokens, lights, segs, showVision, active]);
 
   const measureLabel = useMemo(() => {
     if (!measure || !map) return null;
@@ -2062,14 +2679,14 @@ export default function MapPanel({
   const fogCanvasImage = fogVersion >= 0 ? fogCanvasRef.current : null;
 
   const filterLower = catalogFilter.trim().toLowerCase();
-  const filteredMonsters = monsters.filter(
+  const filteredMonsters = catalogMonsters.filter(
     (m) => !filterLower || m.name.toLowerCase().includes(filterLower)
   );
-  const filteredNpcs = npcs.filter(
+  const filteredNpcs = catalogNpcs.filter(
     (n) => !filterLower || n.name.toLowerCase().includes(filterLower)
   );
 
-    const aiming = tool === "fog" || tool === "fog-erase";
+    const aiming = tool === "fog" || tool === "fog-erase" || tool === "erase" || tool === "delete";
 
   return (
     <div className="map-workspace">
@@ -2081,6 +2698,7 @@ export default function MapPanel({
               type="button"
               className={`btn ghost ${map?.id === m.id ? "active-tab" : ""}`}
               onClick={() => void switchMap(m.id)}
+              onContextMenu={(event) => openMapMenu(event, m.id, m.name)}
             >
               {m.name}
             </button>
@@ -2090,8 +2708,8 @@ export default function MapPanel({
           </button>
         </div>
         <div className="row">
-          <label className="btn">
-            Upload map
+          <label className="btn" data-tip="Use a picture as this scene's map.">
+            Upload
             <input
               type="file"
               accept="image/*"
@@ -2103,26 +2721,40 @@ export default function MapPanel({
               }}
             />
           </label>
-          <button type="button" className="btn" disabled={busy || !map} onClick={() => void syncTokens()}>
-            Sync tokens
+          <label className="btn" data-tip="Bring in a Dungeon Scrawl Universal VTT file, with its walls and doors.">
+            Import
+            <input
+              type="file"
+              accept=".uvtt,.dd2vtt,.df2vtt,.ds,.json,image/*"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void onImportMap(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <button type="button" className="btn ghost" disabled={busy || !map} data-tip="Place the party and the encounter on this map." onClick={() => void syncTokens()}>
+            Sync
           </button>
           <button
             type="button"
             className={`btn ${playerPreview ? "" : "ghost"}`}
+            data-tip={playerPreview ? "Turn off the player view and show the whole map." : "Show the map as the players see it, with fog hiding the rest."}
             onClick={() => setPlayerPreview((v) => !v)}
           >
-            {playerPreview ? "Player preview ON" : "Player preview"}
+            {playerPreview ? "Preview on" : "Preview"}
           </button>
           <button
             type="button"
             className={`btn ${showVision ? "" : "ghost"}`}
-            title="Yellow rings are vision / light range. Off by default."
+            data-tip={showVision ? "Hide the light and vision rings." : "Show the light and vision rings."}
             onClick={() => setShowVision((v) => !v)}
           >
-            {showVision ? "Vision ON" : "Vision OFF"}
+            Vision
           </button>
-          <button type="button" className="btn ghost" onClick={() => setCalibrating((v) => !v)}>
-            Calibrate grid
+          <button type="button" className="btn ghost" data-tip="Set how many squares the map is." onClick={() => setCalibrating((v) => !v)}>
+            Grid
           </button>
         </div>
       </div>
@@ -2390,172 +3022,80 @@ export default function MapPanel({
             />
           ) : (
           <>
-          <div className="map-tools">
-            {(
-              [
-                ["select", "Select"],
-                ["measure", "Ruler"],
-                ["fog", "Fog"],
-                ["fog-erase", "Reveal"],
-                ["wall", "Wall"],
-                ["door", "Door"],
-                ["liquid", "Liquid"],
-                ["light", "Light"],
-                ["portal", "Portal"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                className={`btn ghost ${tool === id ? "active-tab" : ""}`}
-                onClick={() => {
-                  setTool(id);
-                  if (id !== "measure") setMeasure(null);
-                  if (id !== "wall" && id !== "door") setWallDraft([]);
-                  if (id !== "portal") setPortalDraft(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-            {(tool === "fog" || tool === "fog-erase") && (
-              <label className="fog-brush-label">
-                Brush
-                <input
-                  type="range"
-                  min={10}
-                  max={120}
-                  value={fogBrush}
-                  onChange={(e) => setFogBrush(Number(e.target.value))}
-                />
-              </label>
-            )}
-            {(tool === "wall" || tool === "door") && (
-              <span className="muted small">Drag, then let go. Ctrl+Z undoes.</span>
-            )}
-            {tool === "liquid" && (
-              <>
-                <select
-                  value={poolKind}
-                  onChange={(event) => {
-                    setPoolKind(event.target.value as PoolKind);
-                    activePoolRef.current = null;
-                    setActivePoolId(null);
-                  }}
-                >
-                  {POOL_KINDS.map((kind) => (
-                    <option key={kind} value={kind}>
-                      {kind}
-                    </option>
-                  ))}
-                </select>
-                <label className="fog-brush-label">
-                  Depth ft
-                  <input
-                    type="number"
-                    min={0}
-                    value={poolDepth}
-                    onChange={(event) => setPoolDepth(Math.max(0, Number(event.target.value) || 0))}
-                  />
-                </label>
-                <label className="fog-brush-label">
-                  Current ft
-                  <input
-                    type="number"
-                    min={0}
-                    value={poolCurrent}
-                    onChange={(event) => setPoolCurrent(Math.max(0, Number(event.target.value) || 0))}
-                  />
-                </label>
-                <label className="fog-brush-label">
-                  Direction
-                  <input
-                    type="number"
-                    min={0}
-                    max={359}
-                    value={poolDeg}
-                    onChange={(event) => setPoolDeg(((Number(event.target.value) || 0) % 360 + 360) % 360)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className={`btn ghost ${poolErase ? "active-tab" : ""}`}
-                  onClick={() => setPoolErase((on) => !on)}
-                >
-                  {poolErase ? "Erasing" : "Erase"}
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => {
-                    activePoolRef.current = null;
-                    setActivePoolId(null);
-                    setPoolErase(false);
-                  }}
-                >
-                  New pool
-                </button>
-              </>
-            )}
-            {map && (
-              <>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={async () => {
-                    const before = fogCanvasRef.current ? copyCanvas(fogCanvasRef.current) : null;
-                    const mapId = map.id;
-                    ensureFogCanvas(map, true);
-                    await api.resetFog(map.id);
-                    setFogVersion((v) => v + 1);
-                    const updated = await api.getMapState(map.id);
-                    setMap(updated.map);
-                    if (!before) return;
-                    remember(async () => {
-                      const canvas = fogCanvasRef.current;
-                      if (!canvas) return;
-                      pasteCanvas(canvas, before);
-                      setFogVersion((v) => v + 1);
-                      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
-                      if (!blob) return;
-                      setMap(await api.uploadFog(mapId, blob));
-                    });
-                  }}
-                >
-                  Reset fog
-                </button>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => {
-                    const c = fogCanvasRef.current;
-                    if (!c || !map) return;
-                    const before = copyCanvas(c);
-                    const mapId = map.id;
-                    const ctx = c.getContext("2d");
-                    if (!ctx) return;
-                    ctx.clearRect(0, 0, c.width, c.height);
-                    setFogVersion((v) => v + 1);
-                    void persistFog().then(() => {
-                      remember(async () => {
-                        const canvas = fogCanvasRef.current;
-                        if (!canvas) return;
-                        pasteCanvas(canvas, before);
-                        setFogVersion((v) => v + 1);
-                        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
-                        if (!blob) return;
-                        setMap(await api.uploadFog(mapId, blob));
-                      });
-                    });
-                  }}
-                >
-                  Reveal all
-                </button>
-              </>
-            )}
-          </div>
+          <MapToolbar
+            tool={tool}
+            setTool={setTool}
+            setMeasure={() => setMeasure(null)}
+            setWallDraft={setWallDraft}
+            setPortalDraft={() => setPortalDraft(null)}
+            fogBrush={fogBrush}
+            setFogBrush={setFogBrush}
+            poolKind={poolKind}
+            poolDepth={poolDepth}
+            setPoolDepth={setPoolDepth}
+            poolCurrent={poolCurrent}
+            setPoolCurrent={setPoolCurrent}
+            poolDeg={poolDeg}
+            setPoolDeg={setPoolDeg}
+            poolErase={poolErase}
+            setPoolErase={setPoolErase}
+            onPoolKind={(kind) => {
+              setPoolKind(kind);
+              activePoolRef.current = null;
+              setActivePoolId(null);
+            }}
+            onNewPool={() => {
+              activePoolRef.current = null;
+              setActivePoolId(null);
+              setPoolErase(false);
+            }}
+            mapReady={Boolean(map)}
+            onResetFog={() => {
+              if (!map) return;
+              const before = fogCanvasRef.current ? copyCanvas(fogCanvasRef.current) : null;
+              const mapId = map.id;
+              ensureFogCanvas(map, true);
+              void api.resetFog(map.id).then(async () => {
+                setFogVersion((v) => v + 1);
+                const updated = await api.getMapState(map.id);
+                setMap(updated.map);
+                if (!before) return;
+                remember(async () => {
+                  const canvas = fogCanvasRef.current;
+                  if (!canvas) return;
+                  pasteCanvas(canvas, before);
+                  setFogVersion((v) => v + 1);
+                  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+                  if (!blob) return;
+                  setMap(await api.uploadFog(mapId, blob));
+                });
+              });
+            }}
+            onRevealAll={() => {
+              const c = fogCanvasRef.current;
+              if (!c || !map) return;
+              const before = copyCanvas(c);
+              const mapId = map.id;
+              const ctx = c.getContext("2d");
+              if (!ctx) return;
+              ctx.clearRect(0, 0, c.width, c.height);
+              setFogVersion((v) => v + 1);
+              void persistFog().then(() => {
+                remember(async () => {
+                  const canvas = fogCanvasRef.current;
+                  if (!canvas) return;
+                  pasteCanvas(canvas, before);
+                  setFogVersion((v) => v + 1);
+                  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), "image/png"));
+                  if (!blob) return;
+                  setMap(await api.uploadFog(mapId, blob));
+                });
+              });
+            }}
+          />
 
           <Stage
+            ref={stageRef}
             width={stageSize.w}
             height={stageSize.h}
             scaleX={scale}
@@ -2572,6 +3112,11 @@ export default function MapPanel({
             onMouseMove={(e) => onStageMouseMove(e)}
             onMouseUp={(e) => void onStageMouseUp(e)}
             onMouseLeave={() => void onStageMouseUp()}
+            onContextMenu={(event) => {
+              event.evt.preventDefault();
+              if (!map) return;
+              openMapMenu(event.evt, map.id, map.name);
+            }}
           >
             <Layer>
               {map && (
@@ -2591,56 +3136,16 @@ export default function MapPanel({
                 />
               ))}
             </Layer>
-            {map && (
-              <Layer listening={false}>
-                <LiquidOverlay pools={pools} masks={poolMasks.current} width={map.width} height={map.height} />
-              </Layer>
-            )}
-
-            <Layer listening={false}>
-              {map && (
-                <Group
-                  clipX={0}
-                  clipY={0}
-                  clipWidth={map.width}
-                  clipHeight={map.height}
-                  listening={false}
-                >
-                  {visionPolys.map((v) =>
-                    v.points.length >= 6 ? (
-                      <VisionFan key={v.key} area={v} color={chrome.vision} />
-                    ) : v.radius > 0 ? (
-                      <Circle
-                        key={v.key}
-                        x={v.cx}
-                        y={v.cy}
-                        radius={v.radius}
-                        fill={withAlpha(chrome.vision, v.dim ? 0.16 : 0.35)}
-                        stroke={withAlpha(chrome.vision, v.dim ? 0.35 : 0.85)}
-                        strokeWidth={1}
-                        listening={false}
-                      />
-                    ) : null
-                  )}
-                  {showVision && playerPreview && fogCanvasImage && (
-                    <KonvaImage
-                      image={fogCanvasImage}
-                      width={map.width}
-                      height={map.height}
-                      globalCompositeOperation="destination-out"
-                      listening={false}
-                    />
-                  )}
-                </Group>
-              )}
-            </Layer>
-
             <Layer>
               <LightMarks
                 lights={lights}
                 selectedId={selectedLightId}
                 draggable={tool === "select"}
                 onSelect={(id) => {
+                  if (tool === "delete") {
+                    void deletePiece({ kind: "light", id });
+                    return;
+                  }
                   setSelectedLightId(id);
                   setSelectedTokenId(null);
                 }}
@@ -2670,9 +3175,14 @@ export default function MapPanel({
                         : "#c44"
                   }
                   strokeWidth={w.door ? 5 : 4}
+                  dash={w.door_secret ? [10, 8] : undefined}
                   lineCap="round"
                   lineJoin="round"
                   onClick={async () => {
+                    if (tool === "delete") {
+                      void deletePiece({ kind: "wall", id: w.id });
+                      return;
+                    }
                     setSelectedWallId(w.id);
                     if (w.door && tool === "select") {
                       const wasOpen = w.door_open;
@@ -2702,6 +3212,10 @@ export default function MapPanel({
                   }}
                   onClick={(ev) => {
                     ev.cancelBubble = true;
+                    if (tool === "delete") {
+                      void deletePiece({ kind: "portal", id: p.id });
+                      return;
+                    }
                     setSelectedPortalId(p.id);
                   }}
                   onDblClick={async (ev) => {
@@ -2733,6 +3247,60 @@ export default function MapPanel({
                   <Text text={p.label} y={-p.radius - 14} fontSize={12} fill="#d7bfff" />
                 </Group>
               ))}
+              {chests.map((chest) => (
+                <Group
+                  key={chest.id}
+                  x={chest.x}
+                  y={chest.y}
+                  draggable={tool === "select"}
+                  onDragStart={(ev) => {
+                    ev.cancelBubble = true;
+                  }}
+                  onClick={(ev) => {
+                    ev.cancelBubble = true;
+                    if (tool === "delete") {
+                      void deletePiece({ kind: "chest", id: chest.id });
+                      return;
+                    }
+                    setSelectedChestId(chest.id);
+                  }}
+                  onContextMenu={(ev) => {
+                    ev.evt.preventDefault();
+                    ev.cancelBubble = true;
+                    setChestMenu({ id: chest.id, name: chest.name, x: ev.evt.clientX, y: ev.evt.clientY });
+                  }}
+                  onDragEnd={async (ev) => {
+                    ev.cancelBubble = true;
+                    const previous = { x: chest.x, y: chest.y };
+                    const nextX = ev.target.x();
+                    const nextY = ev.target.y();
+                    const updated = await api.patchMapChest(chest.id, { x: nextX, y: nextY });
+                    replaceChest(updated);
+                    if (previous.x === nextX && previous.y === nextY) return;
+                    remember(async () => {
+                      replaceChest(await api.patchMapChest(chest.id, previous));
+                    });
+                  }}
+                >
+                  <Rect
+                    x={-(map?.grid_size_px || 50) * 0.35}
+                    y={-(map?.grid_size_px || 50) * 0.28}
+                    width={(map?.grid_size_px || 50) * 0.7}
+                    height={(map?.grid_size_px || 50) * 0.5}
+                    fill={selectedChestId === chest.id ? "#8a5a32" : "#6b4324"}
+                    stroke="#e2c08a"
+                    strokeWidth={2}
+                    cornerRadius={3}
+                  />
+                  <Text
+                    text={chest.name}
+                    y={-(map?.grid_size_px || 50) * 0.55}
+                    fontSize={12}
+                    fill="#e2c08a"
+                    offsetX={chest.name.length * 3}
+                  />
+                </Group>
+              ))}
               {portalDraft && map && (
                 <Group x={portalDraft.x} y={portalDraft.y} listening={false}>
                   <Circle
@@ -2743,6 +3311,54 @@ export default function MapPanel({
                     fill="rgba(155,89,255,0.28)"
                   />
                   <Text text="Pick a scene" y={-map.grid_size_px - 8} fontSize={12} fill="#d7bfff" />
+                </Group>
+              )}
+            </Layer>
+
+            <Layer listening={false}>
+              {map && (
+                <LiquidOverlay
+                  pools={pools}
+                  masks={poolMasks.current}
+                  width={map.width}
+                  height={map.height}
+                  active={active}
+                />
+              )}
+              {map && (
+                <Group
+                  clipX={0}
+                  clipY={0}
+                  clipWidth={map.width}
+                  clipHeight={map.height}
+                  listening={false}
+                >
+                  {visionPolys.map((v) =>
+                    v.points.length >= 6 ? (
+                      <VisionFan key={v.key} area={v} color={chrome.vision} />
+                    ) : v.radius > 0 ? (
+                      <Circle
+                        key={v.key}
+                        x={v.cx}
+                        y={v.cy}
+                        radius={v.radius}
+                        fill={withAlpha(chrome.vision, v.dim ? 0.16 : 0.35)}
+                        stroke={withAlpha(chrome.vision, v.dim ? 0.35 : 0.85)}
+                        strokeWidth={1}
+                        listening={false}
+                      />
+                    ) : null
+                  )}
+                  {showVision && playerPreview && fogCanvasImage && (
+                    <KonvaImage
+                      name="fog"
+                      image={fogCanvasImage}
+                      width={map.width}
+                      height={map.height}
+                      globalCompositeOperation="destination-out"
+                      listening={false}
+                    />
+                  )}
                 </Group>
               )}
             </Layer>
@@ -2761,6 +3377,10 @@ export default function MapPanel({
                     faded={tokenFaded(t)}
                     draggable={tool === "select" && !armed}
                     onSelect={() => {
+                      if (tool === "delete") {
+                        void deletePiece({ kind: "token", id: t.id });
+                        return;
+                      }
                       if (armed && map) {
                         const tile = tileOf(t.x + 1, t.y + 1, map);
                         const legal = highlighted.some((item) => item.c === tile.c && item.r === tile.r);
@@ -2782,9 +3402,7 @@ export default function MapPanel({
                   />
                 );
               })}
-            </Layer>
-
-            <Layer listening={false}>
+              <Group listening={false}>
               {map && <AimOverlay tiles={highlighted} grid={map} />}
               {map && travel && <TravelEffect travel={travel} progress={travelProgress} grid={map} />}
               <MarkLayer marks={marks} />
@@ -2800,9 +3418,6 @@ export default function MapPanel({
                   <PortalRing radius={map?.grid_size_px ? map.grid_size_px * 0.9 : 36} />
                 </Group>
               )}
-            </Layer>
-
-            <Layer listening={false}>
               {measure && (
                 <>
                   <Line points={measure} stroke="#5ad" strokeWidth={2} dash={[8, 4]} />
@@ -2815,21 +3430,18 @@ export default function MapPanel({
                   />
                 </>
               )}
-            </Layer>
-
-            {/* Only show fog while editing it or in player preview — always-on fog looked like a blank black map. */}
-            {fogCanvasImage && map && (playerPreview || tool === "fog" || tool === "fog-erase") && (
-              <Layer listening={false}>
+              {fogCanvasImage && map && (playerPreview || tool === "fog" || tool === "fog-erase" || tool === "erase") && (
                 <KonvaImage
-                  key={`fog-${fogVersion}`}
                   name="fog"
                   image={fogCanvasImage}
                   width={map.width}
                   height={map.height}
                   opacity={playerPreview ? 1 : 0.55}
+                  listening={false}
                 />
-              </Layer>
-            )}
+              )}
+              </Group>
+            </Layer>
           </Stage>
           </>
           )}
@@ -2847,11 +3459,15 @@ export default function MapPanel({
 
         <aside className={`map-inspector${inspectW < 48 ? " collapsed" : ""}`}>
           <h3>Inspector</h3>
-          <p className="muted small">
-            <strong>Select</strong> moves tokens. Drag empty map to slide it. <strong>Portal</strong> is one click, then
-            pick the scene in the panel. Double-click a doorway to open that scene. With Vision ON,
-            yellow sight uses each token's Vision (ft) and stops at walls and fog.
-          </p>
+          {!selectedToken && !selectedWallId && !selectedLightId && !selectedPortalId && (
+            <p className="muted small">
+              {tool === "delete"
+                ? "Click a chest, portal, light, door, wall, or token."
+                : tool === "select"
+                  ? "Drag a token to move it. Drag empty map to slide."
+                  : "Choose a tool, then use it on the map."}
+            </p>
+          )}
           {selectedToken && (
             <div className="map-inspector-block">
               <strong>{selectedToken.label}</strong>
@@ -2875,7 +3491,6 @@ export default function MapPanel({
                   ))}
                 </select>
               </label>
-              <p className="muted small">Drag an empty part of the map to slide it. Drag a token to move it.</p>
               {poolLines.length > 0 && (
                 <div className="map-inspector-block">
                   {poolLines.map((line, index) => (
@@ -3253,18 +3868,204 @@ export default function MapPanel({
           creatures={pendingResolve.creatures}
           characters={characters}
           scene={scene}
-          npcs={npcs}
+          npcs={catalogNpcs}
           encounter={encounter}
-          monsters={monsters}
+          monsters={catalogMonsters}
           apiBase={API_BASE}
           busy={applyBusy || busy}
           onCancel={() => setPendingResolve(null)}
           onSubmit={(rows) => void commitResolve(rows)}
         />
       )}
+      {sceneAsk !== null && (
+        <TextAsk
+          title="Scene name"
+          initial={sceneAsk}
+          onCancel={() => setSceneAsk(null)}
+          onSubmit={(name) => void submitScene(name)}
+        />
+      )}
+      {mapMenu && (
+        <>
+          <div
+            className="map-menu-shade"
+            onMouseDown={() => setMapMenu(null)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setMapMenu(null);
+            }}
+          />
+          <div className="map-context" style={{ left: mapMenu.x, top: mapMenu.y }}>
+            <button
+              type="button"
+              onClick={() => {
+                setRenameMap({ id: mapMenu.id, name: mapMenu.name });
+                setMapMenu(null);
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteAsk({ id: mapMenu.id, name: mapMenu.name });
+                setMapMenu(null);
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+      {renameMap && (
+        <TextAsk
+          title="Edit map"
+          initial={renameMap.name}
+          onCancel={() => setRenameMap(null)}
+          onSubmit={(name) => void submitRename(name)}
+        />
+      )}
+      {chestMenu && (
+        <>
+          <div
+            className="map-menu-shade"
+            onMouseDown={() => setChestMenu(null)}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              setChestMenu(null);
+            }}
+          />
+          <div className="map-context" style={{ left: chestMenu.x, top: chestMenu.y }}>
+            <button
+              type="button"
+              onClick={() => {
+                setRenameChest({ id: chestMenu.id, name: chestMenu.name });
+                setChestMenu(null);
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteChest({ id: chestMenu.id, name: chestMenu.name });
+                setChestMenu(null);
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+      {renameChest && (
+        <TextAsk
+          title="Edit chest"
+          initial={renameChest.name}
+          onCancel={() => setRenameChest(null)}
+          onSubmit={(name) => void submitChestRename(name)}
+        />
+      )}
+      {deleteChest && (
+        <div className="modal-backdrop name-ask" onClick={() => setDeleteChest(null)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <h2>Delete {deleteChest.name}?</h2>
+            <p>This removes the chest and everything inside it.</p>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setDeleteChest(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn" onClick={() => void confirmDeleteChest()}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {selectedChestId && chests.some((row) => row.id === selectedChestId) && (
+        <div className="modal-backdrop name-ask" onClick={() => setSelectedChestId(null)}>
+          <div className="modal-panel chest-panel" onClick={(event) => event.stopPropagation()}>
+            <h2>{chests.find((row) => row.id === selectedChestId)?.name}</h2>
+            {(chests.find((row) => row.id === selectedChestId)?.contents || []).map((row) => (
+              <div className="chest-row" key={row.id}>
+                <span>{row.item.name}</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={row.qty}
+                  onChange={(event) => {
+                    const qty = Number(event.target.value);
+                    if (!Number.isFinite(qty) || qty < 1) return;
+                    void api.setChestQty(row.id, qty).then(replaceChest).catch((err) => {
+                      onErrorRef.current(err instanceof Error ? err.message : String(err));
+                    });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => {
+                    void api.removeChestItem(row.id).then(replaceChest).catch((err) => {
+                      onErrorRef.current(err instanceof Error ? err.message : String(err));
+                    });
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <div className="chest-add">
+              <select value={chestPick} onChange={(event) => setChestPick(event.target.value)}>
+                {chestCatalog.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn"
+                disabled={!chestPick}
+                onClick={() => {
+                  void api.addChestItem(selectedChestId, chestPick, 1).then(replaceChest).catch((err) => {
+                    onErrorRef.current(err instanceof Error ? err.message : String(err));
+                  });
+                }}
+              >
+                Add
+              </button>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" data-tip="Delete this chest and everything inside it." onClick={() => selectedChestId && void deletePiece({ kind: "chest", id: selectedChestId })}>
+                Delete
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setSelectedChestId(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteAsk && (
+        <div className="modal-backdrop name-ask" onClick={() => setDeleteAsk(null)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <h2>Delete {deleteAsk.name}?</h2>
+            <p className="muted">This removes that scene, including its walls and pools.</p>
+            <div className="modal-actions">
+              <button type="button" className="btn ghost" onClick={() => setDeleteAsk(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn" onClick={() => void confirmDeleteMap()}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export default memo(MapPanel);
 
 function hpTone(current: number, max: number): "ok" | "mid" | "low" {
   if (max <= 0) return "low";

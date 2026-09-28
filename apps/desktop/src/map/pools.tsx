@@ -348,25 +348,41 @@ export function maskCovers(mask: HTMLCanvasElement, x: number, y: number, mapW: 
   return pixel[3] > 40;
 }
 
+function frameSize(mask: HTMLCanvasElement) {
+  const long = Math.max(mask.width, mask.height, 1);
+  const scale = Math.min(1, 256 / long);
+  return {
+    w: Math.max(1, Math.round(mask.width * scale)),
+    h: Math.max(1, Math.round(mask.height * scale)),
+  };
+}
+
 export function LiquidOverlay({
   pools,
   masks,
   width,
   height,
+  active,
 }: {
   pools: MapPool[];
   masks: Map<string, HTMLCanvasElement>;
   width: number;
   height: number;
+  active: boolean;
 }) {
   const layerRef = useRef<Konva.Layer>(null);
   const nodes = useRef<Record<string, Konva.Image | null>>({});
   const frames = useRef<Record<string, HTMLCanvasElement>>({});
 
   useEffect(() => {
+    if (!active) return;
     let raf = 0;
     let frame = 0;
-    const loop = () => {
+    let last = 0;
+    const loop = (now: number) => {
+      raf = requestAnimationFrame(loop);
+      if (now - last < 50) return;
+      last = now;
       frame += 1;
       let drew = false;
       for (const pool of pools) {
@@ -378,20 +394,20 @@ export function LiquidOverlay({
           canvas = document.createElement("canvas");
           frames.current[pool.id] = canvas;
         }
-        if (canvas.width !== mask.width || canvas.height !== mask.height) {
-          canvas.width = mask.width;
-          canvas.height = mask.height;
+        const size = frameSize(mask);
+        if (canvas.width !== size.w || canvas.height !== size.h) {
+          canvas.width = size.w;
+          canvas.height = size.h;
         }
         paintFrame(canvas, mask, pool, frame);
         node.image(canvas);
         drew = true;
       }
-      if (drew) layerRef.current?.getLayer()?.batchDraw();
-      raf = requestAnimationFrame(loop);
-    };
+      if (drew) layerRef.current?.batchDraw();
+      };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [pools, masks, width, height]);
+  }, [pools, masks, width, height, active]);
 
   return (
     <>

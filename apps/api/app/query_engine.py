@@ -1490,6 +1490,7 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
     target = None
     to_hit_needed = None
     howto = None
+    gear_math_lines: list[str] = []
     if incoming_actor and check_type == "attack" and character and gear:
         weapon = _pick_creature_weapon(text, incoming_actor)
         modifier = _parse_bonus((weapon or {}).get("attack_bonus"))
@@ -1511,6 +1512,21 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
         weapon = _pick_weapon(text, character)
         if character and weapon:
             weapon = gear_rules.ensure_damage(character, weapon)
+            math = gear_rules.apply_attack_math(character, weapon, text)
+            if math.get("blocked"):
+                return _impossible_check_result(
+                    text=text,
+                    character=character,
+                    info={"short": "not possible", "reason": math["blocked"]},
+                    source="rules" if not llm else "hybrid",
+                    reasoning=math["blocked"],
+                )
+            if math.get("attack_bonus") is not None:
+                weapon = dict(weapon)
+                weapon["attack_bonus"] = math["attack_bonus"]
+                if math.get("damage"):
+                    weapon["damage"] = math["damage"]
+            gear_math_lines = list(math.get("lines") or [])
         modifier = _modifier_for(character, check_type, ability, skill, weapon)
         try:
             target = npcs_mod.resolve_or_spawn_npc(text) or monsters_mod.resolve_or_spawn_target(text)
@@ -1615,6 +1631,8 @@ def _resolve_query(text: str, character_id: str | None = None) -> dict[str, Any]
     if check_type == "initiative":
         dice = ruleset.get("dice_defaults", {}).get("initiative", "1d20")
     attack_gate = (gear or {}).get("_attack_gate") or {}
+    for line in gear_math_lines:
+        factors.setdefault("lines", []).append(line)
     for line in attack_gate.get("lines") or []:
         factors.setdefault("lines", []).append(line)
     if attack_gate.get("disadvantage"):

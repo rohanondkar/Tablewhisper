@@ -283,13 +283,17 @@ export function setTitleTheme(id: TitleThemeId) {
 }
 
 const CURSOR_HOTSPOT: Record<TitleThemeId, [number, number]> = {
-  hearth: [12, 1],
+  hearth: [4, 8],
   atla: [16, 16],
   starwars: [16, 3],
   cyberpunk: [11, 5],
   shadowrun: [3, 3],
   cthulhu: [7, 5],
   savage: [16, 1],
+};
+
+const CURSOR_GRAB_HOTSPOT: Partial<Record<TitleThemeId, [number, number]>> = {
+  hearth: [22, 24],
 };
 
 const CURSOR_ART: Record<TitleThemeId, { pointer: string; grab: string }> = {
@@ -305,8 +309,9 @@ const CURSOR_ART: Record<TitleThemeId, { pointer: string; grab: string }> = {
 function installCursors(id: TitleThemeId) {
   const art = CURSOR_ART[id];
   const [hotX, hotY] = CURSOR_HOTSPOT[id];
+  const [grabX, grabY] = CURSOR_GRAB_HOTSPOT[id] || [16, 16];
   const pointer = `url("${art.pointer}") ${hotX} ${hotY}, auto`;
-  const closed = `url("${art.grab}") 16 16, auto`;
+  const closed = `url("${art.grab}") ${grabX} ${grabY}, auto`;
   let node = document.getElementById("theme-cursors");
   if (!node) {
     node = document.createElement("style");

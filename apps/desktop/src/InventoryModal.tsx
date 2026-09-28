@@ -1,8 +1,7 @@
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { api, mediaUrl, type BagSummary, type Character } from "./api";
 import HeldHand, {
-  HAND_KINDS,
   TONES,
   asTone,
   handArtKey,
@@ -16,33 +15,14 @@ import HeldHand, {
 type Gear = NonNullable<Character["equipment"]>[number];
 
 const PERSON_SLOTS = ["body", "shoulders", "belt", "back"] as const;
-const FRAME_KEYS = new Set([
-  "left-hand",
-  "right-hand",
-  "left-grip",
-  "right-grip",
-  "light-hand",
-  "body",
-  "shoulders",
-  "belt",
-  "back",
-  "pocket",
-  "bag-cell",
-  ...HAND_KINDS.flatMap((kind) => [`${kind}-hand`, `${kind}-grip`]),
-]);
-
 function gearSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 type Drag = {
   index: number;
-  dx: number;
-  dy: number;
   x: number;
   y: number;
-  w: number;
-  h: number;
 };
 
 export default function InventoryModal({
@@ -59,22 +39,14 @@ export default function InventoryModal({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
-  const [hover, setHover] = useState<{ col: number; row: number; ok: boolean } | null>(null);
   const [art, setArt] = useState<Record<string, string>>({});
   const [tone, setTone] = useState<Rgb | null>(asTone(character.hand_color));
-  const gridRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
   const gear = character.equipment || [];
   const gearRef = useRef(gear);
   gearRef.current = gear;
   const bags = character.bags?.length ? character.bags : character.bag ? [character.bag] : [];
   const active = bags[Math.min(tab, Math.max(bags.length - 1, 0))] || null;
-  const cols = active?.cols || 8;
-  const rows = active?.rows || 4;
-  const colsRef = useRef(cols);
-  const rowsRef = useRef(rows);
-  colsRef.current = cols;
-  rowsRef.current = rows;
   const activeRef = useRef(active);
   activeRef.current = active;
   const busyRef = useRef(busy);
@@ -83,11 +55,8 @@ export default function InventoryModal({
   const pockets = character.pockets || 0;
   const hands = gear.filter((item) => item.state === "equipped" && (item.effect === "weapon" || item.effect === "shield"));
   const person = gear.filter((item) => (item.state === "worn" || item.state === "attuned") && item.pocket == null);
-  const packed = gear.filter(
-    (item) => item.state === "unequipped" && item.placed && item.effect !== "unarmed" && inBag(item, active),
-  );
-  const loose = gear.filter(
-    (item) => item.state === "unequipped" && !item.placed && item.effect !== "unarmed" && inBag(item, active),
+  const stowed = gear.filter(
+    (item) => item.state === "unequipped" && item.effect !== "unarmed" && inBag(item, active),
   );
   const pocketItems = gear.filter((item) => item.state === "worn" && item.pocket != null);
 
@@ -108,17 +77,6 @@ export default function InventoryModal({
     ).then((pairs) => setArt(Object.fromEntries(pairs)));
   }
 
-  function picture(name: string): string {
-    const key = gearSlug(name);
-    if (art[key]) return art[key];
-    let best = "";
-    for (const known of Object.keys(art)) {
-      if (FRAME_KEYS.has(known) || known.startsWith("held-")) continue;
-      if ((key.startsWith(known) || key.includes(known)) && known.length > best.length) best = known;
-    }
-    return best ? art[best] : art.item || "";
-  }
-
   function heldPicture(name: string): string {
     const key = gearSlug(name);
     if (art[`held-${key}`]) return art[`held-${key}`];
@@ -129,10 +87,6 @@ export default function InventoryModal({
       if ((key === weapon || key.startsWith(`${weapon}-`) || key.includes(weapon)) && weapon.length > best.length) best = weapon;
     }
     return best ? art[`held-${best}`] : "";
-  }
-
-  function uploadPicture(name: string, file: File) {
-    void api.uploadGearImage(name, file).then((res) => applyArt(res.images));
   }
 
   const toneRef = useRef<Rgb | null>(asTone(character.hand_color));
@@ -158,39 +112,12 @@ export default function InventoryModal({
         !moved ||
         (patch.state != null && moved.state !== patch.state) ||
         (patch.hand != null && moved.hand !== patch.hand) ||
-        (typeof patch.pocket === "number" && moved.pocket !== patch.pocket) ||
-        (typeof patch.col === "number" && (moved.col !== patch.col || moved.row !== patch.row || !moved.placed)) ||
-        (patch.rotated !== undefined && Boolean(moved.rotated) !== Boolean(patch.rotated));
+        (typeof patch.pocket === "number" && moved.pocket !== patch.pocket);
       setNote(failed ? notes[0] || "That does not fit." : null);
     } finally {
       setBusy(false);
     }
   }
-
-  function rotate(index: number) {
-    const item = gearRef.current[index];
-    if (!item || item.state !== "unequipped" || busyRef.current) return;
-    void commit(index, {
-      state: "unequipped",
-      rotated: !item.rotated,
-      col: item.col ?? null,
-      row: item.row ?? null,
-      container: item.container || activeRef.current?.name || null,
-      pocket: null,
-      hand: null,
-    });
-  }
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key !== "r" && e.key !== "R") return;
-      if (selected == null) return;
-      e.preventDefault();
-      rotate(selected);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
 
   useEffect(() => {
     function move(e: PointerEvent) {
@@ -199,32 +126,16 @@ export default function InventoryModal({
       const next = { ...current, x: e.clientX, y: e.clientY };
       dragRef.current = next;
       setDrag(next);
-      const grid = gridRef.current;
-      if (!grid) return;
-      const rect = grid.getBoundingClientRect();
-      const cell = rect.width / colsRef.current;
-      const col = Math.round((e.clientX - current.dx - rect.left) / cell);
-      const row = Math.round((e.clientY - current.dy - rect.top) / cell);
-      const inside =
-        col >= 0 && row >= 0 && col + current.w <= colsRef.current && row + current.h <= rowsRef.current;
-      setHover(
-        e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom
-          ? { col, row, ok: inside && !overlaps(gearRef.current, current.index, col, row, current.w, current.h, activeRef.current) }
-          : null,
-      );
     }
     function up(e: PointerEvent) {
       const current = dragRef.current;
       if (!current) return;
       dragRef.current = null;
       setDrag(null);
-      setHover(null);
       if (busyRef.current) return;
       const zone = zoneAt(e.clientX, e.clientY);
       const item = gearRef.current[current.index];
       if (!item || !zone) return;
-      const left = e.clientX - current.dx;
-      const top = e.clientY - current.dy;
       if (zone.startsWith("hand:")) {
         const hand = zone.slice(5);
         if (item.effect === "armor" || item.effect === "container") {
@@ -262,8 +173,7 @@ export default function InventoryModal({
         return;
       }
       if (zone.startsWith("pocket:")) {
-        const [w, h] = span(item);
-        if (item.effect === "weapon" || item.effect === "armor" || item.effect === "shield" || item.effect === "container" || w !== 1 || h !== 1) {
+        if (item.effect === "weapon" || item.effect === "armor" || item.effect === "shield" || item.effect === "container") {
           setNote(`${item.name} does not fit in a pocket.`);
           return;
         }
@@ -278,26 +188,11 @@ export default function InventoryModal({
         return;
       }
       if (zone === "bag") {
-        const grid = gridRef.current;
-        if (!grid) return;
-        const rect = grid.getBoundingClientRect();
-        const cell = rect.width / colsRef.current;
-        const col = Math.round((left - rect.left) / cell);
-        const row = Math.round((top - rect.top) / cell);
-        const [w, h] = [current.w, current.h];
-        if (col < 0 || row < 0 || col + w > colsRef.current || row + h > rowsRef.current) {
-          setNote(`${item.name} does not fit.`);
-          return;
-        }
-        if (overlaps(gearRef.current, current.index, col, row, w, h, activeRef.current)) {
-          setNote(`${item.name} does not fit. The bag is full.`);
-          return;
-        }
         void commit(current.index, {
           state: "unequipped",
-          col,
-          row,
-          placed: false,
+          col: null,
+          row: null,
+          placed: true,
           container: activeRef.current?.name || item.container || null,
           pocket: null,
           hand: null,
@@ -317,16 +212,10 @@ export default function InventoryModal({
     if (event.button !== 0 || busy) return;
     const item = gear[index];
     if (!item) return;
-    const [w, h] = span(item);
-    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const next: Drag = {
       index,
-      dx: (w * 2.4 * rem) / 2,
-      dy: (h * 2.4 * rem) / 2,
       x: event.clientX,
       y: event.clientY,
-      w,
-      h,
     };
     dragRef.current = next;
     setDrag(next);
@@ -377,7 +266,6 @@ export default function InventoryModal({
               tone={tone}
               mirror={false}
               gear={gear}
-              art={picture}
               held={heldPicture}
               selected={selected}
               dragging={drag?.index}
@@ -398,7 +286,6 @@ export default function InventoryModal({
                       tone={tone}
                       mirror={side === "light-2"}
                       gear={gear}
-                      art={picture}
                       held={heldPicture}
                       selected={selected}
                       dragging={drag?.index}
@@ -418,7 +305,6 @@ export default function InventoryModal({
               tone={tone}
               mirror
               gear={gear}
-              art={picture}
               held={heldPicture}
               selected={selected}
               dragging={drag?.index}
@@ -464,18 +350,14 @@ export default function InventoryModal({
               return (
                 <div key={slot} className="equip-well">
                   <div className="bag-slot-box" data-drop={`slot:${slot}`}>
-                    {item && (
-                      <ItemBlock
-                        item={item}
+                    {item && index >= 0 && (
+                      <BagLine
+                        name={item.name}
                         index={index}
-                        picture={picture(item.name)}
                         selected={selected === index}
                         dragging={drag?.index === index}
                         onPick={setSelected}
                         onDrag={beginDrag}
-                        onRotate={rotate}
-                        onUpload={uploadPicture}
-                        className="slot-item"
                       />
                     )}
                   </div>
@@ -489,18 +371,14 @@ export default function InventoryModal({
               return (
                 <div key={`pocket-${pocket}`} className="equip-well">
                 <div className="pocket" data-drop={`pocket:${pocket}`}>
-                  {item && (
-                    <ItemBlock
-                      item={item}
+                  {item && index >= 0 && (
+                    <BagLine
+                      name={item.name}
                       index={index}
-                      picture={picture(item.name)}
                       selected={selected === index}
                       dragging={drag?.index === index}
                       onPick={setSelected}
                       onDrag={beginDrag}
-                      onRotate={rotate}
-                      onUpload={uploadPicture}
-                      className="slot-item"
                     />
                   )}
                 </div>
@@ -513,112 +391,44 @@ export default function InventoryModal({
               .map((item) => {
                 const index = gear.indexOf(item);
                 return (
-                  <ItemBlock
+                  <BagLine
                     key={`extra-${item.name}-${index}`}
-                    item={item}
+                    name={item.name}
                     index={index}
-                    picture={picture(item.name)}
                     selected={selected === index}
                     dragging={drag?.index === index}
                     onPick={setSelected}
                     onDrag={beginDrag}
-                    onRotate={rotate}
-                    onUpload={uploadPicture}
                   />
                 );
               })}
           </div>
-          <div
-            ref={gridRef}
-            className="bag-grid"
-            data-drop="bag"
-            style={{
-              gridTemplateColumns: `repeat(${cols}, minmax(2.4rem, 2.4rem))`,
-              gridTemplateRows: `repeat(${rows}, minmax(2.4rem, 2.4rem))`,
-              gridAutoRows: "0px",
-              gridAutoColumns: "0px",
-            }}
-          >
-            {Array.from({ length: cols * rows }, (_, i) => (
-              <div
-                key={i}
-                className="bag-cell"
-                style={art["bag-cell"] ? { background: `url(${art["bag-cell"]}) center / cover no-repeat` } : undefined}
-              />
-            ))}
-            {hover && drag && (
-              <div
-                className={`bag-snap ${hover.ok ? "" : "bad"}`}
-                style={{
-                  gridColumn: `${hover.col + 1} / span ${drag.w}`,
-                  gridRow: `${hover.row + 1} / span ${drag.h}`,
-                }}
-              />
-            )}
-            {packed.map((item) => {
+          <div className="bag-list" data-drop="bag">
+            {stowed.length === 0 && <p className="muted">Nothing in the bag.</p>}
+            {stowed.map((item) => {
               const index = gear.indexOf(item);
               return (
-                <ItemBlock
+                <BagLine
                   key={`${item.name}-${index}`}
-                  item={item}
+                  name={item.name}
                   index={index}
-                  picture={picture(item.name)}
                   selected={selected === index}
                   dragging={drag?.index === index}
                   onPick={setSelected}
                   onDrag={beginDrag}
-                  onRotate={rotate}
-                  onUpload={uploadPicture}
-                  style={{
-                    gridColumn: `${(item.col || 0) + 1} / span ${item.w || 1}`,
-                    gridRow: `${(item.row || 0) + 1} / span ${item.h || 1}`,
-                  }}
-                  className="bag-item"
                 />
               );
             })}
           </div>
-          {loose.length > 0 && (
-            <div className="bag-loose">
-              {loose.map((item) => {
-                const index = gear.indexOf(item);
-                return (
-                  <ItemBlock
-                    key={`${item.name}-loose`}
-                    item={item}
-                    index={index}
-                    picture={picture(item.name)}
-                    selected={selected === index}
-                    dragging={drag?.index === index}
-                    onPick={setSelected}
-                    onDrag={beginDrag}
-                    onRotate={rotate}
-                    onUpload={uploadPicture}
-                  />
-                );
-              })}
-            </div>
-          )}
           {note && <p className="gear-note">{note}</p>}
           <p className="bag-foot">
             {active?.label || ""}
             {character.carry_label ? ` · body ${character.carry_label}` : ""}
           </p>
         </div>
-        {drag && (
-          <div
-            className="bag-ghost"
-            style={{
-              left: drag.x - drag.dx,
-              top: drag.y - drag.dy,
-              width: `calc(${drag.w} * 2.4rem)`,
-              height: `calc(${drag.h} * 2.4rem)`,
-              zIndex: 200,
-            }}
-          >
-            {gear[drag.index] && picture(gear[drag.index].name) ? (
-              <img src={picture(gear[drag.index].name)} alt="" draggable={false} />
-            ) : null}
+        {drag && gear[drag.index] && (
+          <div className="bag-ghost bag-ghost-name" style={{ left: drag.x + 12, top: drag.y + 12, zIndex: 200 }}>
+            {gear[drag.index].name}
           </div>
         )}
       </div>
@@ -634,7 +444,6 @@ function HandPad({
   tone,
   mirror,
   gear,
-  art,
   held,
   selected,
   dragging,
@@ -649,7 +458,6 @@ function HandPad({
   tone: Rgb | null;
   mirror: boolean;
   gear: Gear[];
-  art: (name: string) => string;
   held: (name: string) => string;
   selected: number | null;
   dragging?: number;
@@ -697,115 +505,50 @@ function HandPad({
   );
 }
 
-function ItemBlock({
-  item,
+function BagLine({
+  name,
   index,
-  picture,
   selected,
   dragging,
   onPick,
   onDrag,
-  onRotate,
-  onUpload,
-  style,
-  className,
 }: {
-  item: Gear;
+  name: string;
   index: number;
-  picture: string;
   selected: boolean;
   dragging: boolean;
   onPick: (index: number) => void;
   onDrag: (event: ReactPointerEvent, index: number) => void;
-  onRotate: (index: number) => void;
-  onUpload: (name: string, file: File) => void;
-  style?: CSSProperties;
-  className?: string;
 }) {
   const [plate, setPlate] = useState<{ x: number; y: number } | null>(null);
   return (
-    <div
-      className={`${className || "gear-token"} ${selected ? "on" : ""} ${dragging ? "is-dragging" : ""}`}
-      style={style}
+    <button
+      type="button"
+      className={`bag-line ${selected ? "on" : ""} ${dragging ? "is-dragging" : ""}`}
       onPointerDown={(event) => onDrag(event, index)}
       onClick={() => onPick(index)}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onPick(index);
-        onRotate(index);
-      }}
       onMouseEnter={(event) => {
         const box = event.currentTarget.getBoundingClientRect();
         setPlate({ x: box.left + box.width / 2, y: box.top });
       }}
       onMouseLeave={() => setPlate(null)}
     >
-      {picture ? (
-        <img src={picture} alt="" draggable={false} />
-      ) : selected ? (
-        <label className="gear-upload" title={`Add a picture for ${item.name}`} onPointerDown={(event) => event.stopPropagation()}>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onUpload(item.name, file);
-            }}
-          />
-        </label>
-      ) : null}
+      {name}
       {plate && !dragging
         ? createPortal(
             <span className="name-plate" style={{ left: plate.x, top: plate.y }}>
-              {item.name}
+              {name}
             </span>,
             document.body,
           )
         : null}
-    </div>
+    </button>
   );
 }
 
 function inBag(item: Gear, bag: BagSummary | null): boolean {
   if (!bag) return true;
   return (item.container || "").toLowerCase() === bag.name.toLowerCase();
-}
-
-function span(item: Gear): [number, number] {
-  if (item.state === "unequipped" && item.w && item.h) return [item.w, item.h];
-  const name = item.name.toLowerCase();
-  let w = 1;
-  let h = 1;
-  if (item.effect === "armor" || name.includes("cloak")) {
-    w = 2;
-    h = 3;
-  } else if (item.effect === "shield") {
-    w = 2;
-    h = 2;
-  } else if (item.effect === "weapon") {
-    if ((item.hands || 1) >= 2) h = 5;
-    else if (/\b(dagger|knife|dart)\b/.test(name)) h = 2;
-    else h = 4;
-  }
-  return item.rotated ? [h, w] : [w, h];
-}
-
-function overlaps(gear: Gear[], index: number, col: number, row: number, w: number, h: number, bag: BagSummary | null) {
-  const taken = new Set<string>();
-  gear.forEach((item, itemIndex) => {
-    if (itemIndex === index || item.state !== "unequipped" || !item.placed || !inBag(item, bag)) return;
-    const iw = item.w || 1;
-    const ih = item.h || 1;
-    for (let y = item.row || 0; y < (item.row || 0) + ih; y += 1) {
-      for (let x = item.col || 0; x < (item.col || 0) + iw; x += 1) taken.add(`${x},${y}`);
-    }
-  });
-  for (let y = row; y < row + h; y += 1) {
-    for (let x = col; x < col + w; x += 1) {
-      if (taken.has(`${x},${y}`)) return true;
-    }
-  }
-  return false;
 }
 
 function zoneAt(x: number, y: number): string | null {

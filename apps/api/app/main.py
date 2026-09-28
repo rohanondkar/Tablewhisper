@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -15,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, ollama_client, query_engine, rules, voice, monsters, npcs, maps, xp as xp_mod
+from . import db, items as catalog_items, ollama_client, query_engine, rules, voice, monsters, npcs, maps, xp as xp_mod
 from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
@@ -33,6 +34,7 @@ async def lifespan(_app: FastAPI):
     monsters.ensure_encounter_tables()
     npcs.ensure_scene_tables()
     maps.ensure_map_tables()
+    catalog_items.ensure_tables()
     CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -232,6 +234,35 @@ def status() -> dict[str, Any]:
         },
         "active_ruleset": db.get_setting("active_ruleset", DEFAULT_RULESET),
         "active_session_id": db.active_session_id(),
+    }
+
+
+@app.get("/session/snapshot")
+def session_snapshot(view: str = "console") -> dict[str, Any]:
+    """One read for the open tab. The log is not part of a console read."""
+    try:
+        sessions = db.list_sessions()
+    except Exception:
+        sessions = []
+    if view == "log":
+        return {"events": session_events(), "sessions": sessions}
+    try:
+        npc_list = npcs.list_templates()
+    except Exception:
+        npc_list = []
+    try:
+        scene_list = npcs.list_scene()
+    except Exception:
+        scene_list = []
+    return {
+        "status": status(),
+        "characters": characters(),
+        "rulesets": get_rulesets(),
+        "monsters": monsters.list_templates(),
+        "encounter": monsters.list_encounter(),
+        "npcs": npc_list,
+        "scene": scene_list,
+        "sessions": sessions,
     }
 
 
@@ -842,9 +873,15 @@ async def upload_monster_image(monster_id: str, file: UploadFile = File(...)) ->
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
     try:
-        return monsters.set_monster_image(monster_id, fname)
+        updated = monsters.set_monster_image(monster_id, fname)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    try:
+        for m in maps.list_maps():
+            maps.refresh_token_portraits(m["id"])
+    except Exception:
+        pass
+    return updated
 
 
 @app.get("/encounter")
@@ -960,9 +997,15 @@ async def upload_npc_image(npc_id: str, file: UploadFile = File(...)) -> dict[st
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
     try:
-        return npcs.set_npc_image(npc_id, fname)
+        updated = npcs.set_npc_image(npc_id, fname)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+    try:
+        for m in maps.list_maps():
+            maps.refresh_token_portraits(m["id"])
+    except Exception:
+        pass
+    return updated
 
 
 @app.get("/scene")
@@ -1282,6 +1325,22 @@ async def upload_map_background(
     return m
 
 
+@app.post("/maps/{map_id}/import-uvtt")
+async def import_uvtt_map(map_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    if not maps.get_map(map_id):
+        raise HTTPException(404, "Map not found")
+    raw = await file.read()
+    try:
+        payload = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise HTTPException(400, maps._uvtt_read_error(file.filename or ""))
+    try:
+        return maps.import_uvtt(map_id, payload, file.filename or "")
+    except ValueError as exc:
+        message = str(exc)
+        raise HTTPException(404 if message == "Map not found" else 400, message) from exc
+
+
 @app.post("/maps/{map_id}/tokens/sync")
 def sync_map_tokens(map_id: str) -> list[dict[str, Any]]:
     try:
@@ -1455,6 +1514,109 @@ def delete_portal_route(portal_id: str) -> dict[str, bool]:
     if not maps.delete_portal(portal_id):
         raise HTTPException(404, "Portal not found")
     return {"ok": True}
+
+
+class ItemImportBody(BaseModel):
+    url: str | None = None
+    items: list[dict[str, Any]] | None = None
+
+
+class ChestCreate(BaseModel):
+    name: str = "Chest"
+    x: float
+    y: float
+    kind: str = "chest"
+
+
+class ChestPatch(BaseModel):
+    name: str | None = None
+    x: float | None = None
+    y: float | None = None
+    kind: str | None = None
+
+
+class ChestContentBody(BaseModel):
+    item_id: str
+    qty: int = 1
+
+
+class ChestQtyBody(BaseModel):
+    qty: int
+
+
+@app.get("/items")
+def list_catalog_items() -> list[dict[str, Any]]:
+    return catalog_items.list_items()
+
+
+@app.post("/items/import")
+def import_catalog_items(body: ItemImportBody) -> list[dict[str, Any]]:
+    try:
+        if body.url:
+            return catalog_items.import_url(body.url)
+        if body.items is not None:
+            return catalog_items.import_payload(body.items)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    raise HTTPException(400, "Send a lootstash.app link or an item list.")
+
+
+@app.post("/items/import-file")
+async def import_catalog_file(file: UploadFile = File(...)) -> list[dict[str, Any]]:
+    raw = await file.read()
+    try:
+        payload = json.loads(raw.decode("utf-8-sig"))
+        return catalog_items.import_payload(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(400, "That file is not JSON.") from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/maps/{map_id}/chests")
+def create_map_chest(map_id: str, body: ChestCreate) -> dict[str, Any]:
+    if not maps.get_map(map_id):
+        raise HTTPException(404, "Map not found")
+    return catalog_items.create_chest(map_id, body.name, body.x, body.y, body.kind)
+
+
+@app.patch("/maps/chests/{chest_id}")
+def patch_map_chest(chest_id: str, body: ChestPatch) -> dict[str, Any]:
+    updated = catalog_items.patch_chest(chest_id, body.model_dump(exclude_unset=True))
+    if not updated:
+        raise HTTPException(404, "Chest not found")
+    return updated
+
+
+@app.delete("/maps/chests/{chest_id}")
+def delete_map_chest(chest_id: str) -> dict[str, bool]:
+    if not catalog_items.delete_chest(chest_id):
+        raise HTTPException(404, "Chest not found")
+    return {"ok": True}
+
+
+@app.post("/maps/chests/{chest_id}/contents")
+def add_chest_content(chest_id: str, body: ChestContentBody) -> dict[str, Any]:
+    updated = catalog_items.add_content(chest_id, body.item_id, body.qty)
+    if not updated:
+        raise HTTPException(404, "Chest or item not found")
+    return updated
+
+
+@app.patch("/maps/chests/contents/{row_id}")
+def patch_chest_content(row_id: str, body: ChestQtyBody) -> dict[str, Any]:
+    updated = catalog_items.set_content_qty(row_id, body.qty)
+    if not updated:
+        raise HTTPException(404, "That item is not in the chest")
+    return updated
+
+
+@app.delete("/maps/chests/contents/{row_id}")
+def delete_chest_content(row_id: str) -> dict[str, Any]:
+    updated = catalog_items.remove_content(row_id)
+    if not updated:
+        raise HTTPException(404, "That item is not in the chest")
+    return updated
 
 
 @app.post("/maps/suggest")

@@ -185,6 +185,74 @@ def _catalog() -> list[tuple[str, dict[str, Any]]]:
 _CATALOG = _catalog()
 
 
+def library_cards() -> list[dict[str, Any]]:
+    """Standard gear cards. Weights and dice are the ones already stored here."""
+    seen: set[str] = set()
+    cards: list[dict[str, Any]] = []
+    for name, spec in _CATALOG:
+        if name == "half-plate" or name in seen:
+            continue
+        seen.add(name)
+        effect = spec.get("effect") or "gear"
+        if effect == "weapon":
+            die = spec.get("damage_die") or ""
+            kind = spec.get("damage_type") or ""
+            summary = f"{die} {kind}".strip()
+            item_type = "weapon"
+        elif effect == "armor":
+            summary = f"{spec.get('category') or ''} armor".strip()
+            if spec.get("stealth"):
+                summary = f"{summary}. Stealth disadvantage."
+            item_type = "armor"
+        elif effect == "shield":
+            summary = "Shield."
+            item_type = "shield"
+        else:
+            summary = ""
+            item_type = str(effect)
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        weight = spec.get("weight")
+        cards.append(
+            {
+                "id": f"srd:{slug}",
+                "source": None,
+                "origin": "standard",
+                "name": name[:1].upper() + name[1:],
+                "item_type": item_type,
+                "rarity": None,
+                "summary": summary,
+                "weight": float(weight) if isinstance(weight, (int, float)) else None,
+                "value": None,
+            }
+        )
+    used_by: dict[str, list[str]] = {}
+    for name, spec in _CATALOG:
+        ammo = spec.get("ammo")
+        if ammo:
+            used_by.setdefault(str(ammo), []).append(name)
+    for key, (one, many, lb, bundle) in _AMMO.items():
+        who = used_by.get(key) or []
+        summary = f"{bundle} {many}."
+        if who:
+            summary = f"{summary} Used by {', '.join(who)}."
+        label = " ".join(part[:1].upper() + part[1:] for part in many.split())
+        cards.append(
+            {
+                "id": f"srd:{key}",
+                "source": None,
+                "origin": "standard",
+                "name": label,
+                "item_type": "ammunition",
+                "rarity": None,
+                "summary": summary,
+                "weight": float(lb),
+                "value": None,
+            }
+        )
+    cards.sort(key=lambda row: row["name"].lower())
+    return cards
+
+
 def _match_key(name: str) -> tuple[str, dict[str, Any]] | None:
     low = (name or "").lower()
     if re.search(r"\bunarmed\b", low):
@@ -315,7 +383,158 @@ def damage_formula(spec: dict[str, Any], ability: int, two_handed: bool) -> str 
     if re.fullmatch(r"\d+", str(die)):
         total = max(0, int(die) + ability)
         return f"{total} {kind}".strip()
-    return f"{die}{_signed(ability)} {kind}".strip()
+    signed = "" if ability == 0 else _signed(ability)
+    return f"{die}{signed} {kind}".strip()
+
+
+_OFFHAND_RE = re.compile(
+    r"\b(off[-\s]?hand|offhand|other hand|two[-\s]?weapon|dual[-\s]?wield(?:ing|s)?)\b",
+    re.I,
+)
+
+
+def _named_magic(name: str) -> int:
+    match = re.search(r"\+\s*([123])\b", name or "")
+    return int(match.group(1)) if match else 0
+
+
+def _attack_ability(character: dict[str, Any], spec: dict[str, Any], text: str) -> tuple[int, str]:
+    """The ability on the attack roll and the damage roll. Finesse uses the higher modifier."""
+    thrown = int(spec.get("thrown_ft") or 0) > 0
+    ranged = (bool(spec.get("ammo")) or int(spec.get("range_ft") or 0) > 0) and not thrown
+    if ranged:
+        return ability_mod(character, "dexterity"), "Dexterity"
+    if spec.get("finesse"):
+        strength = ability_mod(character, "strength")
+        dexterity = ability_mod(character, "dexterity")
+        if dexterity > strength:
+            return dexterity, "Dexterity"
+        return strength, "Strength"
+    return ability_mod(character, "strength"), "Strength"
+
+
+def _one_hand_melee(spec: dict[str, Any]) -> bool:
+    if spec.get("effect") != "weapon":
+        return False
+    if int(spec.get("hands") or 0) != 1:
+        return False
+    if spec.get("ammo"):
+        return False
+    return True
+
+
+def _offhand_request(text: str) -> bool:
+    if _OFFHAND_RE.search(text or ""):
+        return True
+    return bool(
+        re.search(r"\bbonus action\b", text or "", re.I)
+        and re.search(r"\b(attack|attacks|hit|hits|strike|strikes|stab|stabs|swing|swings)\b", text or "", re.I)
+    )
+
+
+def _other_melee(items: list[dict[str, Any]], key: str) -> list[tuple[str, dict[str, Any]]]:
+    found: list[tuple[str, dict[str, Any]]] = []
+    for item in items:
+        if not active(item):
+            continue
+        match = _match_key(str(item.get("name") or ""))
+        if not match or match[0] == key:
+            continue
+        if _one_hand_melee(match[1]):
+            found.append(match)
+    return found
+
+
+def apply_attack_math(character: dict[str, Any], weapon: dict[str, Any], text: str = "") -> dict[str, Any]:
+    """Attack bonus and damage from the weapon table and the sheet.
+
+    The d20 adds the ability modifier and proficiency when the class is proficient.
+    Damage adds that ability modifier once, not proficiency.
+    An off-hand attack drops a positive ability modifier unless the sheet has
+    Two-Weapon Fighting. A negative modifier still applies.
+    """
+    name = str(weapon.get("name") or "")
+    found = _match_key(name)
+    if not found or found[1].get("effect") != "weapon":
+        return {"lines": []}
+    key, spec = found
+    if not spec.get("damage_die"):
+        return {"lines": []}
+    ability, ability_name = _attack_ability(character, spec, text)
+    proficient = _weapon_proficient(character, key)
+    prof = int(character.get("proficiency_bonus") or 0) if proficient else 0
+    magic = _named_magic(name)
+    bonus = ability + prof + magic
+    features = _features(character).lower()
+    offhand = _offhand_request(text)
+    lines: list[str] = []
+    label = name.strip() or key
+    if offhand:
+        dual = "dual wielder" in features
+        others = _other_melee(character.get("equipment") or [], key)
+        if not _one_hand_melee(spec):
+            return {
+                "blocked": f"{label} is not a one-handed melee weapon, so it cannot be an off-hand attack.",
+                "lines": [],
+            }
+        if int(spec.get("hands") or 0) >= 2:
+            return {
+                "blocked": f"{label} needs two hands, so it cannot be an off-hand attack.",
+                "lines": [],
+            }
+        if not spec.get("light") and not dual:
+            return {
+                "blocked": (
+                    f"{label} is not light, so it cannot be an off-hand attack unless they have Dual Wielder."
+                ),
+                "lines": [],
+            }
+        if not others:
+            return {
+                "blocked": "Two-weapon fighting needs a different one-handed melee weapon in the other hand.",
+                "lines": [],
+            }
+        if not dual and any(not other[1].get("light") for other in others):
+            return {
+                "blocked": (
+                    "The other weapon is not light, so this cannot be an off-hand attack unless they have Dual Wielder."
+                ),
+                "lines": [],
+            }
+        fighting_style = "two-weapon fighting" in features
+        damage_ability = ability if (ability < 0 or fighting_style) else 0
+        if fighting_style:
+            lines.append(f"Two-Weapon Fighting: the off-hand damage adds {ability_name}.")
+        elif ability < 0:
+            lines.append(f"Off-hand damage still adds {ability_name} {_signed(ability)}, because it is negative.")
+        else:
+            lines.append(
+                f"Off-hand: the attack roll adds {ability_name}, and the damage roll does not."
+            )
+    else:
+        damage_ability = ability
+    two_hands = (
+        not offhand
+        and bool(spec.get("versatile_die"))
+        and _primary_hands_used(character.get("equipment") or [], character) <= 1
+    )
+    formula = damage_formula(spec, damage_ability + magic, two_hands)
+    if proficient:
+        lines.insert(
+            0,
+            f"{label}: d20 {_signed(ability)} {ability_name} {_signed(prof)} proficiency. Damage {formula}.",
+        )
+    else:
+        lines.insert(
+            0,
+            f"{label}: d20 {_signed(ability)} {ability_name}. Not proficient, so proficiency is not added. Damage {formula}.",
+        )
+    return {
+        "blocked": None,
+        "attack_bonus": _signed(bonus),
+        "damage": formula,
+        "lines": lines,
+    }
 
 
 def ensure_damage(character: dict[str, Any], weapon: dict[str, Any]) -> dict[str, Any]:
@@ -1030,20 +1249,6 @@ def _restore(proposed: list[dict[str, Any]], previous: list[dict[str, Any]] | No
         item.update(dict(old))
 
 
-def _occupies(grid: list[list[bool]], col: int, row: int, w: int, h: int) -> bool:
-    rows = len(grid)
-    cols = len(grid[0]) if grid else 0
-    if col < 0 or row < 0 or col + w > cols or row + h > rows:
-        return False
-    return all(not grid[y][x] for y in range(row, row + h) for x in range(col, col + w))
-
-
-def _mark(grid: list[list[bool]], col: int, row: int, w: int, h: int) -> None:
-    for y in range(row, row + h):
-        for x in range(col, col + w):
-            grid[y][x] = True
-
-
 def _bag_key(name: str) -> str:
     return (name or "").strip().lower()
 
@@ -1090,46 +1295,14 @@ def settle_bags(items: list[dict[str, Any]]) -> list[str]:
 
 
 def _place_bag(contents: list[dict[str, Any]], bag: dict[str, Any]) -> None:
+    """Bag contents are a list. The pound cap still applies."""
     name = str(bag["name"])
-    cols = int(bag["cols"])
-    rows = int(bag["rows"])
-    grid = [[False for _ in range(cols)] for _ in range(rows)]
     for item in contents:
-        w, h = footprint(str(item.get("name") or ""), bool(item.get("rotated")))
-        item["w"] = w
-        item["h"] = h
-        col = item.get("col")
-        row = item.get("row")
-        if isinstance(col, int) and isinstance(row, int) and _occupies(grid, col, row, w, h):
-            _mark(grid, col, row, w, h)
-            item["placed"] = True
-        else:
-            item["col"] = None
-            item["row"] = None
-            item["placed"] = False
-    for item in contents:
-        if item.get("placed"):
-            continue
-        w = int(item["w"])
-        h = int(item["h"])
-        found = False
-        for row in range(rows):
-            for col in range(cols):
-                if _occupies(grid, col, row, w, h):
-                    _mark(grid, col, row, w, h)
-                    item["col"] = col
-                    item["row"] = row
-                    item["placed"] = True
-                    found = True
-                    break
-            if found:
-                break
-        if not found:
-            item["placed"] = False
+        item["placed"] = True
+        item.pop("col", None)
+        item.pop("row", None)
     known = 0.0
     for item in contents:
-        if not item.get("placed"):
-            continue
         weight = _item_weight(item, lookup(str(item.get("name") or "")))
         if weight is not None:
             known += weight

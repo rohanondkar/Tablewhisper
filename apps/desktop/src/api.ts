@@ -332,6 +332,8 @@ export interface MapWall {
   points: number[];
   door: boolean;
   door_open: boolean;
+  door_secret?: boolean;
+  door_locked?: boolean;
   block_movement: boolean;
   block_sight: boolean;
   target_map_id?: string | null;
@@ -418,6 +420,34 @@ export interface MapPortal {
   label: string;
 }
 
+export interface CatalogItem {
+  id: string;
+  source: string | null;
+  origin: "standard" | "imported" | string;
+  name: string;
+  item_type: string | null;
+  rarity: string | null;
+  summary: string;
+  weight: number | null;
+  value: string | null;
+}
+
+export interface ChestContent {
+  id: string;
+  qty: number;
+  item: CatalogItem;
+}
+
+export interface MapChest {
+  id: string;
+  map_id: string;
+  name: string;
+  kind: string;
+  x: number;
+  y: number;
+  contents: ChestContent[];
+}
+
 export interface MapState {
   map: BattleMap;
   tokens: MapToken[];
@@ -425,6 +455,7 @@ export interface MapState {
   lights: MapLight[];
   portals: MapPortal[];
   pools: MapPool[];
+  chests?: MapChest[];
 }
 
 export interface SessionEvent {
@@ -471,6 +502,18 @@ export interface StatusInfo {
   active_session_id: string | null;
 }
 
+export interface SessionSnapshot {
+  status?: StatusInfo;
+  characters?: Character[];
+  events?: SessionEvent[];
+  rulesets?: RulesetSummary[];
+  monsters?: MonsterTemplate[];
+  encounter?: EncounterEnemy[];
+  npcs?: NpcTemplate[];
+  scene?: SceneNpc[];
+  sessions?: SessionInfo[];
+}
+
 const fallbackBase = "http://127.0.0.1:8766";
 
 export async function mediaUrl(path: string | undefined | null): Promise<string> {
@@ -509,6 +552,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   status: () => request<StatusInfo>("/status"),
+  sessionSnapshot: (view: "console" | "log" = "console") =>
+    request<SessionSnapshot>(`/session/snapshot?view=${view}`),
   listCharacters: () => request<Character[]>("/characters"),
   getCharacter: (id: string) => request<Character>(`/characters/${id}`),
   deleteCharacter: (id: string) =>
@@ -803,6 +848,24 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
     return res.json() as Promise<BattleMap>;
   },
+  importMapFile: async (mapId: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/maps/${mapId}/import-uvtt`, { method: "POST", body: form });
+    const text = await res.text();
+    if (!res.ok) {
+      let message = text || res.statusText;
+      try {
+        const body = JSON.parse(text) as { detail?: unknown };
+        if (typeof body.detail === "string") message = body.detail;
+      } catch {
+        /* The response was not JSON. */
+      }
+      throw new Error(message);
+    }
+    return JSON.parse(text) as { map_id: string; note?: string | null };
+  },
   syncMapTokens: (mapId: string) =>
     request<MapToken[]>(`/maps/${mapId}/tokens/sync`, { method: "POST" }),
   addMapToken: (mapId: string, body: Partial<MapToken>) =>
@@ -943,4 +1006,47 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  listItems: () => request<CatalogItem[]>("/items"),
+  importItemUrl: (url: string) =>
+    request<CatalogItem[]>("/items/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }),
+  importItemFile: async (file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/items/import-file`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<CatalogItem[]>;
+  },
+  addMapChest: (mapId: string, body: { name: string; x: number; y: number; kind?: string }) =>
+    request<MapChest>(`/maps/${mapId}/chests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchMapChest: (chestId: string, patch: Partial<Pick<MapChest, "name" | "x" | "y" | "kind">>) =>
+    request<MapChest>(`/maps/chests/${chestId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteMapChest: (chestId: string) =>
+    request<{ ok: boolean }>(`/maps/chests/${chestId}`, { method: "DELETE" }),
+  addChestItem: (chestId: string, itemId: string, qty = 1) =>
+    request<MapChest>(`/maps/chests/${chestId}/contents`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId, qty }),
+    }),
+  setChestQty: (rowId: string, qty: number) =>
+    request<MapChest>(`/maps/chests/contents/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ qty }),
+    }),
+  removeChestItem: (rowId: string) =>
+    request<MapChest>(`/maps/chests/contents/${rowId}`, { method: "DELETE" }),
 };

@@ -11,7 +11,11 @@ export type ResolveRow = {
   /** Saving throw from the creature being hit. */
   save: string;
   info: string;
+  /** Faces typed into the printed damage dice, in order. */
+  dice: string[];
 };
+
+export type PrintedDie = { sides: number };
 
 function amountIn(info: string): number | null {
   const match = info.match(/\d+(?:\.\d+)?/);
@@ -31,6 +35,16 @@ export function attackConnects(result: CheckResult, face: number): boolean {
   if (face === 20) return true;
   if (result.to_hit_needed == null) return true;
   return face >= result.to_hit_needed;
+}
+
+/** A hit that doubles the weapon's damage dice. Modifiers are added once. */
+export function attackCrit(result: CheckResult, face: number): boolean {
+  if (!attackConnects(result, face)) return false;
+  if (face === 20) return true;
+  const note = result.crit_note || "";
+  if (face === 19 && /improved critical|\b19\b/i.test(note)) return true;
+  if (/paralyz|unconscious/i.test(note) && /critical hit/i.test(note)) return true;
+  return false;
 }
 
 export function printedSaveBonus(result: CheckResult, creature: RulingCreature | null | undefined): number | null {
@@ -63,6 +77,66 @@ function flatPrinted(formula: string | null | undefined): number | null {
     const value = Number(mod[2]);
     if (!Number.isFinite(value)) continue;
     total += mod[1] === "-" ? -value : value;
+  }
+  return Math.max(0, total);
+}
+
+export function parsePrintedDice(formula: string | null | undefined): { dice: PrintedDie[]; modifier: number } {
+  if (!formula) return { dice: [], modifier: 0 };
+  const dice: PrintedDie[] = [];
+  for (const pool of formula.matchAll(/(\d+)\s*d\s*(\d+)/gi)) {
+    const count = Number(pool[1]);
+    const sides = Number(pool[2]);
+    if (!Number.isInteger(count) || !Number.isInteger(sides) || count < 1 || count > 40 || sides < 2 || sides > 100) {
+      continue;
+    }
+    for (let i = 0; i < count; i += 1) dice.push({ sides });
+  }
+  let modifier = 0;
+  const leftover = formula.replace(/\d+\s*d\s*\d+/gi, " ");
+  for (const mod of leftover.matchAll(/([+-])\s*(\d+)/g)) {
+    const value = Number(mod[2]);
+    if (!Number.isFinite(value)) continue;
+    modifier += mod[1] === "-" ? -value : value;
+  }
+  return { dice, modifier };
+}
+
+export function shownDice(formula: string | null | undefined, crit = false): PrintedDie[] {
+  const { dice } = parsePrintedDice(formula);
+  return crit ? [...dice, ...dice] : dice;
+}
+
+export function dieFace(roll: string | undefined, sides: number): number | null {
+  const value = Number(roll);
+  if (!Number.isInteger(value) || value < 1 || value > sides) return null;
+  return value;
+}
+
+function acceptDie(raw: string, sides: number): string {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const value = Number(digits);
+  if (!Number.isInteger(value) || value < 1 || value > sides) {
+    return digits.length > 1 ? acceptDie(digits.slice(0, -1), sides) : "";
+  }
+  return String(value);
+}
+
+export function facesReady(faces: string[], dice: PrintedDie[]): boolean {
+  return dice.every((die, index) => dieFace(faces[index], die.sides) != null);
+}
+
+/** Faces the DM typed, plus the printed modifier. Empty dice means the number is not ready. */
+export function sumEnteredDice(formula: string | null | undefined, faces: string[], crit = false): number | null {
+  const { dice, modifier } = parsePrintedDice(formula);
+  if (!dice.length) return flatPrinted(formula);
+  const needed = shownDice(formula, crit);
+  let total = modifier;
+  for (let index = 0; index < needed.length; index += 1) {
+    const face = dieFace(faces[index], needed[index].sides);
+    if (face == null) return null;
+    total += face;
   }
   return Math.max(0, total);
 }
@@ -134,6 +208,7 @@ export function strikeOutcome(
   info: string,
   saveRoll = "",
   saveBonus: number | null = null,
+  faces: string[] = [],
 ): Strike {
   const typedEarly = amountIn(info);
   if (result.check_type === "save" && result.suggested_dc == null && faceOf(roll) == null) {
@@ -143,16 +218,22 @@ export function strikeOutcome(
   const face = faceOf(roll);
   if (face == null) return { kind: "pending" };
   const typed = amountIn(info);
-  const printed = (crit = false) => typed ?? rollPrintedDamage(result.damage, crit);
+  const printed = (crit = false) => typed ?? sumEnteredDice(result.damage, faces, crit);
   if (result.check_type === "attack") {
     if (!attackConnects(result, face)) return { kind: "miss" };
-    const amount = printed(face === 20);
+    if (typed == null && parsePrintedDice(result.damage).dice.length && sumEnteredDice(result.damage, faces, attackCrit(result, face)) == null) {
+      return { kind: "pending" };
+    }
+    const amount = printed(attackCrit(result, face));
     if (amount == null) return { kind: "stay" };
     return { kind: "damage", amount };
   }
   if (result.check_type === "save") {
     const saved = saveSucceeds(result, face, saveBonus);
+    const needsDice = typed == null && parsePrintedDice(result.damage).dice.length > 0;
     const amount = printed();
+    if (saved && !saveHalves(result)) return { kind: "stay" };
+    if (needsDice && amount == null) return { kind: "pending" };
     if (saved == null) {
       if (typed != null) return typed <= 0 ? { kind: "stay" } : { kind: "damage", amount: typed };
       if (amount == null) return { kind: "stay" };
@@ -164,7 +245,6 @@ export function strikeOutcome(
       if (half <= 0) return { kind: "stay" };
       return { kind: "damage", amount: half };
     }
-    if (saved) return { kind: "stay" };
     if (amount == null) return { kind: "stay" };
     if (amount <= 0) return { kind: "stay" };
     return { kind: "damage", amount };
@@ -173,12 +253,22 @@ export function strikeOutcome(
   return typed <= 0 ? { kind: "stay" } : { kind: "damage", amount: typed };
 }
 
-function damagePreview(result: CheckResult, typed: number | null): string {
+function damagePreview(result: CheckResult, row: ResolveRow, crit = false): string {
+  const typed = amountIn(row.info);
   if (typed != null) return String(typed);
-  const flat = flatPrinted(result.damage);
-  if (flat != null) return String(flat);
-  if (result.damage && /\d+\s*d\s*\d+/i.test(result.damage)) return result.damage;
-  return "";
+  const rolled = sumEnteredDice(result.damage, row.dice || [], crit);
+  return rolled == null ? "" : String(rolled);
+}
+
+function damageWait(result: CheckResult): string {
+  return parsePrintedDice(result.damage).dice.length ? "Enter the damage dice." : "Type the damage in additional info.";
+}
+
+function spellDamageLine(result: CheckResult, label: string, info: string, faces: string[]): string {
+  const typed = amountIn(info);
+  if (typed != null) return `${typed} shows on ${label}.`;
+  const rolled = sumEnteredDice(result.damage, faces, false);
+  return rolled == null ? `Enter the damage dice.` : `${rolled} shows on ${label}.`;
 }
 
 export function rowOutcome(result: CheckResult, heal: boolean, row: ResolveRow): string {
@@ -197,8 +287,8 @@ export function rowOutcome(result: CheckResult, heal: boolean, row: ResolveRow):
   if (result.check_type === "attack") {
     const attacker = result.character || "The attacker";
     if (!attackConnects(result, face)) return `${attacker} misses ${row.label}. Hit points stay.`;
-    const preview = damagePreview(result, amount);
-    if (!preview) return `${attacker} hits. Type the damage in additional info.`;
+    const preview = damagePreview(result, row, attackCrit(result, face));
+    if (!preview) return `${attacker} hits. ${damageWait(result)}`;
     return amount != null
       ? `${attacker} hits for ${amount}. That number shows on ${row.label}.`
       : `${attacker} hits. ${preview} shows on ${row.label}.`;
@@ -207,17 +297,17 @@ export function rowOutcome(result: CheckResult, heal: boolean, row: ResolveRow):
     const bonus = printedSaveBonus(result, row.creature);
     const saved = saveSucceeds(result, face, bonus);
     const verdict = saved == null ? "no DC on this card" : saved ? "succeeds" : "fails";
-    const preview = damagePreview(result, amount);
-    if (saved == null && amount == null) return `${row.label} ${verdict}. Hit points stay until a damage number is entered.`;
+    const preview = damagePreview(result, row);
+    if (saved == null && amount == null && !preview) return `${row.label} ${verdict}. Hit points stay until a damage number is entered.`;
     if (saved && !saveHalves(result)) return `${row.label} ${verdict}. Hit points stay.`;
     if (saved && saveHalves(result)) {
       return preview
         ? `${row.label} ${verdict}. Half of ${preview} shows on ${row.label}.`
-        : `${row.label} ${verdict}. Type the damage in additional info.`;
+        : `${row.label} ${verdict}. ${damageWait(result)}`;
     }
     return preview
       ? `${row.label} ${verdict}. ${preview} shows on ${row.label}.`
-      : `${row.label} ${verdict}. Type the damage in additional info.`;
+      : `${row.label} ${verdict}. ${damageWait(result)}`;
   }
   if (result.suggested_dc != null) {
     const total = face + (result.modifier ?? 0);
@@ -258,10 +348,10 @@ function damageWords(result: CheckResult, amount: number, face: number): string 
     .replace(/\s+/g, " ")
     .trim();
   const printed = type ? `${amount} ${type.toLowerCase()}` : String(amount);
-  if (face === 20 && /\d+\s*d\s*\d+/i.test(raw)) {
+  if (attackCrit(result, face) && /\d+\s*d\s*\d+/i.test(raw)) {
     return `The critical doubles the dice. The strike is ${printed}, so they take ${amount}.`;
   }
-  if (face === 20) return `The strike is ${printed}. The critical has no dice to double, so they take ${amount}.`;
+  if (attackCrit(result, face)) return `The strike is ${printed}. The critical has no dice to double, so they take ${amount}.`;
   return `The strike is ${printed}, so they take ${amount}.`;
 }
 
@@ -367,6 +457,68 @@ export function mapLine(
   return null;
 }
 
+function dieClass(sides: number): string {
+  if (sides === 4) return "die-d4";
+  if (sides === 6) return "die-d6";
+  if (sides === 8) return "die-d8";
+  if (sides === 10) return "die-d10";
+  if (sides === 12) return "die-d12";
+  if (sides === 20) return "die-d20";
+  return "die-d100";
+}
+
+function DieFace({
+  sides,
+  value,
+  onChange,
+}: {
+  sides: number;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="die-face">
+      <span className={`die-shape ${dieClass(sides)}`}>
+        <input
+          className="resolve-die-input"
+          inputMode="numeric"
+          aria-label={`d${sides}`}
+          value={value}
+          onChange={(event) => onChange(acceptDie(event.target.value, sides))}
+        />
+      </span>
+      <span className="die-caption">d{sides}</span>
+    </label>
+  );
+}
+
+function DamageDice({
+  dice,
+  faces,
+  onChange,
+  modifier,
+}: {
+  dice: PrintedDie[];
+  faces: string[];
+  onChange: (index: number, value: string) => void;
+  modifier: number;
+}) {
+  if (!dice.length && modifier === 0) return null;
+  return (
+    <>
+      {dice.map((die, index) => (
+        <DieFace
+          key={`${die.sides}-${index}`}
+          sides={die.sides}
+          value={faces[index] || ""}
+          onChange={(value) => onChange(index, value)}
+        />
+      ))}
+      {modifier !== 0 && <span className="die-mod">{modifier > 0 ? `+${modifier}` : String(modifier)}</span>}
+    </>
+  );
+}
+
 export default function ResolveModal({
   result,
   blocked,
@@ -409,30 +561,70 @@ export default function ResolveModal({
       roll: "",
       save: "",
       info: "",
+      dice: [],
     }));
   });
   const [attackRoll, setAttackRoll] = useState("");
+  const [damageFaces, setDamageFaces] = useState<string[]>([]);
 
   function patch(key: string, field: "roll" | "save" | "info", value: string) {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, [field]: value } : row)));
   }
 
-  const quiet = result.check_type === "spell" || result.check_type === "contest";
+  function setSharedFace(index: number, value: string) {
+    setDamageFaces((prev) => {
+      const next = prev.slice();
+      next[index] = value;
+      return next;
+    });
+  }
+
+  function setRowDie(key: string, index: number, value: string) {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const dice = (row.dice || []).slice();
+        dice[index] = value;
+        return { ...row, dice };
+      }),
+    );
+  }
+
+  const formula = parsePrintedDice(result.damage);
+  const spellDice = !heal && result.check_type === "spell" && formula.dice.length > 0;
+  const quiet = result.check_type === "contest" || (result.check_type === "spell" && !spellDice);
   const printedRoll = /\d+\s*d\s*\d+/i.test(result.damage || "") || flatPrinted(result.damage) != null;
   const typedDamage = result.check_type === "save" && result.suggested_dc == null && !printedRoll;
   const needsAttack = !heal && result.check_type === "attack";
   const needsSave = !heal && !typedDamage && result.check_type === "save";
   const attackerName = result.character || "Attacker";
+  const attackFace = faceOf(attackRoll);
+  const attackIsCrit = needsAttack && attackFace != null && attackCrit(result, attackFace);
+  const attackHits = needsAttack && attackFace != null && attackConnects(result, attackFace);
+  const attackDice = shownDice(result.damage, attackIsCrit);
   const ready = blocked
     ? false
     : quiet ||
-      ((!needsAttack || faceOf(attackRoll) != null) &&
+      ((!needsAttack || attackFace != null) &&
+        (!attackHits || !attackDice.length || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, attackDice)) &&
+        (!spellDice || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, formula.dice)) &&
         rows.every((row) => {
           if (typedDamage) return amountIn(row.info) != null;
-          if (needsAttack) return true;
-          if (needsSave) return faceOf(row.roll) != null;
-        return faceOf(row.roll) != null;
-      }));
+          if (needsAttack || spellDice) return true;
+          if (faceOf(row.roll) == null) return false;
+          if (!needsSave || !formula.dice.length || amountIn(row.info) != null) return true;
+          const saved = saveSucceeds(result, faceOf(row.roll) as number, printedSaveBonus(result, row.creature));
+          if (saved && !saveHalves(result)) return true;
+          return facesReady(row.dice || [], formula.dice);
+        }));
+
+  function filledRow(row: ResolveRow): ResolveRow {
+    return {
+      ...row,
+      roll: needsAttack ? attackRoll : row.roll,
+      dice: needsAttack || spellDice ? damageFaces : row.dice || [],
+    };
+  }
 
   return (
     <div
@@ -457,27 +649,36 @@ export default function ResolveModal({
           {!blocked && !quiet && needsAttack && (
             <div className="resolve-row">
               <strong>{attackerName}</strong>
-              <label className="resolve-die">
-                Attack roll
-                <input
-                  className="resolve-die-input"
-                  type="number"
-                  min={1}
-                  max={20}
-                  inputMode="numeric"
-                  placeholder="d20"
-                  value={attackRoll}
-                  onChange={(event) => setAttackRoll(event.target.value)}
+              <div className="die-tray">
+                <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} />
+                <DamageDice
+                  dice={attackDice}
+                  faces={damageFaces}
+                  onChange={setSharedFace}
+                  modifier={formula.modifier}
                 />
-              </label>
-              <p className="muted small">The person hitting rolls this against armor class.</p>
+              </div>
+              <p className="muted small">The person hitting rolls the d20 against armor class. Fill each damage die.</p>
             </div>
           )}
-          {!blocked && !quiet &&
+          {!blocked && spellDice && (
+            <div className="resolve-row">
+              <strong>Damage</strong>
+              <div className="die-tray">
+                <DamageDice
+                  dice={formula.dice}
+                  faces={damageFaces}
+                  onChange={setSharedFace}
+                  modifier={formula.modifier}
+                />
+              </div>
+            </div>
+          )}
+          {!blocked && (spellDice || !quiet) &&
             rows.map((row) => (
               <div key={row.key} className="resolve-row">
                 <strong>{row.label}</strong>
-                {!needsAttack && (
+                {!needsAttack && !spellDice && (
                 <label className="resolve-die">
                   {heal
                     ? "Healing"
@@ -487,16 +688,17 @@ export default function ResolveModal({
                         ? skillTitle(result)
                         : "Saving throw"}
                   {!typedDamage && !heal && (
-                    <input
-                      className="resolve-die-input"
-                      type="number"
-                      min={1}
-                      max={20}
-                      inputMode="numeric"
-                      placeholder="d20"
-                      value={row.roll}
-                      onChange={(event) => patch(row.key, "roll", event.target.value)}
-                    />
+                    <div className="die-tray">
+                      <DieFace sides={20} value={row.roll} onChange={(value) => patch(row.key, "roll", value)} />
+                      {needsSave && (
+                        <DamageDice
+                          dice={formula.dice}
+                          faces={row.dice || []}
+                          onChange={(index, value) => setRowDie(row.key, index, value)}
+                          modifier={formula.modifier}
+                        />
+                      )}
+                    </div>
                   )}
                   {(typedDamage || heal) && (
                     <input
@@ -520,7 +722,9 @@ export default function ResolveModal({
                   </label>
                 )}
                 <p className="muted small">
-                  {rowOutcome(result, heal, needsAttack ? { ...row, roll: attackRoll } : row)}
+                  {spellDice
+                    ? spellDamageLine(result, row.label, row.info, damageFaces)
+                    : rowOutcome(result, heal, filledRow(row))}
                 </p>
               </div>
             ))}
@@ -530,7 +734,7 @@ export default function ResolveModal({
               className="btn primary"
               disabled={busy || !ready}
               onClick={() => {
-                const submitted = rows.map((row) => (needsAttack ? { ...row, roll: attackRoll } : row));
+                const submitted = rows.map((row) => filledRow(row));
                 onSubmit(submitted);
               }}
             >
@@ -599,58 +803,102 @@ export function HitEntry({
       roll: "",
       save: "",
       info: "",
+      dice: [],
     }))
   );
   const [attackRoll, setAttackRoll] = useState("");
+  const [damageFaces, setDamageFaces] = useState<string[]>([]);
   if (!seeded.length) return null;
   const needsAttack = !heal && result.check_type === "attack";
   const needsSave = !heal && result.check_type === "save";
+  const formula = parsePrintedDice(result.damage);
+  const attackFace = faceOf(attackRoll);
+  const attackIsCrit = needsAttack && attackFace != null && attackCrit(result, attackFace);
+  const attackHits = needsAttack && attackFace != null && attackConnects(result, attackFace);
+  const attackDice = shownDice(result.damage, attackIsCrit);
+  const spellDice = !heal && result.check_type === "spell" && formula.dice.length > 0;
   const ready =
-    (!needsAttack || faceOf(attackRoll) != null) &&
-    rows.every((row) => needsAttack || faceOf(row.roll) != null);
+    (!needsAttack || attackFace != null) &&
+    (!attackHits || !attackDice.length || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, attackDice)) &&
+    (!spellDice || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, formula.dice)) &&
+    rows.every((row) => {
+      if (needsAttack || spellDice) return true;
+      if (heal) return faceOf(row.roll) != null || amountIn(row.info) != null;
+      if (faceOf(row.roll) == null) return false;
+      if (!needsSave || !formula.dice.length || amountIn(row.info) != null) return true;
+      const saved = saveSucceeds(result, faceOf(row.roll) as number, printedSaveBonus(result, row.creature));
+      if (saved && !saveHalves(result)) return true;
+      return facesReady(row.dice || [], formula.dice);
+    });
+  function setSharedFace(index: number, value: string) {
+    setDamageFaces((prev) => {
+      const next = prev.slice();
+      next[index] = value;
+      return next;
+    });
+  }
+  function setRowDie(key: string, index: number, value: string) {
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const dice = (row.dice || []).slice();
+        dice[index] = value;
+        return { ...row, dice };
+      }),
+    );
+  }
+  function filled(row: ResolveRow): ResolveRow {
+    return {
+      ...row,
+      roll: needsAttack ? attackRoll : row.roll,
+      dice: needsAttack || spellDice ? damageFaces : row.dice || [],
+    };
+  }
   return (
     <div className="ruling-boxes">
       <p className="muted small" style={{ margin: 0 }}>
-        Type the d20. Submit rolls the printed damage and shows it on this creature. A number in additional info is used instead.
+        Type each die. A number in additional info is used instead of the damage dice.
       </p>
       {needsAttack && (
         <div className="resolve-row">
           <strong>{result.character || "Attacker"}</strong>
-          <label className="resolve-die">
-            Attack roll
-            <input
-              className="resolve-die-input"
-              type="number"
-              min={1}
-              max={20}
-              inputMode="numeric"
-              placeholder="d20"
-              value={attackRoll}
-              onChange={(event) => setAttackRoll(event.target.value)}
-            />
-          </label>
+          <div className="die-tray">
+            <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} />
+            <DamageDice dice={attackDice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} />
+          </div>
+        </div>
+      )}
+      {spellDice && (
+        <div className="resolve-row">
+          <strong>Damage</strong>
+          <div className="die-tray">
+            <DamageDice dice={formula.dice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} />
+          </div>
         </div>
       )}
       {rows.map((row) => (
         <div key={row.key} className="resolve-row">
           <strong>{row.label}</strong>
-          {!needsAttack && (
+          {!needsAttack && !spellDice && !heal && (
           <label className="resolve-die">
-            {needsSave ? "Saving throw" : social ? skillTitle(result) : heal ? "Healing" : "Check"}
-            <input
-              className="resolve-die-input"
-              type="number"
-              min={1}
-              max={20}
-              inputMode="numeric"
-              placeholder="d20"
-              value={row.roll}
-              onChange={(event) =>
-                setRows((prev) =>
-                  prev.map((item) => (item.key === row.key ? { ...item, roll: event.target.value } : item))
-                )
-              }
-            />
+            {needsSave ? "Saving throw" : social ? skillTitle(result) : "Check"}
+            <div className="die-tray">
+              <DieFace
+                sides={20}
+                value={row.roll}
+                onChange={(value) =>
+                  setRows((prev) => prev.map((item) => (item.key === row.key ? { ...item, roll: value } : item)))
+                }
+              />
+              {needsSave && (
+                <DamageDice
+                  dice={formula.dice}
+                  faces={row.dice || []}
+                  onChange={(index, value) => setRowDie(row.key, index, value)}
+                  modifier={formula.modifier}
+                />
+              )}
+            </div>
           </label>
           )}
           <label className="resolve-note">
@@ -664,7 +912,11 @@ export function HitEntry({
               }
             />
           </label>
-          <p className="muted small">{rowOutcome(result, heal, needsAttack ? { ...row, roll: attackRoll } : row)}</p>
+          <p className="muted small">
+            {spellDice
+              ? spellDamageLine(result, row.label, row.info, damageFaces)
+              : rowOutcome(result, heal, filled(row))}
+          </p>
         </div>
       ))}
       <button
@@ -673,24 +925,32 @@ export function HitEntry({
         disabled={busy || !ready}
         onClick={() => {
           for (const row of rows) {
-            const filled = needsAttack ? { ...row, roll: attackRoll } : row;
-            const face = faceOf(filled.roll);
+            const next = filled(row);
+            const face = faceOf(next.roll);
+            if (spellDice) {
+              const typed = amountIn(row.info);
+              const amount = typed ?? sumEnteredDice(result.damage, damageFaces, false);
+              if (amount == null || !row.creature) continue;
+              onApply(row.creature, amount);
+              onFate?.(`${row.label} takes ${amount}.`);
+              continue;
+            }
             if (face == null) continue;
             if (social) {
-              const line = playFate(result, filled);
+              const line = playFate(result, next);
               if (line) onFate?.(line);
               continue;
             }
             if (!row.creature) continue;
             if (heal) {
               const healing = amountIn(row.info) ?? face;
-              const line = playFate(result, filled, { heal: healing });
+              const line = playFate(result, next, { heal: healing });
               if (line) onFate?.(line);
               onApply(row.creature, healing);
               continue;
             }
-            const strike = strikeOutcome(result, filled.roll, row.info, row.save, printedSaveBonus(result, row.creature));
-            const line = playFate(result, filled, { strike });
+            const strike = strikeOutcome(result, next.roll, row.info, row.save, printedSaveBonus(result, row.creature), next.dice);
+            const line = playFate(result, next, { strike });
             if (line && strike.kind !== "pending") onFate?.(line);
             if (strike.kind === "damage") onApply(row.creature, strike.amount);
             else if (strike.kind === "miss") onMiss?.(row.creature);
