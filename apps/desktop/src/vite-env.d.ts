@@ -60,7 +60,9 @@ declare module "@3d-dice/dice-box" {
     clear(): void;
     getRollResults(): unknown;
     updateConfig(config: Record<string, unknown>): void;
+    loadTheme?(name: string): Promise<unknown>;
     resizeWorld?: () => void;
     onRollComplete: (results: unknown) => void;
+    onDieComplete?: (dieResult: unknown) => void;
   }
 }

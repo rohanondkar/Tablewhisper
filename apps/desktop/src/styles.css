@@ -1758,6 +1758,228 @@ html.window-framed .rail-panel {
   z-index: 50000;
 }
 
+.ask-panel {
+  width: min(440px, 100%);
+}
+
+.ask-panel.chest-panel {
+  width: min(520px, 100%);
+}
+
+.ask-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.ask-body > p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field input,
+.field textarea,
+.ask-body input:not([type="file"]):not([type="checkbox"]):not([type="radio"]),
+.ask-body textarea,
+.ask-body select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #12151c;
+  color: var(--ink);
+  padding: 0.6rem 0.75rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field input:focus,
+.field textarea:focus,
+.ask-body input:focus,
+.ask-body textarea:focus,
+.ask-body select:focus {
+  outline: none;
+  border-color: rgba(203, 180, 134, 0.55);
+  box-shadow: 0 0 0 3px rgba(203, 180, 134, 0.12);
+}
+
+.field textarea {
+  min-height: 5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.modal-actions .btn.primary {
+  min-width: 5.5rem;
+}
+
+.faction-ask-panel {
+  width: min(460px, 100%);
+}
+
+.image-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.image-pick.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.image-pick-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.image-pick-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.image-pick-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.image-pick-zone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 7.5rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(203, 180, 134, 0.35);
+  background:
+    linear-gradient(180deg, rgba(34, 38, 47, 0.65), rgba(18, 21, 28, 0.9));
+  cursor: var(--cursor, pointer);
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.image-pick-zone:hover,
+.image-pick.dragging .image-pick-zone {
+  border-color: rgba(228, 7, 18, 0.55);
+  background:
+    linear-gradient(180deg, rgba(50, 24, 28, 0.55), rgba(18, 21, 28, 0.95));
+  box-shadow: inset 0 0 0 1px rgba(228, 7, 18, 0.18);
+}
+
+.image-pick-zone:focus-visible {
+  outline: none;
+  border-color: rgba(203, 180, 134, 0.7);
+  box-shadow: 0 0 0 3px rgba(203, 180, 134, 0.15);
+}
+
+.image-pick-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.image-pick-empty strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.image-pick-empty span:last-child {
+  font-size: 0.78rem;
+}
+
+.image-pick-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+  color: var(--ddb-gold);
+  opacity: 0.85;
+}
+
+.image-pick-preview {
+  width: 100%;
+  height: 7.5rem;
+  object-fit: cover;
+  display: block;
+}
+
+.image-pick.round .image-pick-zone {
+  width: 7.5rem;
+  height: 7.5rem;
+  min-height: 7.5rem;
+  margin-inline: auto;
+  border-radius: 50%;
+  border-style: solid;
+  border-width: 2px;
+  border-color: rgba(230, 184, 77, 0.55);
+}
+
+.image-pick.round .image-pick-preview {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.image-pick.round .image-pick-empty {
+  padding: 0.65rem;
+}
+
+.image-pick.round .image-pick-empty strong {
+  font-size: 0.78rem;
+}
+
+.image-pick.round .image-pick-empty span:last-child {
+  display: none;
+}
+
+.image-pick-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.image-pick-actions .btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.relations-inspect .image-pick {
+  margin: 0.55rem 0 0.25rem;
+}
+
 .bag-panel {
   width: min(920px, 100%);
 }
@@ -2325,7 +2547,16 @@ html.window-framed .rail-panel {
 
 .modal-header h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.modal-header .btn.ghost {
+  min-width: 2rem;
+  padding: 0.3rem 0.55rem;
+  color: var(--muted);
 }
 
 .modal-body {

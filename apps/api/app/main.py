@@ -1633,6 +1633,7 @@ class FactionCreate(BaseModel):
     color: str | None = None
     pattern: str | None = None
     notes: str | None = None
+    summary: str | None = None
     x: float | None = None
     y: float | None = None
 

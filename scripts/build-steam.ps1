@@ -1,5 +1,6 @@
 # Build the Steam edition into G:\Discord Bot\Tablewhisper.
 # This repo stays the browser edition. The exe, Python, packages, and saves live next door.
+# Mac builds are separate (GitHub Actions → Releases); they never write here.
 $ErrorActionPreference = "Stop"
 
 $Repo = Split-Path -Parent $PSScriptRoot
@@ -9,6 +10,8 @@ $PyVersion = "3.12.8"
 $Desktop = Join-Path $Repo "apps\desktop"
 $ApiSrc = Join-Path $Repo "apps\api"
 $Packages = Join-Path $Repo "packages"
+$Packaged = Join-Path $Desktop "packaged-resources"
+$BuilderYml = Join-Path $Desktop "electron-builder.yml"
 
 New-Item -ItemType Directory -Force -Path $Cache | Out-Null
 
@@ -58,52 +61,24 @@ if ($LASTEXITCODE -ne 0) {
   if ($LASTEXITCODE -ne 0) { throw "API package install failed" }
 }
 
-Write-Host "Copying the API source..."
-$ApiDest = Join-Path $Cache "api"
-if (Test-Path $ApiDest) { Remove-Item -Recurse -Force $ApiDest }
-New-Item -ItemType Directory -Force -Path $ApiDest | Out-Null
-& robocopy $ApiSrc $ApiDest /E /NFL /NDL /NJH /NJS /XD .venv __pycache__ .pytest_cache /XF *.pyc
-if ($LASTEXITCODE -ge 8) { throw "Copying the API failed ($LASTEXITCODE)" }
+Write-Host "Staging packaged-resources for electron-builder..."
+if (Test-Path $Packaged) { Remove-Item -Recurse -Force $Packaged }
+New-Item -ItemType Directory -Force -Path (Join-Path $Packaged "python") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $Packaged "api") | Out-Null
+& robocopy $PyDir (Join-Path $Packaged "python") /E /NFL /NDL /NJH /NJS
+if ($LASTEXITCODE -ge 8) { throw "Copying Python into packaged-resources failed ($LASTEXITCODE)" }
+$global:LASTEXITCODE = 0
+& robocopy $ApiSrc (Join-Path $Packaged "api") /E /NFL /NDL /NJH /NJS /XD .venv __pycache__ .pytest_cache /XF *.pyc
+if ($LASTEXITCODE -ge 8) { throw "Copying the API into packaged-resources failed ($LASTEXITCODE)" }
 $global:LASTEXITCODE = 0
 
-$yml = Join-Path $Cache "electron-builder.yml"
-$packagesPath = ($Packages -replace "\\", "/")
-$pyPath = ($PyDir -replace "\\", "/")
-$apiPath = ($ApiDest -replace "\\", "/")
 $outPath = (($Cache + "\out") -replace "\\", "/")
-$diceAssets = ((Join-Path $Desktop "public\assets\dice-box") -replace "\\", "/")
-@"
-appId: com.tablewhisper.game
-productName: Tablewhisper
-asar: true
-asarUnpack:
-  - "**/*.wasm"
-  - "**/assets/dice-box/**"
-  - "**/dice-box/**"
-directories:
-  output: $outPath
-files:
-  - dist/**/*
-  - electron/**/*
-  - package.json
-extraResources:
-  - from: $pyPath
-    to: python
-  - from: $apiPath
-    to: api
-  - from: $packagesPath
-    to: packages
-  - from: $diceAssets
-    to: dice-box
-win:
-  target: dir
-  signAndEditExecutable: false
-"@ | Set-Content -Path $yml -Encoding ascii
+if (-not (Test-Path $BuilderYml)) { throw "Missing $BuilderYml" }
 
 Write-Host "Packaging Tablewhisper.exe..."
 Push-Location $Desktop
 try {
-  npx.cmd electron-builder --win dir --config $yml
+  npx.cmd electron-builder --win dir --config electron-builder.yml "-c.directories.output=$outPath"
   if ($LASTEXITCODE -ne 0) { throw "electron-builder failed" }
 } finally {
   Pop-Location
@@ -132,3 +107,4 @@ Write-Host ""
 Write-Host "Steam edition is ready:"
 Write-Host "  $Steam\Tablewhisper.exe"
 Write-Host "Add that exe as a non-Steam game. Leave launch options empty."
+Write-Host "Mac builds are separate - use GitHub Actions Release Mac (not this folder)."

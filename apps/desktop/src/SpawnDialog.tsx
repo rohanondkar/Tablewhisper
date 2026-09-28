@@ -349,7 +349,7 @@ export function SpawnDialog({
               </label>
               <label className="btn file-btn">
                 {customMonster.image ? "Portrait ready" : "Portrait image"}
-                <PortraitFileButton onFile={(file) => setCustomMonster((c) => ({ ...c, image: file }))} />
+                <PortraitFileButton hidden onFile={(file) => setCustomMonster((c) => ({ ...c, image: file }))} />
               </label>
               <button
                 className="btn"
@@ -422,7 +422,7 @@ export function SpawnDialog({
               </label>
               <label className="btn file-btn">
                 {customNpc.image ? "Portrait ready" : "Portrait image"}
-                <PortraitFileButton onFile={(file) => setCustomNpc((c) => ({ ...c, image: file }))} />
+                <PortraitFileButton hidden onFile={(file) => setCustomNpc((c) => ({ ...c, image: file }))} />
               </label>
               <button
                 className="btn"

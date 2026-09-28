@@ -1,9 +1,38 @@
-import { useState } from "react";
-import type { Character, CheckResult, EncounterEnemy, MonsterTemplate, NpcTemplate, SceneNpc } from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { api, type Character, type CheckResult, type EncounterEnemy, type MonsterTemplate, type NpcTemplate, type SceneNpc } from "../api";
 import type { RulingCreature } from "./effects";
 import ResolveCard from "./ResolveCard";
-import { skinFromCreature } from "./dieSkins";
+import { skinFromCreature, uniquifySkin, type DieSkin } from "./dieSkins";
 import { isDiceRolling, rollPhysicsDice } from "./diceRoller";
+
+function skinForCharacter(
+  characters: Character[],
+  characterId: string | null | undefined,
+  characterName: string | null | undefined,
+  overrides?: { color?: string | null; pattern?: string | null } | null,
+): DieSkin {
+  const roller =
+    (characterId && characters.find((c) => c.id === characterId)) ||
+    (characterName && characters.find((c) => c.name === characterName)) ||
+    null;
+  const base = skinFromCreature({
+    name: characterName || roller?.name,
+    species: roller?.species,
+    class_level: roller?.class_level,
+    hand_color: roller?.hand_color,
+    color: overrides?.color,
+    pattern: overrides?.pattern,
+  });
+  const siblings = characters.map((c) =>
+    skinFromCreature({
+      name: c.name,
+      species: c.species,
+      class_level: c.class_level,
+      hand_color: c.hand_color,
+    }),
+  );
+  return uniquifySkin(base, siblings);
+}
 
 export type ResolveRow = {
   key: string;
@@ -576,12 +605,33 @@ export default function ResolveModal({
   const [rolling, setRolling] = useState(false);
 
   const roller = characters.find((c) => c.id === result.character_id) || null;
-  const skin = skinFromCreature({
-    name: result.character || roller?.name,
-    species: roller?.species,
-    class_level: roller?.class_level,
-    hand_color: roller?.hand_color,
-  });
+  const [relationOverride, setRelationOverride] = useState<{ color?: string; pattern?: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getRelations()
+      .then((board) => {
+        if (cancelled) return;
+        const node = board.nodes.find(
+          (n) =>
+            (result.character_id && n.ref_id === result.character_id) ||
+            (result.character && n.name === result.character),
+        );
+        if (node) setRelationOverride({ color: node.color, pattern: String(node.pattern) });
+        else setRelationOverride(null);
+      })
+      .catch(() => {
+        if (!cancelled) setRelationOverride(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [result.character_id, result.character]);
+  const skin = useMemo(
+    () =>
+      skinForCharacter(characters, result.character_id, result.character || roller?.name, relationOverride),
+    [characters, result.character_id, result.character, roller?.name, relationOverride],
+  );
 
   function patch(key: string, field: "roll" | "save" | "info", value: string) {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, [field]: value } : row)));
@@ -838,6 +888,7 @@ export { amountIn };
 export function HitEntry({
   result,
   creatures,
+  characters = [],
   heal,
   busy,
   onApply,
@@ -846,6 +897,7 @@ export function HitEntry({
 }: {
   result: CheckResult;
   creatures: RulingCreature[];
+  characters?: Character[];
   heal: boolean;
   busy?: boolean;
   onApply: (creature: RulingCreature, amount: number) => void;
@@ -892,6 +944,32 @@ export function HitEntry({
   const [attackRoll, setAttackRoll] = useState("");
   const [damageFaces, setDamageFaces] = useState<string[]>([]);
   const [rolling, setRolling] = useState(false);
+  const [relationOverride, setRelationOverride] = useState<{ color?: string; pattern?: string } | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .getRelations()
+      .then((board) => {
+        if (cancelled) return;
+        const node = board.nodes.find(
+          (n) =>
+            (result.character_id && n.ref_id === result.character_id) ||
+            (result.character && n.name === result.character),
+        );
+        if (node) setRelationOverride({ color: node.color, pattern: String(node.pattern) });
+        else setRelationOverride(null);
+      })
+      .catch(() => {
+        if (!cancelled) setRelationOverride(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [result.character_id, result.character]);
+  const skin = useMemo(
+    () => skinForCharacter(characters, result.character_id, result.character, relationOverride),
+    [characters, result.character_id, result.character, relationOverride],
+  );
   if (!seeded.length) return null;
   const needsAttack = !heal && result.check_type === "attack";
   const needsSave = !heal && result.check_type === "save";
@@ -901,7 +979,6 @@ export function HitEntry({
   const attackHits = needsAttack && attackFace != null && attackConnects(result, attackFace);
   const attackDice = shownDice(result.damage, attackIsCrit);
   const spellDice = !heal && result.check_type === "spell" && formula.dice.length > 0;
-  const skin = skinFromCreature({ name: result.character });
   const ready =
     (!needsAttack || attackFace != null) &&
     (!attackHits || !attackDice.length || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, attackDice)) &&

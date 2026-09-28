@@ -43,7 +43,8 @@ def audio_source() -> str:
     if _discord_fresh():
         return "discord"
     if _capturing:
-        return "wasapi"
+        # Windows prefers WASAPI loopback; macOS/Linux use the default mic (no WASAPI).
+        return "wasapi" if os.name == "nt" else "microphone"
     return "idle"
 
 
@@ -140,29 +141,33 @@ def start_capture() -> dict[str, Any]:
         import sounddevice as sd
     except Exception as exc:
         raise RuntimeError(
-            "sounddevice is not available. Install PortAudio support to capture Discord audio."
+            "sounddevice is not available. Install PortAudio support to capture audio "
+            "(Windows loopback or the Mac microphone)."
         ) from exc
 
-    # Prefer loopback devices on Windows (WASAPI)
+    # Prefer WASAPI loopback on Windows. On macOS there is no WASAPI loopback —
+    # use the default input device (mic). Discord VC can still feed the buffer
+    # via ingest_discord_pcm without opening a local capture stream.
     device = None
     device_name = None
     try:
         devices = sd.query_devices()
         hostapis = sd.query_hostapis()
-        wasapi_index = None
-        for i, api in enumerate(hostapis):
-            if "wasapi" in str(api.get("name", "")).lower():
-                wasapi_index = i
-                break
-        for idx, dev in enumerate(devices):
-            name = str(dev.get("name", ""))
-            max_in = int(dev.get("max_input_channels") or 0)
-            is_loopback = "loopback" in name.lower()
-            same_api = wasapi_index is None or dev.get("hostapi") == wasapi_index
-            if max_in > 0 and is_loopback and same_api:
-                device = idx
-                device_name = name
-                break
+        if os.name == "nt":
+            wasapi_index = None
+            for i, api in enumerate(hostapis):
+                if "wasapi" in str(api.get("name", "")).lower():
+                    wasapi_index = i
+                    break
+            for idx, dev in enumerate(devices):
+                name = str(dev.get("name", ""))
+                max_in = int(dev.get("max_input_channels") or 0)
+                is_loopback = "loopback" in name.lower()
+                same_api = wasapi_index is None or dev.get("hostapi") == wasapi_index
+                if max_in > 0 and is_loopback and same_api:
+                    device = idx
+                    device_name = name
+                    break
         if device is None:
             device = None
             info = sd.query_devices(kind="input")

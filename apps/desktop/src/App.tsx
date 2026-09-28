@@ -1534,23 +1534,30 @@ export default function App() {
       {saveOpen && (
         <div className="modal-backdrop" onClick={() => setSaveOpen(false)}>
           <form
-            className="modal-panel"
+            className="modal-panel ask-panel"
             onClick={(event) => event.stopPropagation()}
             onSubmit={(event) => {
               event.preventDefault();
               void confirmSave();
             }}
           >
-            <h2>Save session</h2>
-            <label>
-              Name
-              <input value={saveName} autoFocus onChange={(event) => setSaveName(event.target.value)} />
-            </label>
+            <div className="modal-header">
+              <h2>Save session</h2>
+              <button type="button" className="btn ghost" onClick={() => setSaveOpen(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body ask-body">
+              <label className="field">
+                <span className="field-label">Name</span>
+                <input value={saveName} autoFocus onChange={(event) => setSaveName(event.target.value)} />
+              </label>
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn ghost" onClick={() => setSaveOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn" disabled={busy || !saveName.trim()}>
+              <button type="submit" className="btn primary" disabled={busy || !saveName.trim()}>
                 Save
               </button>
             </div>
@@ -1559,21 +1566,28 @@ export default function App() {
       )}
       {loadOpen && (
         <div className="modal-backdrop" onClick={() => setLoadOpen(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <h2>Load session</h2>
-            {saves.length === 0 ? (
-              <p className="muted">No saves yet.</p>
-            ) : (
-              <ul className="save-list">
-                {saves.map((row) => (
-                  <li key={row.name}>
-                    <button type="button" className="btn ghost" disabled={busy} onClick={() => void confirmLoad(row.name)}>
-                      {row.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+          <div className="modal-panel ask-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Load session</h2>
+              <button type="button" className="btn ghost" onClick={() => setLoadOpen(false)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body ask-body">
+              {saves.length === 0 ? (
+                <p className="muted">No saves yet.</p>
+              ) : (
+                <ul className="save-list">
+                  {saves.map((row) => (
+                    <li key={row.name}>
+                      <button type="button" className="btn ghost" disabled={busy} onClick={() => void confirmLoad(row.name)}>
+                        {row.name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn ghost" onClick={() => setLoadOpen(false)}>
                 Close
@@ -2051,6 +2065,7 @@ export default function App() {
                 <HitEntry
                   result={result}
                   creatures={mapRuling?.blocked ? [] : mapRuling?.creatures || []}
+                  characters={characters}
                   heal={Boolean(mapRuling?.heal)}
                   busy={busy}
                   onApply={(creature, amount) => applyCreature(creature, amount)}

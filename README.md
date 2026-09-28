@@ -257,6 +257,20 @@ Naming a creature or NPC in the query can also spawn or match them.
 
 ---
 
+## Mac (Apple Silicon)
+
+The Windows Steam folder (`G:\Discord Bot\Tablewhisper`) is **Windows only**. Mac builds are separate.
+
+1. On GitHub: **Actions → Release Mac → Run workflow**, or push a `v*` tag.
+2. Open the new **Release** and download the arm64 zip (`Tablewhisper-*-mac.zip` or similar).
+3. On your Mac: unzip, then **right-click** `Tablewhisper.app` → **Open** (Gatekeeper; the build is unsigned).
+4. Optional: install [Ollama](https://ollama.com) on the Mac the same way as on Windows.
+5. **Start listening** uses the microphone (allow when prompted). Discord VC still works through the local Discord bot feed. There is no Windows-style system loopback on macOS.
+
+Saves on Mac live under Application Support (`~/Library/Application Support/Tablewhisper/data`), not inside the `.app` bundle.
+
+---
+
 ## Stop
 
 Prefer in-app **Quit** or `start-dev.bat` → **8**.  
@@ -276,6 +290,8 @@ The manual two-window commands below still stop with `Ctrl+C`.
 | Ollama offline | Install Ollama, run `ollama pull llama3.2`, keep Ollama running |
 | Voice buffer empty | Start listening, play Discord audio, then capture |
 | Re-upload empty party | Upload a character PDF first |
+| Mac Gatekeeper blocks the app | Right-click `Tablewhisper.app` → **Open** (unsigned Release build) |
+| Mac Start listening has no Discord loopback | Use the mic, or run the Discord VC bot feed; macOS has no WASAPI loopback |
 
 Using `py -3`:
 

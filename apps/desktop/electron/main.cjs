@@ -218,18 +218,31 @@ function rememberFreeSize() {
 function packagedLayout() {
   const resources = process.resourcesPath;
   const exeDir = path.dirname(process.execPath);
+  const python =
+    process.platform === "darwin" || process.platform === "linux"
+      ? path.join(resources, "python", "bin", "python3")
+      : path.join(resources, "python", "python.exe");
+  // Mac .app bundles are not writable; keep saves under Application Support.
+  const data =
+    process.platform === "darwin"
+      ? path.join(app.getPath("userData"), "data")
+      : path.join(exeDir, "data");
   return {
-    python: path.join(resources, "python", "python.exe"),
+    python,
     apiDir: path.join(resources, "api"),
     packages: path.join(resources, "packages"),
-    data: path.join(exeDir, "data"),
+    data,
   };
 }
 
 function startApi() {
   const apiDir = path.resolve(__dirname, "..", "..", "api");
-  const venvPython = path.join(apiDir, ".venv", "Scripts", "python.exe");
-  const python = process.env.DM_PYTHON || (fs.existsSync(venvPython) ? venvPython : "python");
+  const venvPython =
+    process.platform === "win32"
+      ? path.join(apiDir, ".venv", "Scripts", "python.exe")
+      : path.join(apiDir, ".venv", "bin", "python");
+  const fallback = process.platform === "win32" ? "python" : "python3";
+  const python = process.env.DM_PYTHON || (fs.existsSync(venvPython) ? venvPython : fallback);
   apiProcess = spawn(
     python,
     ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(API_PORT)],
@@ -249,22 +262,19 @@ function startPackagedApi() {
   const layout = packagedLayout();
   fs.mkdirSync(path.join(layout.data, "logs"), { recursive: true });
   const log = fs.openSync(path.join(layout.data, "logs", "api.log"), "a");
-  apiProcess = spawn(
-    layout.python,
-    ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(API_PORT)],
-    {
-      cwd: layout.apiDir,
-      env: {
-        ...process.env,
-        DM_API_PORT: String(API_PORT),
-        TABLEWHISPER_DATA: layout.data,
-        TABLEWHISPER_PACKAGES: layout.packages,
-        PYTHONNOUSERSITE: "1",
-      },
-      windowsHide: true,
-      stdio: ["ignore", log, log],
-    }
-  );
+  const opts = {
+    cwd: layout.apiDir,
+    env: {
+      ...process.env,
+      DM_API_PORT: String(API_PORT),
+      TABLEWHISPER_DATA: layout.data,
+      TABLEWHISPER_PACKAGES: layout.packages,
+      PYTHONNOUSERSITE: "1",
+    },
+    stdio: ["ignore", log, log],
+  };
+  if (process.platform === "win32") opts.windowsHide = true;
+  apiProcess = spawn(layout.python, ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", String(API_PORT)], opts);
   apiProcess.on("exit", (code) => {
     console.log("API exited", code);
   });
@@ -351,9 +361,9 @@ function registerHotkeys() {
 }
 
 function runQuitScript() {
+  if (process.platform !== "win32") return Promise.resolve(false);
   const ps1 = path.join(ROOT, "scripts", "quit-dm.ps1");
   const bat = path.join(ROOT, "scripts", "quit-dm.bat");
-  const fs = require("fs");
   if (fs.existsSync(ps1)) {
     return new Promise((resolve) => {
       execFile(

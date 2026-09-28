@@ -1,6 +1,7 @@
 import DiceBox from "@3d-dice/dice-box";
 import type { DieSkin } from "./dieSkins";
-import { playDiceSettleSound, startDiceRollSound, stopDiceSounds } from "./diceSounds";
+import { prewarmDieThemes, resolveDieTheme } from "./diePatternTheme";
+import { noteDieLanded, playDiceSettleSound, startDiceRollSound, stopDiceSounds } from "./diceSounds";
 
 type RollFace = { sides: number; value: number };
 
@@ -10,20 +11,27 @@ let overlay: HTMLDivElement | null = null;
 let ready: Promise<InstanceType<typeof DiceBox> | null> | null = null;
 let rolling = false;
 let lastError = "";
+let assetPathCache = "";
 
 async function resolveAssetPath(): Promise<string> {
+  if (assetPathCache) return assetPathCache;
   try {
     const fromDesktop = await window.dmDesktop?.getDiceAssetUrl?.();
-    if (fromDesktop) return fromDesktop.endsWith("/") ? fromDesktop : `${fromDesktop}/`;
+    if (fromDesktop) {
+      assetPathCache = fromDesktop.endsWith("/") ? fromDesktop : `${fromDesktop}/`;
+      return assetPathCache;
+    }
   } catch {
     /* fall through */
   }
   try {
-    return new URL("assets/dice-box/", window.location.href).href;
+    assetPathCache = new URL("assets/dice-box/", window.location.href).href;
+    return assetPathCache;
   } catch {
     const base = import.meta.env.BASE_URL || "./";
     const root = base.endsWith("/") ? base : `${base}/`;
-    return `${root}assets/dice-box/`;
+    assetPathCache = `${root}assets/dice-box/`;
+    return assetPathCache;
   }
 }
 
@@ -114,6 +122,7 @@ async function getBox(): Promise<InstanceType<typeof DiceBox>> {
         lightIntensity: 1.15,
         theme: "default",
         themeColor: "#6b7280",
+        preloadThemes: [],
         enableShadows: true,
         shadowTransparency: 0.7,
       });
@@ -125,6 +134,8 @@ async function getBox(): Promise<InstanceType<typeof DiceBox>> {
       }
       box = created;
       lastError = "";
+      // Background-load patterned themes so Roll stays cache-hit only.
+      void prewarmDieThemes(created as unknown as Parameters<typeof prewarmDieThemes>[0]);
       return created;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
@@ -139,12 +150,12 @@ async function getBox(): Promise<InstanceType<typeof DiceBox>> {
   return started;
 }
 
-function groupNotation(sides: number[]): string[] {
+function groupSides(sides: number[]): Array<{ qty: number; sides: number }> {
   const counts = new Map<number, number>();
   for (const side of sides) {
     counts.set(side, (counts.get(side) || 0) + 1);
   }
-  return [...counts.entries()].map(([side, qty]) => `${qty}d${side}`);
+  return [...counts.entries()].map(([side, qty]) => ({ qty, sides: side }));
 }
 
 function flattenFaces(results: unknown, expected: number[]): number[] {
@@ -175,41 +186,52 @@ function flattenFaces(results: unknown, expected: number[]): number[] {
 
 function waitForRollComplete(
   dice: InstanceType<typeof DiceBox>,
-  notation: string | string[],
-  color: string,
+  notation: Array<{ qty: number; sides: number; theme: string; themeColor: string }>,
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const previous = dice.onRollComplete;
+    const previousRoll = dice.onRollComplete;
+    const previousDie = dice.onDieComplete;
     let done = false;
     const finish = (results: unknown) => {
       if (done) return;
       done = true;
-      dice.onRollComplete = previous;
+      dice.onRollComplete = previousRoll;
+      dice.onDieComplete = previousDie;
       resolve(results);
+    };
+    dice.onDieComplete = (dieResult: unknown) => {
+      try {
+        previousDie?.(dieResult);
+      } catch {
+        /* ignore */
+      }
+      noteDieLanded();
     };
     dice.onRollComplete = (results: unknown) => {
       try {
-        previous?.(results);
+        previousRoll?.(results);
       } catch {
         /* ignore */
       }
       finish(results);
     };
     try {
-      const rolled = dice.roll(notation, { themeColor: color });
+      const rolled = dice.roll(notation.length === 1 ? notation[0] : notation);
       if (rolled && typeof (rolled as Promise<unknown>).then === "function") {
         void (rolled as Promise<unknown>)
           .then((results) => finish(results))
           .catch((err) => {
             if (done) return;
             done = true;
-            dice.onRollComplete = previous;
+            dice.onRollComplete = previousRoll;
+            dice.onDieComplete = previousDie;
             reject(err);
           });
       }
     } catch (err) {
       done = true;
-      dice.onRollComplete = previous;
+      dice.onRollComplete = previousRoll;
+      dice.onDieComplete = previousDie;
       reject(err);
     }
   });
@@ -223,7 +245,7 @@ export function isDiceRolling(): boolean {
   return rolling;
 }
 
-/** Warm the WebGL physics tray so the first Roll is instant. */
+/** Warm the WebGL physics tray and idle-preload pattern themes. */
 export function warmDiceBox(): void {
   void getBox()
     .then(() => {
@@ -255,9 +277,13 @@ export async function rollPhysicsDice(sides: number[], skin: DieSkin): Promise<R
     } catch {
       /* ignore */
     }
+
+    // Cache-only theme resolve — never generate textures here.
+    const resolved = resolveDieTheme(skin);
     try {
       dice.updateConfig?.({
-        themeColor: skin.color,
+        theme: resolved.theme,
+        themeColor: resolved.themeColor,
         offscreen: false,
         throwForce: 10,
         spinForce: 9,
@@ -271,16 +297,16 @@ export async function rollPhysicsDice(sides: number[], skin: DieSkin): Promise<R
     await new Promise((r) => requestAnimationFrame(r));
 
     startDiceRollSound(sides.length);
-    const notation = groupNotation(sides);
+    const notation = groupSides(sides).map((row) => ({
+      ...row,
+      theme: resolved.theme,
+      themeColor: resolved.themeColor,
+    }));
     let settled: unknown;
     try {
-      settled = await withTimeout(
-        waitForRollComplete(dice, notation.length === 1 ? notation[0] : notation, skin.color),
-        25000,
-        "Dice roll",
-      );
+      settled = await withTimeout(waitForRollComplete(dice, notation), 25000, "Dice roll");
     } catch (err) {
-      stopDiceSounds();
+      stopDiceSounds(80);
       throw err;
     }
     const values = flattenFaces(settled ?? dice.getRollResults?.(), sides);
@@ -296,7 +322,6 @@ export async function rollPhysicsDice(sides: number[], skin: DieSkin): Promise<R
     }));
   } finally {
     rolling = false;
-    stopDiceSounds();
     try {
       box?.clear?.();
     } catch {

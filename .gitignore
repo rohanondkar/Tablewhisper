@@ -7,6 +7,7 @@ __pycache__/
 *.pyc
 .DS_Store
 apps/desktop/dist/
+apps/desktop/packaged-resources/
 apps/api/.venv/
 # Discord bot kept local for now (token + WIP) — do not publish yet
 apps/discord-bot/

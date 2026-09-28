@@ -3968,14 +3968,18 @@ function MapPanel({
       )}
       {deleteChest && (
         <div className="modal-backdrop name-ask" onClick={() => setDeleteChest(null)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <h2>Delete {deleteChest.name}?</h2>
-            <p>This removes the chest and everything inside it.</p>
+          <div className="modal-panel ask-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delete {deleteChest.name}?</h2>
+            </div>
+            <div className="modal-body ask-body">
+              <p>This removes the chest and everything inside it.</p>
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn ghost" onClick={() => setDeleteChest(null)}>
                 Cancel
               </button>
-              <button type="button" className="btn" onClick={() => void confirmDeleteChest()}>
+              <button type="button" className="btn primary" onClick={() => void confirmDeleteChest()}>
                 Delete
               </button>
             </div>
@@ -3984,8 +3988,14 @@ function MapPanel({
       )}
       {selectedChestId && chests.some((row) => row.id === selectedChestId) && (
         <div className="modal-backdrop name-ask" onClick={() => setSelectedChestId(null)}>
-          <div className="modal-panel chest-panel" onClick={(event) => event.stopPropagation()}>
-            <h2>{chests.find((row) => row.id === selectedChestId)?.name}</h2>
+          <div className="modal-panel ask-panel chest-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{chests.find((row) => row.id === selectedChestId)?.name}</h2>
+              <button type="button" className="btn ghost" onClick={() => setSelectedChestId(null)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+            <div className="modal-body ask-body">
             {(chests.find((row) => row.id === selectedChestId)?.contents || []).map((row) => (
               <div className="chest-row" key={row.id}>
                 <span>{row.item.name}</span>
@@ -4035,6 +4045,7 @@ function MapPanel({
                 Add
               </button>
             </div>
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn ghost" data-tip="Delete this chest and everything inside it." onClick={() => selectedChestId && void deletePiece({ kind: "chest", id: selectedChestId })}>
                 Delete
@@ -4048,14 +4059,18 @@ function MapPanel({
       )}
       {deleteAsk && (
         <div className="modal-backdrop name-ask" onClick={() => setDeleteAsk(null)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <h2>Delete {deleteAsk.name}?</h2>
-            <p className="muted">This removes that scene, including its walls and pools.</p>
+          <div className="modal-panel ask-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delete {deleteAsk.name}?</h2>
+            </div>
+            <div className="modal-body ask-body">
+              <p className="muted">This removes that scene, including its walls and pools.</p>
+            </div>
             <div className="modal-actions">
               <button type="button" className="btn ghost" onClick={() => setDeleteAsk(null)}>
                 Cancel
               </button>
-              <button type="button" className="btn" onClick={() => void confirmDeleteMap()}>
+              <button type="button" className="btn primary" onClick={() => void confirmDeleteMap()}>
                 Delete
               </button>
             </div>

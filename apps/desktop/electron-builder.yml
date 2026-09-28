@@ -1,0 +1,34 @@
+appId: com.tablewhisper.game
+productName: Tablewhisper
+asar: true
+asarUnpack:
+  - "**/*.wasm"
+  - "**/assets/dice-box/**"
+  - "**/dice-box/**"
+files:
+  - dist/**/*
+  - electron/**/*
+  - package.json
+extraResources:
+  - from: packaged-resources/python
+    to: python
+  - from: packaged-resources/api
+    to: api
+  - from: ../../packages
+    to: packages
+  - from: public/assets/dice-box
+    to: dice-box
+win:
+  target: dir
+  signAndEditExecutable: false
+mac:
+  target:
+    - target: zip
+      arch:
+        - arm64
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  category: public.app-category.games
+  extendInfo:
+    NSMicrophoneUsageDescription: Tablewhisper listens with the microphone (or Discord voice) for whispered rulings. macOS has no Windows-style loopback; use the mic or the Discord bot feed.

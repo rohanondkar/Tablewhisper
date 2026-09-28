@@ -9,8 +9,13 @@ import {
   type RelationsBoard as BoardState,
   type SceneNpc,
 } from "./api";
-import { COLOR_OPTIONS, PATTERN_OPTIONS, skinFromCreature } from "./map/dieSkins";
+import { COLOR_OPTIONS, PATTERN_OPTIONS, patternCanvas, skinFromCreature } from "./map/dieSkins";
 import { TextAsk } from "./TextAsk";
+import { FactionAsk, type FactionAskResult } from "./FactionAsk";
+import { ImagePickField } from "./ImagePickField";
+import { mediaUrlSync } from "./api";
+
+const API_BASE = "http://127.0.0.1:8766";
 
 const EDGE_PRESETS = ["ally", "rival", "enemy", "family", "serves", "owes"];
 
@@ -142,14 +147,48 @@ export function RelationsBoard({
   }
 
   async function placeNamed(name: string) {
-    if (!ask) return;
+    if (!ask || ask.kind === "faction") return;
     const trimmed = name.trim();
     setAsk(null);
     if (!trimmed) return;
-    if (ask.kind === "faction") {
-      await run(() => api.addFaction({ name: trimmed, x: ask.x, y: ask.y }));
-    } else {
-      await run(() => api.addRelationNode({ name: trimmed, kind: "person", x: ask.x, y: ask.y }));
+    await run(() => api.addRelationNode({ name: trimmed, kind: "person", x: ask.x, y: ask.y }));
+  }
+
+  async function placeFaction(result: FactionAskResult) {
+    if (!ask || ask.kind !== "faction") return;
+    const trimmed = result.name.trim();
+    const x = ask.x;
+    const y = ask.y;
+    setAsk(null);
+    if (!trimmed) return;
+    setBusy(true);
+    try {
+      const next = await api.addFaction({
+        name: trimmed,
+        summary: result.summary.trim(),
+        x,
+        y,
+      });
+      applyBoard(next);
+      const created =
+        next.factions.find((f) => f.name === trimmed && Math.abs(f.x - x) < 1 && Math.abs(f.y - y) < 1) ||
+        next.factions.find((f) => f.name === trimmed) ||
+        next.factions[next.factions.length - 1];
+      if (result.image && created) {
+        applyBoard(await api.uploadFactionImage(created.id, result.image));
+        setFactionImages((prev) => {
+          const copy = { ...prev };
+          delete copy[created.id];
+          return copy;
+        });
+      }
+      const hub = next.nodes.find((n) => n.kind === "faction" && n.ref_id === created?.id);
+      if (hub) setSelectedId(hub.id);
+      setNotice("Faction placed. You can still edit picture and description in the inspector.");
+    } catch (err) {
+      setNotice(explain(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -367,7 +406,14 @@ export function RelationsBoard({
                       />
                     ) : (
                       <>
-                        <Circle radius={radius - 2} fill={node.color} opacity={0.92} />
+                        <Circle
+                          radius={radius - 2}
+                          fill={node.pattern === "solid" ? node.color : undefined}
+                          fillPatternImage={node.pattern === "solid" ? undefined : patternCanvas(node.pattern, node.color)}
+                          fillPatternRepeat="repeat"
+                          fillPriority={node.pattern === "solid" ? "color" : "pattern"}
+                          opacity={0.92}
+                        />
                         <Shape
                           sceneFunc={(ctx, shape) => {
                             ctx.beginPath();
@@ -560,28 +606,25 @@ export function RelationsBoard({
                       }
                     />
                   </label>
-                  <label>
-                    Picture
-                    <input
-                      type="file"
-                      accept="image/*"
-                      disabled={busy}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (!file) return;
-                        setFactionImages((prev) => {
-                          const next = { ...prev };
-                          delete next[selectedFaction.id];
-                          return next;
-                        });
-                        void run(() => api.uploadFactionImage(selectedFaction.id, file));
-                      }}
-                    />
-                  </label>
-                  {selectedFaction.image_url && (
-                    <p className="muted small">Picture set. It shows on the faction hub.</p>
-                  )}
+                  <ImagePickField
+                    round
+                    disabled={busy}
+                    showRemove={false}
+                    previewUrl={
+                      selectedFaction.image_url
+                        ? mediaUrlSync(selectedFaction.image_url, API_BASE)
+                        : null
+                    }
+                    onFile={(file) => {
+                      if (!file) return;
+                      setFactionImages((prev) => {
+                        const next = { ...prev };
+                        delete next[selectedFaction.id];
+                        return next;
+                      });
+                      void run(() => api.uploadFactionImage(selectedFaction.id, file));
+                    }}
+                  />
                   <label>
                     Leader
                     <select
@@ -678,13 +721,16 @@ export function RelationsBoard({
           )}
         </aside>
       </div>
-      {ask && (
+      {ask?.kind === "person" && (
         <TextAsk
-          title={ask.kind === "faction" ? "Name this faction" : "Name this person"}
-          initial={ask.kind === "faction" ? "Faction" : "Person"}
+          title="Name this person"
+          initial="Person"
           onCancel={() => setAsk(null)}
           onSubmit={(name) => void placeNamed(name)}
         />
+      )}
+      {ask?.kind === "faction" && (
+        <FactionAsk onCancel={() => setAsk(null)} onSubmit={(value) => void placeFaction(value)} />
       )}
     </div>
   );
