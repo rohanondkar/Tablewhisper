@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { pathToFileURL } = require("url");
 const { spawn, execFile } = require("child_process");
 const http = require("http");
 
@@ -308,6 +309,8 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      // Packaged UI is file://; dice themes/wasm live under resources/dice-box.
+      webSecurity: false,
     },
     title: app.isPackaged ? "Tablewhisper" : "DM Console",
   };
@@ -475,6 +478,12 @@ ipcMain.handle("api:base", () => API_BASE);
 ipcMain.handle("app:isGame", () => app.isPackaged);
 ipcMain.handle("app:quitAll", () => quitEverything());
 ipcMain.handle("display:get", () => displayState());
+ipcMain.handle("dice:assets", () => {
+  if (!app.isPackaged) return null;
+  const dir = path.join(process.resourcesPath, "dice-box");
+  if (!fs.existsSync(path.join(dir, "themes", "default", "theme.config.json"))) return null;
+  return pathToFileURL(dir + path.sep).href;
+});
 ipcMain.handle("window:minimize", () => {
   mainWindow?.minimize();
 });

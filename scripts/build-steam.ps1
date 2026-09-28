@@ -71,10 +71,15 @@ $packagesPath = ($Packages -replace "\\", "/")
 $pyPath = ($PyDir -replace "\\", "/")
 $apiPath = ($ApiDest -replace "\\", "/")
 $outPath = (($Cache + "\out") -replace "\\", "/")
+$diceAssets = ((Join-Path $Desktop "public\assets\dice-box") -replace "\\", "/")
 @"
 appId: com.tablewhisper.game
 productName: Tablewhisper
 asar: true
+asarUnpack:
+  - "**/*.wasm"
+  - "**/assets/dice-box/**"
+  - "**/dice-box/**"
 directories:
   output: $outPath
 files:
@@ -88,6 +93,8 @@ extraResources:
     to: api
   - from: $packagesPath
     to: packages
+  - from: $diceAssets
+    to: dice-box
 win:
   target: dir
   signAndEditExecutable: false

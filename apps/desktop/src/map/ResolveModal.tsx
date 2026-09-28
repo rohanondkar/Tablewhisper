@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { Character, CheckResult, EncounterEnemy, MonsterTemplate, NpcTemplate, SceneNpc } from "../api";
 import type { RulingCreature } from "./effects";
 import ResolveCard from "./ResolveCard";
+import { skinFromCreature } from "./dieSkins";
+import { isDiceRolling, rollPhysicsDice } from "./diceRoller";
 
 export type ResolveRow = {
   key: string;
@@ -471,19 +473,21 @@ function DieFace({
   sides,
   value,
   onChange,
+  rolling = false,
 }: {
   sides: number;
   value: string;
   onChange: (value: string) => void;
+  rolling?: boolean;
 }) {
   return (
-    <label className="die-face">
-      <span className={`die-shape ${dieClass(sides)}`}>
+    <label className={`die-face${rolling ? " is-rolling" : ""}`}>
+      <span className={`die-shape ${dieClass(sides)}${rolling ? " tumbling" : ""}`}>
         <input
           className="resolve-die-input"
           inputMode="numeric"
           aria-label={`d${sides}`}
-          value={value}
+          value={rolling && !value ? "…" : value}
           onChange={(event) => onChange(acceptDie(event.target.value, sides))}
         />
       </span>
@@ -497,11 +501,13 @@ function DamageDice({
   faces,
   onChange,
   modifier,
+  rolling = false,
 }: {
   dice: PrintedDie[];
   faces: string[];
   onChange: (index: number, value: string) => void;
   modifier: number;
+  rolling?: boolean;
 }) {
   if (!dice.length && modifier === 0) return null;
   return (
@@ -511,6 +517,7 @@ function DamageDice({
           key={`${die.sides}-${index}`}
           sides={die.sides}
           value={faces[index] || ""}
+          rolling={rolling}
           onChange={(value) => onChange(index, value)}
         />
       ))}
@@ -566,6 +573,15 @@ export default function ResolveModal({
   });
   const [attackRoll, setAttackRoll] = useState("");
   const [damageFaces, setDamageFaces] = useState<string[]>([]);
+  const [rolling, setRolling] = useState(false);
+
+  const roller = characters.find((c) => c.id === result.character_id) || null;
+  const skin = skinFromCreature({
+    name: result.character || roller?.name,
+    species: roller?.species,
+    class_level: roller?.class_level,
+    hand_color: roller?.hand_color,
+  });
 
   function patch(key: string, field: "roll" | "save" | "info", value: string) {
     setRows((prev) => prev.map((row) => (row.key === key ? { ...row, [field]: value } : row)));
@@ -626,6 +642,46 @@ export default function ResolveModal({
     };
   }
 
+  async function rollTray(mode: "attack" | "spell" | "row", rowKey?: string) {
+    if (rolling || isDiceRolling()) return;
+    const sides: number[] = [];
+    if (mode === "attack") {
+      sides.push(20);
+      if (attackHits || attackFace == null) {
+        for (const die of attackDice.length ? attackDice : shownDice(result.damage, false)) sides.push(die.sides);
+      }
+    } else if (mode === "spell") {
+      for (const die of formula.dice) sides.push(die.sides);
+    } else if (rowKey) {
+      sides.push(20);
+      if (needsSave) for (const die of formula.dice) sides.push(die.sides);
+    }
+    if (!sides.length) return;
+    setRolling(true);
+    try {
+      const faces = await rollPhysicsDice(sides, skin);
+      let index = 0;
+      if (mode === "attack") {
+        setAttackRoll(String(faces[index++]?.value ?? ""));
+        const damage = faces.slice(index).map((face) => String(face.value));
+        setDamageFaces(damage);
+      } else if (mode === "spell") {
+        setDamageFaces(faces.map((face) => String(face.value)));
+      } else if (rowKey) {
+        const roll = String(faces[index++]?.value ?? "");
+        const damage = faces.slice(index).map((face) => String(face.value));
+        setRows((prev) =>
+          prev.map((row) => (row.key === rowKey ? { ...row, roll, dice: damage } : row)),
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRolling(false);
+    }
+  }
+
   return (
     <div
       className="modal-backdrop"
@@ -650,15 +706,24 @@ export default function ResolveModal({
             <div className="resolve-row">
               <strong>{attackerName}</strong>
               <div className="die-tray">
-                <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} />
+                <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} rolling={rolling} />
                 <DamageDice
                   dice={attackDice}
                   faces={damageFaces}
                   onChange={setSharedFace}
                   modifier={formula.modifier}
+                  rolling={rolling}
                 />
+                <button
+                  type="button"
+                  className="btn die-roll-btn"
+                  disabled={busy || rolling}
+                  onClick={() => void rollTray("attack")}
+                >
+                  {rolling ? "Rolling…" : "Roll"}
+                </button>
               </div>
-              <p className="muted small">The person hitting rolls the d20 against armor class. Fill each damage die.</p>
+              <p className="muted small">The person hitting rolls the d20 against armor class. Fill each damage die, or use Roll for physics dice.</p>
             </div>
           )}
           {!blocked && spellDice && (
@@ -670,7 +735,16 @@ export default function ResolveModal({
                   faces={damageFaces}
                   onChange={setSharedFace}
                   modifier={formula.modifier}
+                  rolling={rolling}
                 />
+                <button
+                  type="button"
+                  className="btn die-roll-btn"
+                  disabled={busy || rolling}
+                  onClick={() => void rollTray("spell")}
+                >
+                  {rolling ? "Rolling…" : "Roll"}
+                </button>
               </div>
             </div>
           )}
@@ -689,15 +763,24 @@ export default function ResolveModal({
                         : "Saving throw"}
                   {!typedDamage && !heal && (
                     <div className="die-tray">
-                      <DieFace sides={20} value={row.roll} onChange={(value) => patch(row.key, "roll", value)} />
+                      <DieFace sides={20} value={row.roll} onChange={(value) => patch(row.key, "roll", value)} rolling={rolling} />
                       {needsSave && (
                         <DamageDice
                           dice={formula.dice}
                           faces={row.dice || []}
                           onChange={(index, value) => setRowDie(row.key, index, value)}
                           modifier={formula.modifier}
+                          rolling={rolling}
                         />
                       )}
+                      <button
+                        type="button"
+                        className="btn die-roll-btn"
+                        disabled={busy || rolling}
+                        onClick={() => void rollTray("row", row.key)}
+                      >
+                        {rolling ? "Rolling…" : "Roll"}
+                      </button>
                     </div>
                   )}
                   {(typedDamage || heal) && (
@@ -808,6 +891,7 @@ export function HitEntry({
   );
   const [attackRoll, setAttackRoll] = useState("");
   const [damageFaces, setDamageFaces] = useState<string[]>([]);
+  const [rolling, setRolling] = useState(false);
   if (!seeded.length) return null;
   const needsAttack = !heal && result.check_type === "attack";
   const needsSave = !heal && result.check_type === "save";
@@ -817,6 +901,7 @@ export function HitEntry({
   const attackHits = needsAttack && attackFace != null && attackConnects(result, attackFace);
   const attackDice = shownDice(result.damage, attackIsCrit);
   const spellDice = !heal && result.check_type === "spell" && formula.dice.length > 0;
+  const skin = skinFromCreature({ name: result.character });
   const ready =
     (!needsAttack || attackFace != null) &&
     (!attackHits || !attackDice.length || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, attackDice)) &&
@@ -854,17 +939,54 @@ export function HitEntry({
       dice: needsAttack || spellDice ? damageFaces : row.dice || [],
     };
   }
+  async function rollTray(mode: "attack" | "spell" | "row", rowKey?: string) {
+    if (rolling || isDiceRolling()) return;
+    const sides: number[] = [];
+    if (mode === "attack") {
+      sides.push(20);
+      for (const die of attackDice.length ? attackDice : shownDice(result.damage, false)) sides.push(die.sides);
+    } else if (mode === "spell") {
+      for (const die of formula.dice) sides.push(die.sides);
+    } else if (rowKey) {
+      sides.push(20);
+      if (needsSave) for (const die of formula.dice) sides.push(die.sides);
+    }
+    if (!sides.length) return;
+    setRolling(true);
+    try {
+      const faces = await rollPhysicsDice(sides, skin);
+      let index = 0;
+      if (mode === "attack") {
+        setAttackRoll(String(faces[index++]?.value ?? ""));
+        setDamageFaces(faces.slice(index).map((face) => String(face.value)));
+      } else if (mode === "spell") {
+        setDamageFaces(faces.map((face) => String(face.value)));
+      } else if (rowKey) {
+        const roll = String(faces[index++]?.value ?? "");
+        const damage = faces.slice(index).map((face) => String(face.value));
+        setRows((prev) => prev.map((row) => (row.key === rowKey ? { ...row, roll, dice: damage } : row)));
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRolling(false);
+    }
+  }
   return (
     <div className="ruling-boxes">
       <p className="muted small" style={{ margin: 0 }}>
-        Type each die. A number in additional info is used instead of the damage dice.
+        Type each die, or use Roll for physics dice. A number in additional info is used instead of the damage dice.
       </p>
       {needsAttack && (
         <div className="resolve-row">
           <strong>{result.character || "Attacker"}</strong>
           <div className="die-tray">
-            <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} />
-            <DamageDice dice={attackDice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} />
+            <DieFace sides={20} value={attackRoll} onChange={setAttackRoll} rolling={rolling} />
+            <DamageDice dice={attackDice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} rolling={rolling} />
+            <button type="button" className="btn die-roll-btn" disabled={busy || rolling} onClick={() => void rollTray("attack")}>
+              {rolling ? "Rolling…" : "Roll"}
+            </button>
           </div>
         </div>
       )}
@@ -872,7 +994,10 @@ export function HitEntry({
         <div className="resolve-row">
           <strong>Damage</strong>
           <div className="die-tray">
-            <DamageDice dice={formula.dice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} />
+            <DamageDice dice={formula.dice} faces={damageFaces} onChange={setSharedFace} modifier={formula.modifier} rolling={rolling} />
+            <button type="button" className="btn die-roll-btn" disabled={busy || rolling} onClick={() => void rollTray("spell")}>
+              {rolling ? "Rolling…" : "Roll"}
+            </button>
           </div>
         </div>
       )}
@@ -886,6 +1011,7 @@ export function HitEntry({
               <DieFace
                 sides={20}
                 value={row.roll}
+                rolling={rolling}
                 onChange={(value) =>
                   setRows((prev) => prev.map((item) => (item.key === row.key ? { ...item, roll: value } : item)))
                 }
@@ -896,8 +1022,12 @@ export function HitEntry({
                   faces={row.dice || []}
                   onChange={(index, value) => setRowDie(row.key, index, value)}
                   modifier={formula.modifier}
+                  rolling={rolling}
                 />
               )}
+              <button type="button" className="btn die-roll-btn" disabled={busy || rolling} onClick={() => void rollTray("row", row.key)}>
+                {rolling ? "Rolling…" : "Roll"}
+              </button>
             </div>
           </label>
           )}

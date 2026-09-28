@@ -29,6 +29,7 @@ import { applyThemeChrome, setTitleTheme, TitleAtmosphere, TITLE_THEMES, titleTh
 import { WindowFrame } from "./WindowFrame";
 import { ItemsPanel } from "./ItemsPanel";
 import { LogPage } from "./LogPage";
+import { RelationsBoard } from "./RelationsBoard";
 import { TextAsk } from "./TextAsk";
 import { hpTone, PartyAvatar } from "./ConsoleScreen";
 
@@ -721,7 +722,7 @@ export default function App() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [quitOpen, setQuitOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"foes" | "scene" | "log" | "pictures">("foes");
-  const [viewMode, setViewMode] = useState<"console" | "map" | "log" | "items">("console");
+  const [viewMode, setViewMode] = useState<"console" | "map" | "log" | "items" | "relations">("console");
   const [logId, setLogId] = useState<string | null>(null);
   const [logTurn, setLogTurn] = useState<"" | "older" | "newer">("");
   const [logLeaving, setLogLeaving] = useState<SessionEvent | null>(null);
@@ -801,6 +802,11 @@ export default function App() {
       cancel = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (gameMode === null || (gameMode && atTitle)) return;
+    void import("./map/diceRoller").then((mod) => mod.warmDiceBox()).catch(() => undefined);
+  }, [gameMode, atTitle]);
 
   useEffect(() => {
     if (gameMode === null || (gameMode && atTitle)) return;
@@ -1422,6 +1428,13 @@ export default function App() {
             >
               Items
             </button>
+            <button
+              type="button"
+              className={`btn ghost ${viewMode === "relations" ? "active-tab" : ""}`}
+              onClick={() => setViewMode("relations")}
+            >
+              Relations
+            </button>
           </div>
           <span className={`pill ${status?.ollama.available ? "on" : "off"}`}>
             Ollama {status?.ollama.available ? "ready" : "offline"}
@@ -1638,6 +1651,7 @@ export default function App() {
         </MapErrorBoundary>
       </div>
       {viewMode === "items" && <ItemsPanel />}
+      {viewMode === "relations" && <RelationsBoard characters={characters} scene={scene} />}
       {viewMode === "log" && (
         <LogPage
           events={events}
@@ -2018,6 +2032,7 @@ export default function App() {
           )}
           {error && <div className="error">{error}</div>}
 
+          <div className="query-scroll">
           {result && (
             <ResolveCard
               result={result}
@@ -2081,6 +2096,7 @@ export default function App() {
               </p>
             </div>
           )}
+          </div>
         </section>
 
         <aside className="panel rail-panel">

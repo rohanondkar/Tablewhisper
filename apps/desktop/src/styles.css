@@ -754,6 +754,10 @@ button {
   grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(200px, 260px);
   gap: 1rem;
   padding: 1rem 1.25rem 1.5rem;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  align-items: stretch;
 }
 
 @media (min-width: 1500px) {
@@ -1214,6 +1218,36 @@ button {
   cursor: var(--cursor, pointer);
 }
 
+.query-box {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100dvh - 10rem);
+  overflow: hidden;
+}
+
+html.window-framed .query-box {
+  max-height: 100%;
+  height: 100%;
+}
+
+.query-box > h2,
+.query-box > textarea,
+.query-box > .query-actions,
+.query-box > .error,
+.query-box > .muted {
+  flex: 0 0 auto;
+}
+
+.query-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.2rem;
+  margin-top: 0.25rem;
+}
+
 .query-box textarea {
   width: 100%;
   min-height: 120px;
@@ -1649,8 +1683,13 @@ button {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: calc(100vh - 5.5rem);
+  max-height: calc(100dvh - 5.5rem);
   overflow: hidden;
+}
+
+html.window-framed .rail-panel {
+  max-height: 100%;
+  height: 100%;
 }
 
 .rail-tabs {
@@ -3423,6 +3462,29 @@ button {
   box-shadow: inset 0 0 0 1px rgba(230, 184, 77, 0.75);
 }
 
+.die-shape.tumbling,
+.die-face.is-rolling .die-shape {
+  animation: die-tumble 0.55s ease-in-out infinite;
+}
+
+@keyframes die-tumble {
+  0% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  25% {
+    transform: translateY(-10px) rotate(-18deg) scale(1.05);
+  }
+  50% {
+    transform: translateY(2px) rotate(14deg) scale(0.96);
+  }
+  75% {
+    transform: translateY(-6px) rotate(-10deg) scale(1.03);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+}
+
 .die-shape input {
   width: 62%;
   border: none;
@@ -4118,6 +4180,12 @@ html.window-framed .app,
 html.window-framed .title-screen {
   min-height: 0;
   height: 100%;
+  overflow: hidden;
+}
+
+html.window-framed .layout {
+  height: 100%;
+  min-height: 0;
 }
 
 html.window-framed .title-screen.opt-game {
@@ -4520,3 +4588,129 @@ html.window-framed .title-screen.opt-game {
 .chest-add select {
   flex: 1;
 }
+
+.relations-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.relations-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.relations-notice {
+  color: #e7b3b3;
+  margin-left: 0.5rem;
+}
+
+.relations-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr min(280px, 34vw);
+  gap: 0.75rem;
+}
+
+.relations-stage {
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(180, 130, 70, 0.12), transparent 40%),
+    linear-gradient(180deg, #1a1612, #12100e);
+}
+
+.relations-stage.relations-web {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(212, 180, 110, 0.16), transparent 55%),
+    radial-gradient(circle at 80% 80%, rgba(90, 60, 30, 0.25), transparent 45%),
+    linear-gradient(180deg, #17120e 0%, #0e0c0a 100%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45);
+}
+
+.relations-side {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.relations-side h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.relations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.relations-inspect label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+}
+
+.relations-inspect input,
+.relations-inspect select,
+.relations-inspect textarea {
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
+}
+
+.dice-box-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120000;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, rgba(28, 55, 38, 0.72) 0%, rgba(8, 6, 4, 0.88) 70%),
+    #0c1410;
+}
+
+.dice-box-overlay.active {
+  pointer-events: none;
+}
+
+.dice-box-host {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.dice-box-host canvas,
+.dice-box-host .dice-box-canvas,
+#dice-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  touch-action: none;
+}
+
+.die-roll-btn {
+  align-self: center;
+}
+

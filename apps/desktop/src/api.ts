@@ -432,6 +432,55 @@ export interface CatalogItem {
   value: string | null;
 }
 
+export type RelationPattern = "solid" | "stripes" | "checks" | "dots" | "scales" | "leaves" | "wraps";
+export type RelationKind = "person" | "character" | "npc" | "faction";
+
+export interface RelationFaction {
+  id: string;
+  session_id: string;
+  name: string;
+  color: string;
+  pattern: RelationPattern | string;
+  leader_node_id?: string | null;
+  notes: string;
+  summary?: string;
+  image_path?: string | null;
+  image_url?: string | null;
+  x: number;
+  y: number;
+}
+
+export interface RelationNode {
+  id: string;
+  session_id: string;
+  kind: RelationKind | string;
+  ref_id?: string | null;
+  name: string;
+  faction_id?: string | null;
+  role: string;
+  color: string;
+  pattern: RelationPattern | string;
+  x: number;
+  y: number;
+  notes: string;
+}
+
+export interface RelationEdge {
+  id: string;
+  session_id: string;
+  from_id: string;
+  to_id: string;
+  label: string;
+  notes: string;
+}
+
+export interface RelationsBoard {
+  session_id: string;
+  factions: RelationFaction[];
+  nodes: RelationNode[];
+  edges: RelationEdge[];
+}
+
 export interface ChestContent {
   id: string;
   qty: number;
@@ -1049,4 +1098,55 @@ export const api = {
     }),
   removeChestItem: (rowId: string) =>
     request<MapChest>(`/maps/chests/contents/${rowId}`, { method: "DELETE" }),
+  getRelations: () => request<RelationsBoard>("/relations"),
+  addFaction: (body: Partial<RelationFaction> & { name?: string }) =>
+    request<RelationsBoard>("/relations/factions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchFaction: (factionId: string, patch: Partial<RelationFaction>) =>
+    request<RelationsBoard>(`/relations/factions/${factionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteFaction: (factionId: string) =>
+    request<{ ok: boolean }>(`/relations/factions/${factionId}`, { method: "DELETE" }),
+  uploadFactionImage: async (factionId: string, file: File) => {
+    const base = await apiBase();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${base}/relations/factions/${factionId}/image`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json() as Promise<RelationsBoard>;
+  },
+  addRelationNode: (body: Partial<RelationNode> & { name?: string }) =>
+    request<RelationsBoard>("/relations/nodes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchRelationNode: (nodeId: string, patch: Partial<RelationNode>) =>
+    request<RelationsBoard>(`/relations/nodes/${nodeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteRelationNode: (nodeId: string) =>
+    request<{ ok: boolean }>(`/relations/nodes/${nodeId}`, { method: "DELETE" }),
+  addRelationEdge: (body: { from_id: string; to_id: string; label?: string; notes?: string }) =>
+    request<RelationsBoard>("/relations/edges", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchRelationEdge: (edgeId: string, patch: Partial<Pick<RelationEdge, "label" | "notes">>) =>
+    request<RelationsBoard>(`/relations/edges/${edgeId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  deleteRelationEdge: (edgeId: string) =>
+    request<{ ok: boolean }>(`/relations/edges/${edgeId}`, { method: "DELETE" }),
 };

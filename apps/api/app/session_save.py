@@ -7,7 +7,7 @@ import re
 import uuid
 from typing import Any
 
-from . import db, monsters, npcs
+from . import db, monsters, npcs, relations
 from .config import DATA_DIR
 
 SAVES_DIR = DATA_DIR / "savedata"
@@ -66,6 +66,7 @@ def export_active() -> dict[str, Any]:
         "characters": [db.public_character(row) for row in db.list_characters()],
         "encounter": monsters.list_encounter(),
         "scene": npcs.list_scene(),
+        "relations": relations.export_board(),
         "events": db.list_events(limit=500),
     }
 
@@ -88,6 +89,8 @@ def restore_active(payload: dict[str, Any]) -> dict[str, Any]:
         restored_characters += 1
     _replace_encounter(payload.get("encounter") or [])
     _replace_scene(payload.get("scene") or [])
+    if isinstance(payload.get("relations"), dict):
+        relations.restore_board(payload["relations"])
     return {
         "ok": True,
         "characters": restored_characters,

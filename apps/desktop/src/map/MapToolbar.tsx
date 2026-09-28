@@ -85,7 +85,15 @@ export const MapToolbar = memo(function MapToolbar({
           key={id}
           type="button"
           className={`btn ghost ${tool === id ? "active-tab" : ""}`}
-          data-tip={id === "delete" ? "Click a chest, portal, light, door, wall, or token to remove it." : undefined}
+          data-tip={
+            id === "delete"
+              ? "Click a chest, portal, light, door, wall, or token to remove it."
+              : id === "wall" || id === "door" || id === "light" || id === "chest" || id === "portal"
+                ? "One stroke, then back to Select."
+                : id === "select"
+                  ? "Click and drag tokens. Middle-mouse or Space pans."
+                  : undefined
+          }
           onClick={() => {
             setTool(id);
             if (id !== "measure") setMeasure(null);

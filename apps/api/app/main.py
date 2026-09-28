@@ -16,12 +16,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import db, items as catalog_items, ollama_client, query_engine, rules, voice, monsters, npcs, maps, xp as xp_mod
+from . import db, items as catalog_items, ollama_client, query_engine, rules, voice, monsters, npcs, maps, relations, xp as xp_mod
 from .config import DATA_DIR, DEFAULT_RULESET, ROOT, UPLOADS_DIR
 from .pdf_import import character_diff, format_character_changes, parse_dndbeyond_pdf
 from .monsters import CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR
 from .npcs import CUSTOM_IMAGE_DIR as NPC_CUSTOM_IMAGE_DIR, SRD_IMAGE_DIR as NPC_SRD_IMAGE_DIR
 from .maps import MAP_FOG_DIR, MAP_GROUND_DIR, MAP_IMAGE_DIR, MAP_POOL_DIR
+from .relations import FACTION_IMAGE_DIR
 from .portraits import CHAR_IMAGE_DIR
 from . import gear_images
 from .token_art import TOKEN_DIR
@@ -35,6 +36,8 @@ async def lifespan(_app: FastAPI):
     npcs.ensure_scene_tables()
     maps.ensure_map_tables()
     catalog_items.ensure_tables()
+    relations.ensure_tables()
+    FACTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     SRD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     NPC_CUSTOM_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -66,6 +69,7 @@ for _media_dir in (
     MAP_IMAGE_DIR,
     MAP_FOG_DIR,
     CHAR_IMAGE_DIR,
+    FACTION_IMAGE_DIR,
 ):
     _media_dir.mkdir(parents=True, exist_ok=True)
 
@@ -129,6 +133,11 @@ app.mount(
     "/media/characters",
     StaticFiles(directory=str(CHAR_IMAGE_DIR)),
     name="character_images",
+)
+app.mount(
+    "/media/factions",
+    StaticFiles(directory=str(FACTION_IMAGE_DIR)),
+    name="faction_images",
 )
 gear_images.ensure_dirs()
 app.mount(
@@ -1617,6 +1626,157 @@ def delete_chest_content(row_id: str) -> dict[str, Any]:
     if not updated:
         raise HTTPException(404, "That item is not in the chest")
     return updated
+
+
+class FactionCreate(BaseModel):
+    name: str = "Faction"
+    color: str | None = None
+    pattern: str | None = None
+    notes: str | None = None
+    x: float | None = None
+    y: float | None = None
+
+
+class FactionPatch(BaseModel):
+    name: str | None = None
+    color: str | None = None
+    pattern: str | None = None
+    leader_node_id: str | None = None
+    notes: str | None = None
+    summary: str | None = None
+    x: float | None = None
+    y: float | None = None
+
+
+class RelationNodeCreate(BaseModel):
+    name: str = "Person"
+    kind: str = "person"
+    ref_id: str | None = None
+    faction_id: str | None = None
+    role: str | None = None
+    color: str | None = None
+    pattern: str | None = None
+    notes: str | None = None
+    x: float | None = None
+    y: float | None = None
+
+
+class RelationNodePatch(BaseModel):
+    name: str | None = None
+    kind: str | None = None
+    ref_id: str | None = None
+    faction_id: str | None = None
+    role: str | None = None
+    color: str | None = None
+    pattern: str | None = None
+    notes: str | None = None
+    x: float | None = None
+    y: float | None = None
+
+
+class RelationEdgeCreate(BaseModel):
+    from_id: str
+    to_id: str
+    label: str = "ally"
+    notes: str | None = None
+
+
+class RelationEdgePatch(BaseModel):
+    label: str | None = None
+    notes: str | None = None
+
+
+@app.get("/relations")
+def get_relations() -> dict[str, Any]:
+    return relations.board_state()
+
+
+@app.post("/relations/factions")
+def post_faction(body: FactionCreate) -> dict[str, Any]:
+    return relations.create_faction(body.model_dump(exclude_none=True))
+
+
+@app.patch("/relations/factions/{faction_id}")
+def patch_faction_route(faction_id: str, body: FactionPatch) -> dict[str, Any]:
+    try:
+        updated = relations.patch_faction(faction_id, body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not updated:
+        raise HTTPException(404, "Faction not found")
+    return updated
+
+
+@app.delete("/relations/factions/{faction_id}")
+def delete_faction_route(faction_id: str) -> dict[str, bool]:
+    if not relations.delete_faction(faction_id):
+        raise HTTPException(404, "Faction not found")
+    return {"ok": True}
+
+
+@app.post("/relations/factions/{faction_id}/image")
+async def upload_faction_image(faction_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    FACTION_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = FACTION_IMAGE_DIR / f"_tmp_{uuid.uuid4().hex}"
+    with tmp.open("wb") as out:
+        shutil.copyfileobj(file.file, out)
+    try:
+        updated = relations.set_faction_image(faction_id, tmp, file.filename or "faction.png")
+    finally:
+        if tmp.exists():
+            tmp.unlink(missing_ok=True)
+    if not updated:
+        raise HTTPException(404, "Faction not found")
+    return updated
+
+
+@app.post("/relations/nodes")
+def post_relation_node(body: RelationNodeCreate) -> dict[str, Any]:
+    try:
+        return relations.create_node(body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/relations/nodes/{node_id}")
+def patch_relation_node(node_id: str, body: RelationNodePatch) -> dict[str, Any]:
+    try:
+        updated = relations.patch_node(node_id, body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not updated:
+        raise HTTPException(404, "Node not found")
+    return updated
+
+
+@app.delete("/relations/nodes/{node_id}")
+def delete_relation_node(node_id: str) -> dict[str, bool]:
+    if not relations.delete_node(node_id):
+        raise HTTPException(404, "Node not found")
+    return {"ok": True}
+
+
+@app.post("/relations/edges")
+def post_relation_edge(body: RelationEdgeCreate) -> dict[str, Any]:
+    try:
+        return relations.create_edge(body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/relations/edges/{edge_id}")
+def patch_relation_edge(edge_id: str, body: RelationEdgePatch) -> dict[str, Any]:
+    updated = relations.patch_edge(edge_id, body.model_dump(exclude_unset=True))
+    if not updated:
+        raise HTTPException(404, "Link not found")
+    return updated
+
+
+@app.delete("/relations/edges/{edge_id}")
+def delete_relation_edge(edge_id: str) -> dict[str, bool]:
+    if not relations.delete_edge(edge_id):
+        raise HTTPException(404, "Link not found")
+    return {"ok": True}
 
 
 @app.post("/maps/suggest")

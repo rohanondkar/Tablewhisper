@@ -2437,6 +2437,7 @@ function MapPanel({
           onErrorRef.current(err instanceof Error ? err.message : String(err));
         }
       }
+      setTool("select");
     }
     if (paintingPool.current) {
       paintingPool.current = false;

@@ -20,4 +20,5 @@ contextBridge.exposeInMainWorld("dmDesktop", {
     ipcRenderer.on("window:state", handler);
     return () => ipcRenderer.removeListener("window:state", handler);
   },
+  getDiceAssetUrl: () => ipcRenderer.invoke("dice:assets"),
 });
