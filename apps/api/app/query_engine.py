@@ -45,7 +45,7 @@ _PERSUASION_RE = re.compile(
     r"\b("
     r"kisses?|kissing|make[\s-]?out|hugs?|hugging|embraces?|embracing|"
     r"caress(?:es|ing)?|cuddles?|cuddling|hold\s+hands|flirts?|flirting|"
-    r"seduces?|seducing|woos?|wooing|courts?|courting|romances?|romancing|"
+    r"seduces?|seducing|seduction|seductive|woos?|wooing|courts?|courting|romances?|romancing|"
     r"sweet[\s-]?talk(?:s|ing)?|compliments?|complimenting|"
     r"charms?|charming|convinces?|convincing|persuades?|persuading|"
     r"negotiates?|negotiating|bargains?|bargaining|pleads?|pleading|"
@@ -77,7 +77,9 @@ _INTIMIDATION_RE = re.compile(
     r"threatens?|threatening|scares?|scaring|intimidates?|intimidating|"
     r"cows?|cowing|menaces?|menacing|bullies?|bullying|"
     r"blackmails?|blackmailing|coerces?|coercing|extorts?|extorting|"
-    r"growls?\s+at|demands?|demanding"
+    r"growls?\s+at|demands?|demanding|"
+    r"yells?|yelling|shouts?|shouting|screams?|screaming|"
+    r"roars?|roaring|bellows?|bellowing|howls?|howling"
     r")\b",
     re.I,
 )

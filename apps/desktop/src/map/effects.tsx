@@ -38,6 +38,8 @@ export type MapAction = {
   aim?: SpellAim;
   sight?: boolean;
   resolution?: SpellResolution;
+  /** Typed action. The sentence keeps these words instead of "uses {label}". */
+  phrase?: string;
 };
 
 export type Grid = {
@@ -284,7 +286,7 @@ function namedOnSheet(text: string): MapAction[] {
       longFt: 0,
       radiusFt: 0,
       sentence: false,
-      spellNote: "Bonus action. Regain 1d10+1 hit points. 2 uses per long rest.",
+      spellNote: "Bonus action. Roll 1d10 and add your fighter level. That total is hit points regained. 2 uses per long rest.",
       longRange: false,
       aim: "self",
       resolution: "heal",
@@ -306,15 +308,24 @@ export function standardMoves(): MapAction[] {
     longFt: 0,
     radiusFt: 0,
     sentence: false,
-    spellNote: `${label}. No attack roll. Hit points stay.`,
+    spellNote:
+      label === "Dash"
+        ? "No roll. Speed this turn is added again."
+        : label === "Disengage"
+          ? "No roll. Movement this turn does not provoke opportunity attacks."
+          : label === "Dodge"
+            ? "No roll. Until your next turn, attacks against you have disadvantage and you have advantage on Dexterity saves."
+            : label === "Hide"
+              ? "Roll a Dexterity (Stealth) check. Meeting or beating a watcher's passive Perception means you are hidden."
+              : "Roll a Wisdom (Perception) check. The total is what you notice.",
     longRange: false,
     aim: "self" as const,
     resolution: "none" as const,
   }));
   const near: MapAction[] = [
-    ["Help", "none", "Help a creature within 5 feet. No attack roll. Hit points stay."],
-    ["Grapple", "contest", "Strength (Athletics) contest. Hit points stay."],
-    ["Shove", "contest", "Strength (Athletics) contest. Hit points stay."],
+    ["Help", "none", "No attack roll. The next ally check has advantage, or the next attack against this creature has advantage."],
+    ["Grapple", "contest", "Strength (Athletics) contest. If you win, their speed becomes 0. Hit points stay."],
+    ["Shove", "contest", "Strength (Athletics) contest. If you win, they fall prone or move 5 feet. Hit points stay."],
   ].map(([label, resolution, note]) => ({
     id: `move-${label.toLowerCase()}`,
     label,
@@ -386,7 +397,39 @@ export function actionsFor(
   return list;
 }
 
+const VOICE_ACTION = /\b(yells?|yelling|shouts?|shouting|screams?|screaming|roars?|roaring|bellows?|bellowing|howls?|howling)\b/i;
+
+export function customReachFor(text: string): "touch" | "voice" {
+  return VOICE_ACTION.test(text) ? "voice" : "touch";
+}
+
+export function customMapAction(text: string, reach: "touch" | "voice"): MapAction {
+  const phrase = text.trim();
+  const rangeFt = reach === "voice" ? 30 : 5;
+  return {
+    id: "custom-action",
+    label: phrase,
+    phrase,
+    family: "ray",
+    damageType: "",
+    shape: "ray",
+    reachFt: rangeFt,
+    rangeFt,
+    longFt: rangeFt,
+    radiusFt: 0,
+    sentence: true,
+    spellNote: null,
+    longRange: false,
+    aim: "creature",
+  };
+}
+
 export function rulingSentence(actor: string, action: MapAction, target: string, far: boolean): string {
+  if (action.phrase) {
+    const words = action.phrase.trim();
+    if (!target || target === "the open ground") return `${actor} ${words}`;
+    return `${actor} ${words} ${target}${far ? " at long range" : ""}`;
+  }
   if (action.aim) {
     const verb = action.id.startsWith("spell-") ? "casts" : "uses";
     if (action.aim === "self") return `${actor} ${verb} ${action.label}`;

@@ -55,6 +55,27 @@ function amountIn(info: string): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+export function enteredTotal(info: string): number | null {
+  const match = info.trim().match(/^-?\d+/);
+  if (!match) return null;
+  const value = Number(match[0]);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function contestWon(result: CheckResult, row: ResolveRow): boolean {
+  const face = faceOf(row.roll);
+  const theirs = enteredTotal(row.info);
+  if (face == null || theirs == null) return false;
+  return face + (result.modifier ?? 0) > theirs;
+}
+
+export function checkSucceeded(result: CheckResult, row: ResolveRow): boolean {
+  const face = faceOf(row.roll);
+  if (result.suggested_dc == null) return true;
+  if (face == null) return false;
+  return face + (result.modifier ?? 0) >= result.suggested_dc;
+}
+
 function faceOf(roll: string): number | null {
   const value = Number(roll);
   if (!Number.isInteger(value) || value < 1 || value > 20) return null;
@@ -303,6 +324,23 @@ function spellDamageLine(result: CheckResult, label: string, info: string, faces
 }
 
 export function rowOutcome(result: CheckResult, heal: boolean, row: ResolveRow): string {
+  if (heal && parsePrintedDice(result.damage).dice.length) {
+    const healing = amountIn(row.info) ?? sumEnteredDice(result.damage, row.dice || [], false);
+    if (healing == null) return "Enter the healing dice.";
+    return `${row.label} regains ${healing}.`;
+  }
+  if (result.check_type === "contest") {
+    const face = faceOf(row.roll);
+    if (face == null) return "Enter your d20.";
+    const total = face + (result.modifier ?? 0);
+    const mod = result.modifier ?? 0;
+    const modTxt = `${mod >= 0 ? "+" : ""}${mod}`;
+    const theirs = enteredTotal(row.info);
+    if (theirs == null) return `${result.character || "You"}: ${face} ${modTxt} = ${total}. Enter their total.`;
+    if (total > theirs) return `${total} beats ${theirs}. The contest succeeds.`;
+    if (total < theirs) return `${theirs} beats ${total}. The contest fails.`;
+    return `Both totals are ${total}. Nothing changes.`;
+  }
   if (result.check_type === "save" && result.suggested_dc == null && faceOf(row.roll) == null) {
     const amount = amountIn(row.info);
     if (amount == null) return `${row.label}: type the damage. No save DC is printed on this card.`;
@@ -658,7 +696,9 @@ export default function ResolveModal({
 
   const formula = parsePrintedDice(result.damage);
   const spellDice = !heal && result.check_type === "spell" && formula.dice.length > 0;
-  const quiet = result.check_type === "contest" || (result.check_type === "spell" && !spellDice);
+  const healDice = heal && formula.dice.length > 0;
+  const contest = result.check_type === "contest";
+  const quiet = !contest && result.check_type === "spell" && !spellDice;
   const printedRoll = /\d+\s*d\s*\d+/i.test(result.damage || "") || flatPrinted(result.damage) != null;
   const typedDamage = result.check_type === "save" && result.suggested_dc == null && !printedRoll;
   const needsAttack = !heal && result.check_type === "attack";
@@ -676,6 +716,8 @@ export default function ResolveModal({
         (!spellDice || rows.every((row) => amountIn(row.info) != null) || facesReady(damageFaces, formula.dice)) &&
         rows.every((row) => {
           if (typedDamage) return amountIn(row.info) != null;
+          if (healDice) return amountIn(row.info) != null || facesReady(row.dice || [], formula.dice);
+          if (contest) return faceOf(row.roll) != null && enteredTotal(row.info) != null;
           if (needsAttack || spellDice) return true;
           if (faceOf(row.roll) == null) return false;
           if (!needsSave || !formula.dice.length || amountIn(row.info) != null) return true;
@@ -692,7 +734,7 @@ export default function ResolveModal({
     };
   }
 
-  async function rollTray(mode: "attack" | "spell" | "row", rowKey?: string) {
+  async function rollTray(mode: "attack" | "spell" | "row" | "heal", rowKey?: string) {
     if (rolling || isDiceRolling()) return;
     const sides: number[] = [];
     if (mode === "attack") {
@@ -700,7 +742,7 @@ export default function ResolveModal({
       if (attackHits || attackFace == null) {
         for (const die of attackDice.length ? attackDice : shownDice(result.damage, false)) sides.push(die.sides);
       }
-    } else if (mode === "spell") {
+    } else if (mode === "spell" || mode === "heal") {
       for (const die of formula.dice) sides.push(die.sides);
     } else if (rowKey) {
       sides.push(20);
@@ -717,6 +759,9 @@ export default function ResolveModal({
         setDamageFaces(damage);
       } else if (mode === "spell") {
         setDamageFaces(faces.map((face) => String(face.value)));
+      } else if (mode === "heal" && rowKey) {
+        const healing = faces.map((face) => String(face.value));
+        setRows((prev) => prev.map((row) => (row.key === rowKey ? { ...row, dice: healing } : row)));
       } else if (rowKey) {
         const roll = String(faces[index++]?.value ?? "");
         const damage = faces.slice(index).map((face) => String(face.value));
@@ -802,7 +847,32 @@ export default function ResolveModal({
             rows.map((row) => (
               <div key={row.key} className="resolve-row">
                 <strong>{row.label}</strong>
-                {!needsAttack && !spellDice && (
+                {!needsAttack && !spellDice && contest && (
+                  <label className="resolve-die">
+                    {`${result.character || "You"} — Athletics`}
+                    <div className="die-tray">
+                      <DieFace sides={20} value={row.roll} onChange={(value) => patch(row.key, "roll", value)} rolling={rolling} />
+                      {result.modifier != null && result.modifier !== 0 && (
+                        <span className="die-mod">{result.modifier > 0 ? `+${result.modifier}` : String(result.modifier)}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="btn die-roll-btn"
+                        disabled={busy || rolling}
+                        onClick={() => void rollTray("row", row.key)}
+                      >
+                        {rolling ? "Rolling…" : "Roll"}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Their total"
+                      value={row.info}
+                      onChange={(event) => patch(row.key, "info", event.target.value)}
+                    />
+                  </label>
+                )}
+                {!needsAttack && !spellDice && !contest && (
                 <label className="resolve-die">
                   {heal
                     ? "Healing"
@@ -811,6 +881,25 @@ export default function ResolveModal({
                       : result.check_type === "skill" || result.check_type === "ability"
                         ? skillTitle(result)
                         : "Saving throw"}
+                  {healDice && (
+                    <div className="die-tray">
+                      <DamageDice
+                        dice={formula.dice}
+                        faces={row.dice || []}
+                        onChange={(index, value) => setRowDie(row.key, index, value)}
+                        modifier={formula.modifier}
+                        rolling={rolling}
+                      />
+                      <button
+                        type="button"
+                        className="btn die-roll-btn"
+                        disabled={busy || rolling}
+                        onClick={() => void rollTray("heal", row.key)}
+                      >
+                        {rolling ? "Rolling…" : "Roll"}
+                      </button>
+                    </div>
+                  )}
                   {!typedDamage && !heal && (
                     <div className="die-tray">
                       <DieFace sides={20} value={row.roll} onChange={(value) => patch(row.key, "roll", value)} rolling={rolling} />
@@ -833,7 +922,7 @@ export default function ResolveModal({
                       </button>
                     </div>
                   )}
-                  {(typedDamage || heal) && (
+                  {(typedDamage || (heal && !healDice)) && (
                     <input
                       type="text"
                       placeholder={heal ? "Healing" : "Damage"}
@@ -843,7 +932,7 @@ export default function ResolveModal({
                   )}
                 </label>
                 )}
-                {!typedDamage && (
+                {!typedDamage && !contest && (
                   <label className="resolve-note">
                     Additional info
                     <input

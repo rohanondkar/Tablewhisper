@@ -45,6 +45,8 @@ import {
   footprint,
   markKind,
   rangeGate,
+  customMapAction,
+  customReachFor,
   rulingSentence,
   tileCenter,
   tileKey,
@@ -58,7 +60,9 @@ import {
   type Tile,
   type Travel,
 } from "./effects";
-import ResolveModal, { amountIn, effortFailed, mapLine, playFate, printedSaveBonus, strikeOutcome, sumEnteredDice, type ResolveRow } from "./ResolveModal";
+import ResolveModal, { amountIn, checkSucceeded, contestWon, effortFailed, mapLine, playFate, printedSaveBonus, strikeOutcome, sumEnteredDice, type ResolveRow } from "./ResolveModal";
+import { looksForToken, type TokenLooks } from "./tokenLooks";
+import { attackWithRiders, dropEffect, readEffects, upsertEffect } from "./tokenEffects";
 import TurnOrder, { sortTurns, type TurnSlot } from "./TurnOrder";
 
 const API_BASE = "http://127.0.0.1:8766";
@@ -329,6 +333,8 @@ function MapPanel({
   const [poolRev, setPoolRev] = useState(0);
   const [tool, setTool] = useState<Tool>("select");
   const [armed, setArmed] = useState<MapAction | null>(null);
+  const [customText, setCustomText] = useState("");
+  const [customReach, setCustomReach] = useState<"touch" | "voice">("touch");
   const [hoverTile, setHoverTile] = useState<Tile | null>(null);
   const [travel, setTravel] = useState<Travel | null>(null);
   const [queuedTravel, setQueuedTravel] = useState<Travel | null>(null);
@@ -375,6 +381,10 @@ function MapPanel({
   const [showVision, setShowVision] = useState(false);
   const [scale, setScale] = useState(1);
   const [stagePos, setStagePos] = useState({ x: 40, y: 40 });
+  const scaleRef = useRef(scale);
+  const stagePosRef = useRef(stagePos);
+  scaleRef.current = scale;
+  stagePosRef.current = stagePos;
   const [measure, setMeasure] = useState<number[] | null>(null);
   const [wallDraft, setWallDraft] = useState<number[]>([]);
   const [portalDraft, setPortalDraft] = useState<{ x: number; y: number } | null>(null);
@@ -551,6 +561,27 @@ function MapPanel({
         ensureFogCanvas(m, !m.fog_url);
         setFogVersion((v) => v + 1);
         undoStack.current = [];
+        const squarePx = 160;
+        const gs = Math.max(8, Number(m.grid_size_px) || 50);
+        const next = Math.min(8, Math.max(0.2, squarePx / gs));
+        const wrap = stageWrapRef.current;
+        const viewW = Math.max(320, wrap?.clientWidth || 900);
+        const viewH = Math.max(240, wrap?.clientHeight || 600);
+        let focusX = m.width / 2;
+        let focusY = m.height / 2;
+        if (state.tokens.length) {
+          let sumX = 0;
+          let sumY = 0;
+          for (const token of state.tokens) {
+            const tokenSide = gs * (token.size_sq || 1);
+            sumX += token.x + tokenSide / 2;
+            sumY += token.y + tokenSide / 2;
+          }
+          focusX = sumX / state.tokens.length;
+          focusY = sumY / state.tokens.length;
+        }
+        setScale(next);
+        setStagePos({ x: viewW / 2 - focusX * next, y: viewH / 2 - focusY * next });
       } catch (e) {
         setMap(null);
         setTokens([]);
@@ -945,10 +976,39 @@ function MapPanel({
     window.addEventListener("pointerup", up);
   }
 
+  async function leaveEffect(result: CheckResult, rows: ResolveRow[]) {
+    const effect = result.effect;
+    if (!effect) return;
+    const when = effect.when || "always";
+    const row = rows[0];
+    if (when === "contest_win" && (!row || !contestWon(result, row))) return;
+    if (when === "success" && row && !checkSucceeded(result, row)) return;
+    const actor =
+      tokens.find((item) => item.kind === "pc" && item.ref_id && item.ref_id === result.character_id) ||
+      findTokenByName(result.character);
+    const aimed =
+      (row?.creature?.tokenId && tokens.find((item) => item.id === row.creature?.tokenId)) ||
+      findTokenByName(result.target?.label) ||
+      null;
+    const token = effect.on === "target" ? aimed || actor : actor || aimed;
+    if (!token) return;
+    const updated = await api.patchMapToken(token.id, {
+      data: upsertEffect(token.data, {
+        id: `${effect.name}-${Date.now()}`,
+        name: effect.name,
+        detail: effect.detail,
+        from: result.character || undefined,
+        extra: effect.extra || undefined,
+      }),
+    });
+    setTokens((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+  }
+
   async function commitResolve(rows: ResolveRow[]) {
     const pending = pendingResolve;
     if (!pending || pending.blocked) return;
     if (pending.result.check_type === "spell" || pending.result.check_type === "contest") {
+      await leaveEffect(pending.result, rows);
       setPendingResolve(null);
       if (pending.travel) beginTravel(pending.travel);
       const note = (pending.result.notes || pending.result.roll_line || "").trim();
@@ -972,6 +1032,7 @@ function MapPanel({
       return;
     }
     if (pending.result.check_type === "skill" || pending.result.check_type === "ability") {
+      await leaveEffect(pending.result, rows);
       setPendingResolve(null);
       playResolved(pending.travel, effortFailed(pending.result, rows, null), pending.result);
       const lines: string[] = [];
@@ -991,7 +1052,9 @@ function MapPanel({
       const face = Number(row.roll);
       const typed = amountIn(row.info);
       if (pending.heal) {
-        const healing = typed ?? (Number.isInteger(face) ? face : null);
+        const fromDice = sumEnteredDice(pending.result.damage, row.dice || [], false);
+        const rolledFace = Number.isInteger(face) && face >= 1 && face <= 20 ? face : null;
+        const healing = typed ?? fromDice ?? rolledFace;
         planned.push({ row, strike: null, healing });
         continue;
       }
@@ -1007,6 +1070,7 @@ function MapPanel({
       planned.push({ row, strike, healing: null });
     }
     if (hold) return;
+    await leaveEffect(pending.result, rows);
     setPendingResolve(null);
     playResolved(
       pending.travel,
@@ -1185,7 +1249,7 @@ function MapPanel({
     setHoverTile(null);
     const pcId = selectedToken.kind === "pc" ? selectedToken.ref_id : target?.kind === "pc" ? target.ref_id : null;
     try {
-      const result = await api.query(sentence, pcId, "map");
+      const result = attackWithRiders(await api.query(sentence, pcId, "map"), selectedToken.label, target);
       const blocked = result.possible === false || result.check_type === "impossible" ? result.notes || "That action is not possible." : null;
       const tiles = blocked ? [] : effectTiles(action, fromTiles, tile, map, segs);
       let creatures = blocked ? [] : creaturesOn(tiles);
@@ -1314,6 +1378,7 @@ function MapPanel({
         onErrorRef.current(err instanceof Error ? err.message : String(err));
       }
     }
+    next = attackWithRiders(next, actor.label, targetToken);
     if (!gate.play) {
       publishRuling(next, action, gate.blocked, [], to, []);
       openResolve(next, action, gate.blocked, null, [], null);
@@ -2477,20 +2542,8 @@ function MapPanel({
     }
   }
 
-  function squareOpen(x: number, y: number) {
-    if (!map?.ground_url) return true;
-    const ground = groundCanvas.current;
-    if (!ground) return true;
-    if (maskCovers(ground, x, y, map.width, map.height)) return true;
-    for (const item of portals) {
-      if (Math.hypot(x - item.x, y - item.y) <= item.radius) return true;
-    }
-    for (const pool of pools) {
-      const mask = poolMasks.current.get(pool.id);
-      if (mask && poolsReady.current.has(pool.id) && maskCovers(mask, x, y, map.width, map.height)) return true;
-    }
-    if (pools.some((pool) => pool.mask_url && !poolsReady.current.has(pool.id))) return true;
-    return false;
+  function squareOpen(_x: number, _y: number) {
+    return true;
   }
 
   function footprintOpen(x: number, y: number, sizeSq: number) {
@@ -3106,8 +3159,19 @@ function MapPanel({
             draggable={false}
             onWheel={(e) => {
               e.evt.preventDefault();
+              const pointer = stageRef.current?.getPointerPosition();
+              if (!pointer) return;
               const factor = e.evt.deltaY > 0 ? 0.9 : 1.1;
-              setScale((s) => Math.min(4, Math.max(0.2, s * factor)));
+              const prev = scaleRef.current;
+              const next = Math.min(8, Math.max(0.2, prev * factor));
+              const pos = stagePosRef.current;
+              const worldX = (pointer.x - pos.x) / prev;
+              const worldY = (pointer.y - pos.y) / prev;
+              const nextPos = { x: pointer.x - worldX * next, y: pointer.y - worldY * next };
+              scaleRef.current = next;
+              stagePosRef.current = nextPos;
+              setScale(next);
+              setStagePos(nextPos);
             }}
             onMouseDown={(e) => void onStageMouseDown(e)}
             onMouseMove={(e) => onStageMouseMove(e)}
@@ -3318,15 +3382,6 @@ function MapPanel({
 
             <Layer listening={false}>
               {map && (
-                <LiquidOverlay
-                  pools={pools}
-                  masks={poolMasks.current}
-                  width={map.width}
-                  height={map.height}
-                  active={active}
-                />
-              )}
-              {map && (
                 <Group
                   clipX={0}
                   clipY={0}
@@ -3376,6 +3431,7 @@ function MapPanel({
                     selected={selectedTokenId === t.id}
                     acting={t.id === activeTokenId}
                     faded={tokenFaded(t)}
+                    looks={looksForToken(t, characters)}
                     draggable={tool === "select" && !armed}
                     onSelect={() => {
                       if (tool === "delete") {
@@ -3472,6 +3528,28 @@ function MapPanel({
           {selectedToken && (
             <div className="map-inspector-block">
               <strong>{selectedToken.label}</strong>
+              {readEffects(selectedToken.data).length > 0 && (
+                <div className="map-effect-list">
+                  {readEffects(selectedToken.data).map((effect) => (
+                    <p key={effect.id} className="muted small">
+                      <strong>{effect.name}</strong>
+                      {effect.detail ? ` — ${effect.detail}` : ""}
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={async () => {
+                          const updated = await api.patchMapToken(selectedToken.id, {
+                            data: dropEffect(selectedToken.data, effect.id),
+                          });
+                          setTokens((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+                        }}
+                      >
+                        Clear
+                      </button>
+                    </p>
+                  ))}
+                </div>
+              )}
               <label>
                 Size
                 <select
@@ -3492,15 +3570,6 @@ function MapPanel({
                   ))}
                 </select>
               </label>
-              {poolLines.length > 0 && (
-                <div className="map-inspector-block">
-                  {poolLines.map((line, index) => (
-                    <p key={`${index}-${line}`} className="muted small">
-                      {line}
-                    </p>
-                  ))}
-                </div>
-              )}
               <div className="map-action-list">
                 {tokenActions.map((action) => (
                   <button
@@ -3515,6 +3584,43 @@ function MapPanel({
                     {action.label}
                   </button>
                 ))}
+              </div>
+              <div className="map-custom-act">
+                <input
+                  type="text"
+                  value={customText}
+                  placeholder="Do something else"
+                  aria-label="Typed action"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setCustomText(value);
+                    setCustomReach(customReachFor(value));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    event.preventDefault();
+                    const text = customText.trim();
+                    if (!text) return;
+                    setArmed(customMapAction(text, customReach));
+                    setHoverTile(null);
+                  }}
+                />
+                <div className="map-reach-row">
+                  <button
+                    type="button"
+                    className={`btn ghost ${customReach === "touch" ? "active-tab" : ""}`}
+                    onClick={() => setCustomReach("touch")}
+                  >
+                    Touch 5 ft
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ghost ${customReach === "voice" ? "active-tab" : ""}`}
+                    onClick={() => setCustomReach("voice")}
+                  >
+                    Voice 30 ft
+                  </button>
+                </div>
               </div>
               {armed && (
                 <p className="muted small">
@@ -4133,6 +4239,14 @@ function TrayRow({
   );
 }
 
+const nameMeasure = document.createElement("canvas").getContext("2d");
+
+function firstNameWidth(text: string, size: number): number {
+  if (!nameMeasure) return text.length * size;
+  nameMeasure.font = `${size}px Cinzel, "Palatino Linotype", serif`;
+  return nameMeasure.measureText(text).width;
+}
+
 function TokenNode({
   token,
   side,
@@ -4140,6 +4254,7 @@ function TokenNode({
   selected,
   acting,
   faded,
+  looks,
   draggable,
   onSelect,
   onDragEnd,
@@ -4150,6 +4265,7 @@ function TokenNode({
   selected: boolean;
   acting?: boolean;
   faded?: boolean;
+  looks: TokenLooks;
   draggable: boolean;
   onSelect: () => void;
   onDragEnd: (x: number, y: number) => void;
@@ -4180,16 +4296,36 @@ function TokenNode({
   const url = path ? mediaUrlSync(path, API_BASE) : null;
   const img = useHtmlImage(url);
   const fill = chrome.panel;
-  const radius = side * chrome.radius;
+  const cx = side / 2;
+  const ringWidth = Math.max(2, side * 0.055);
+  const ringColor = acting ? chrome.accent : selected ? chrome.tokenOn : "#c9a36a";
   const initials = (token.label || "?")
     .split(/\s+/)
     .map((p) => p[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
-  const nameSize = 15;
-  const nameWidth = Math.ceil(token.label.length * nameSize * 0.74) + 18;
-  const [hovered, setHovered] = useState(false);
+  const label = (token.label || "?").trim().split(/\s+/)[0] || "?";
+  const inner = Math.max(1, cx - ringWidth / 2);
+  const nameY = cx + inner * 0.18;
+  const chordAt = (y: number) => {
+    const dy = y - cx;
+    const inside = inner * inner - dy * dy;
+    return inside > 0 ? 2 * Math.sqrt(inside) : 0;
+  };
+  const roomAt = (size: number) => {
+    const top = nameY;
+    const mid = nameY + size * 0.55;
+    const bot = nameY + size;
+    return Math.min(chordAt(top), chordAt(mid), chordAt(bot)) - 10;
+  };
+  let nameSize = Math.round(side * 0.22);
+  while (nameSize > 6) {
+    const width = Math.max(firstNameWidth(label, nameSize), label.length * nameSize * 0.72);
+    if (width <= roomAt(nameSize)) break;
+    nameSize -= 1;
+  }
+  const nameWidth = Math.ceil(Math.max(firstNameWidth(label, nameSize), label.length * nameSize * 0.72));
   return (
     <Group
       x={token.x}
@@ -4214,79 +4350,151 @@ function TokenNode({
         e.cancelBubble = true;
         onDragEnd(e.target.x(), e.target.y());
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
-      {acting && (
-        <Rect
-          x={-5}
-          y={-5}
-          width={side + 10}
-          height={side + 10}
-          stroke={chrome.accent}
-          strokeWidth={3}
-          cornerRadius={radius}
+      <Group
+        opacity={looks.opacity}
+        clipFunc={(ctx) => {
+          ctx.beginPath();
+          ctx.arc(cx, cx, Math.max(1, cx - ringWidth / 2), 0, Math.PI * 2, false);
+          ctx.closePath();
+        }}
+      >
+        {img ? (
+          <>
+            {looks.ghosts > 0 &&
+              [8, -8].slice(0, looks.ghosts).map((shift) => (
+                <KonvaImage
+                  key={shift}
+                  image={img}
+                  x={shift}
+                  y={shift / 2}
+                  width={side}
+                  height={side}
+                  opacity={0.28}
+                />
+              ))}
+            <KonvaImage image={img} width={side} height={side} />
+          </>
+        ) : (
+          <>
+            <Circle x={cx} y={cx} radius={cx} fill={fill} />
+            <Text
+              text={initials}
+              y={side * 0.08}
+              width={side}
+              height={Math.max(12, nameY - side * 0.12)}
+              align="center"
+              verticalAlign="middle"
+              fontSize={Math.max(12, Math.min(side * 0.26, nameY * 0.42))}
+              fill={chrome.nameInk}
+              fontStyle="bold"
+            />
+          </>
+        )}
+        {looks.tint && <Rect width={side} height={side} fill={looks.tint} listening={false} />}
+        {looks.blindfold && (
+          <Rect
+            y={side * 0.38}
+            width={side}
+            height={Math.max(6, side * 0.16)}
+            fill="rgba(0,0,0,0.72)"
+            listening={false}
+          />
+        )}
+        {looks.slash && (
+          <Line points={[4, 4, side - 4, side - 4]} stroke="#ffd0a8" strokeWidth={3} listening={false} />
+        )}
+        {looks.pale && (
+          <Rect
+            x={side * 0.22}
+            y={side * 0.16}
+            width={side * 0.56}
+            height={Math.max(6, side * 0.16)}
+            fill="rgba(230, 232, 240, 0.72)"
+            cornerRadius={side}
+            listening={false}
+          />
+        )}
+      </Group>
+      <Text
+        text={label}
+        x={(side - nameWidth) / 2}
+        y={nameY}
+        width={nameWidth}
+        height={nameSize * 1.25}
+        align="center"
+        verticalAlign="middle"
+        fontSize={nameSize}
+        fontFamily="Cinzel, Palatino Linotype, serif"
+        fill="#f0c14a"
+        shadowColor="#1a1208"
+        shadowBlur={4}
+        shadowOpacity={0.8}
+        wrap="none"
+        listening={false}
+      />
+      <Circle
+        x={cx}
+        y={cx}
+        radius={Math.max(1, cx - ringWidth / 2)}
+        stroke={ringColor}
+        strokeWidth={ringWidth}
+        listening={false}
+      />
+      {looks.chevron && (
+        <Line
+          points={[side * 0.32, -2, side * 0.5, -14, side * 0.68, -2]}
+          stroke="#b7e0ff"
+          strokeWidth={2}
+          lineJoin="round"
           listening={false}
         />
       )}
-      {img ? (
-        <KonvaImage
-          image={img}
-          width={side}
-          height={side}
-          cornerRadius={radius}
-          stroke={selected ? chrome.tokenOn : chrome.token}
-          strokeWidth={selected ? 3 : 2}
+      {looks.halo && (
+        <Circle
+          x={cx}
+          y={cx}
+          radius={cx + 4}
+          stroke={looks.halo}
+          strokeWidth={5}
+          opacity={0.85}
+          listening={false}
         />
-      ) : (
-        <>
-          <Rect
-            width={side}
-            height={side}
-            fill={fill}
-            cornerRadius={radius}
-            stroke={selected ? chrome.tokenOn : chrome.token}
-            strokeWidth={selected ? 3 : 2}
-          />
-          <Text
-            text={initials}
-            width={side}
-            height={side}
-            align="center"
-            verticalAlign="middle"
-            fontSize={Math.max(12, side * 0.35)}
-            fill={chrome.nameInk}
-            fontStyle="bold"
-          />
-        </>
       )}
-      {hovered && (
-        <>
-          <Rect
-            x={(side - nameWidth) / 2 - 10}
-            y={-nameSize - 16}
-            width={nameWidth + 20}
-            height={nameSize + 12}
-            fill={chrome.nameFill}
-            stroke={chrome.token}
-            strokeWidth={1}
-            cornerRadius={8}
-            listening={false}
-          />
-          <Text
-            text={token.label}
-            x={(side - nameWidth) / 2}
-            y={-nameSize - 10}
-            width={nameWidth}
-            fontSize={nameSize}
-            fontFamily="Cinzel, Palatino Linotype, serif"
-            fill={chrome.nameInk}
-            align="center"
-            wrap="none"
-            listening={false}
-          />
-        </>
+      {looks.ring && (
+        <Circle
+          x={cx}
+          y={cx}
+          radius={cx + 3}
+          stroke={looks.ring}
+          strokeWidth={looks.ringWidth}
+          dash={looks.dash ? [5, 4] : undefined}
+          listening={false}
+        />
       )}
+      {looks.clamps &&
+        [
+          [0, 0],
+          [side - 8, 0],
+          [0, side - 8],
+          [side - 8, side - 8],
+        ].map(([x, y]) => (
+          <Rect key={`${x}-${y}`} x={x} y={y} width={8} height={8} fill="#ff5a5a" listening={false} />
+        ))}
+      {looks.speed && (
+        <Group listening={false}>
+          <Line points={[-6, side * 0.3, -1, side * 0.3]} stroke="#ffe08a" strokeWidth={2} />
+          <Line points={[-8, side * 0.5, -1, side * 0.5]} stroke="#ffe08a" strokeWidth={2} />
+          <Line points={[side + 1, side * 0.4, side + 7, side * 0.4]} stroke="#ffe08a" strokeWidth={2} />
+          <Line points={[side + 1, side * 0.62, side + 8, side * 0.62]} stroke="#ffe08a" strokeWidth={2} />
+        </Group>
+      )}
+      {looks.pips.map((pip, index) => (
+        <Group key={pip.label} x={side + 2} y={index * 14} listening={false}>
+          <Rect width={44} height={12} fill="rgba(8,10,14,0.82)" cornerRadius={4} />
+          <Text text={pip.label} width={44} y={1} fontSize={8} fill={pip.color} align="center" />
+        </Group>
+      ))}
     </Group>
   );
 }

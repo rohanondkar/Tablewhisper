@@ -16,8 +16,6 @@ type Flow =
 const FLOW: Flow[] = [
   { id: "size" },
   { id: "walls" },
-  { id: "ground" },
-  ...POOL_KINDS.map((kind) => ({ id: "liquid" as const, kind })),
   { id: "lights" },
   { id: "portals" },
 ];
@@ -427,23 +425,6 @@ export function MapSetup({
       const doors: Record<string, string | null> = {};
       for (const door of suggestion.doors || []) doors[cellKey(door.c, door.r)] = null;
       setDoorCells(doors);
-      setGroundCells((suggestion.ground || []).map((cell) => cellKey(cell.c, cell.r)));
-      const nextCells: Record<string, string[]> = {};
-      const depth: Record<string, number> = {};
-      const current: Record<string, number> = {};
-      for (const kind of POOL_KINDS) {
-        nextCells[kind] = [];
-        depth[kind] = 5;
-        current[kind] = 0;
-      }
-      for (const pool of suggestion.liquids || []) {
-        nextCells[pool.kind] = (pool.cells || []).map((cell) => cellKey(cell.c, cell.r));
-        depth[pool.kind] = pool.depth_ft;
-        current[pool.kind] = pool.current_ft;
-      }
-      setLiquidCells(nextCells);
-      setLiquidDepth(depth);
-      setLiquidCurrent(current);
       setLights(
         (suggestion.lights || []).map((item, lightIndex) => ({
           key: `l-${lightIndex}-${item.c}-${item.r}`,
@@ -507,19 +488,6 @@ export function MapSetup({
         };
       }),
     ];
-    const pools = POOL_KINDS.flatMap((kind) => {
-      const cells = liquidCells[kind] || [];
-      if (!cells.length) return [];
-      return [
-        {
-          kind,
-          depth_ft: liquidDepth[kind] ?? 5,
-          current_ft: liquidCurrent[kind] ?? 0,
-          current_deg: 0,
-          mask_png: cellsToPng(cells, width, height, offsetX, offsetY),
-        },
-      ];
-    });
     onConfirm({
       name: name.trim() || "Map",
       width,
@@ -536,6 +504,7 @@ export function MapSetup({
         dim_ft: item.dim_ft,
         kind: item.kind,
       })),
+      pools: [],
       portals: portals.flatMap((item) => {
         const scene = others.find((map) => map.id === item.targetMapId);
         if (!scene) return [];
@@ -551,8 +520,6 @@ export function MapSetup({
           },
         ];
       }),
-      pools,
-      ground_png: cellsToPng([...groundCells, ...Object.keys(doorCells)], width, height, offsetX, offsetY),
     });
   }
 
@@ -762,16 +729,11 @@ export function MapSetup({
 }
 
 function heading(step: Flow) {
-  if (step.id === "liquid") {
-    const name = step.kind.charAt(0).toUpperCase() + step.kind.slice(1);
-    return `4 of 6 · ${name}`;
-  }
   const names: Record<string, string> = {
-    size: "1 of 6 · Size",
-    walls: "2 of 6 · Walls",
-    ground: "3 of 6 · Solid ground",
-    lights: "5 of 6 · Lights",
-    portals: "6 of 6 · Portals",
+    size: "1 of 4 · Size",
+    walls: "2 of 4 · Walls and doors",
+    lights: "3 of 4 · Lights",
+    portals: "4 of 4 · Portals",
   };
   return names[step.id];
 }
@@ -779,12 +741,7 @@ function heading(step: Flow) {
 function blurb(step: Flow, brush: "wall" | "door") {
   if (step.id === "size") return "More squares makes the grid finer. Drag the picture to line the squares up.";
   if (step.id === "walls" && brush === "door") return "Paint door squares yourself. A drag that starts on a door clears it. Ctrl+Z undoes.";
-  if (step.id === "walls") return "No walls are guessed. Paint the squares that block movement. Ctrl+Z undoes.";
-  if (step.id === "ground") return "Solid ground is highlighted. Water and other liquids are left empty. Ctrl+Z undoes.";
-  if (step.id === "liquid") {
-    const name = step.kind.charAt(0).toUpperCase() + step.kind.slice(1);
-    return `${name} squares are highlighted. A drag that starts on one clears it. Ctrl+Z undoes.`;
-  }
+  if (step.id === "walls") return "Paint walls, or switch to Door and paint door squares. Ctrl+Z undoes.";
   if (step.id === "lights") return "No lights are guessed. Click a square to place or remove one. Ctrl+Z undoes.";
   return "Click a square to place or remove a portal. Choose where it opens. Ctrl+Z undoes.";
 }

@@ -317,10 +317,14 @@ _LABEL_RE = re.compile(
 
 def parse_npc_mention(text: str) -> dict[str, Any] | None:
     lowered = text.lower()
-    for m in _LABEL_RE.finditer(lowered):
+    for m in _LABEL_RE.finditer(text):
         raw_name = m.group(1).strip()
-        tag = m.group(2).upper()
-        if raw_name in {"with", "his", "her", "the", "and", "vs", "ac"}:
+        tag_raw = m.group(2)
+        tag = tag_raw.upper()
+        # "with a Club" is an article, not a second creature named Abeer A.
+        if tag_raw.isalpha() and tag_raw.islower():
+            continue
+        if raw_name.lower() in {"with", "his", "her", "the", "and", "vs", "ac"}:
             continue
         template = find_template_by_name(raw_name)
         if not template:

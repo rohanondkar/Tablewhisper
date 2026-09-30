@@ -3105,6 +3105,44 @@ html.window-framed .rail-panel {
   font-size: 0.78rem;
   padding: 0.2rem 0.45rem;
 }
+.map-custom-act {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.map-custom-act input {
+  width: 100%;
+  background: #12151c;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+}
+.map-reach-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.map-reach-row .btn {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.45rem;
+}
+.map-effect-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.map-effect-list p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+.map-effect-list .btn {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+}
 .map-inspector-block {
   display: flex;
   flex-direction: column;

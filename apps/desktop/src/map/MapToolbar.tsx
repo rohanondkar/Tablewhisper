@@ -68,7 +68,6 @@ export const MapToolbar = memo(function MapToolbar({
     ["measure", "Ruler"],
     ["wall", "Wall"],
     ["door", "Door"],
-    ["liquid", "Liquid"],
     ["light", "Light"],
     ["portal", "Portal"],
     ["chest", "Chest"],

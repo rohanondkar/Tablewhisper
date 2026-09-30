@@ -165,6 +165,14 @@ export interface CheckResult {
   target_ac?: number | null;
   to_hit_needed?: number | null;
   howto?: string | null;
+  /** Lasting buff or condition this card leaves on a creature when confirmed. */
+  effect?: {
+    name: string;
+    detail: string;
+    on: "self" | "target";
+    extra?: string | null;
+    when?: "always" | "success" | "contest_win";
+  } | null;
   factors?: string[];
   extra_dice?: string | null;
   crit_note?: string | null;
